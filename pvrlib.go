@@ -13,13 +13,35 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/evanphx/json-patch"
 )
 
 type Pvr struct {
 	Dir             string
-	PristineJson    string
+	PristineJson    []byte
 	PristineJsonMap PvrMap
 	NewFiles        PvrIndex
+}
+
+type PvrStatus struct {
+	NewFiles     []string
+	RemovedFiles []string
+	ChangedFiles []string
+}
+
+func (p *PvrStatus) String() string {
+	str := ""
+	for _, f := range p.NewFiles {
+		str += "A " + f + "\n"
+	}
+	for _, f := range p.RemovedFiles {
+		str += "D " + f + "\n"
+	}
+	for _, f := range p.ChangedFiles {
+		str += "C " + f + "\n"
+	}
+	return str
 }
 
 type PvrMap map[string]interface{}
@@ -50,9 +72,9 @@ func NewPvr(dir string) (*Pvr, error) {
 	byteJson, err := ioutil.ReadFile(dir + "/.pvr/json")
 	// pristine json we keep as string as this will allow users load into
 	// convenient structs
-	pvr.PristineJson = string(byteJson)
+	pvr.PristineJson = byteJson
 
-	err = json.Unmarshal(byteJson, &pvr.PristineJsonMap)
+	err = json.Unmarshal(pvr.PristineJson, &pvr.PristineJsonMap)
 	if err != nil {
 		return nil, err
 	}
@@ -148,6 +170,7 @@ func (p *Pvr) AddFile(globs []string) error {
 func (p *Pvr) GetWorkingJson() ([]byte, error) {
 
 	workingJson := map[string]interface{}{}
+	workingJson["#spec"] = "pantavisor-multi-platform@1"
 
 	err := filepath.Walk(p.Dir, func(path string, info os.FileInfo, err error) error {
 		relPath := strings.TrimPrefix(path, p.Dir)
@@ -189,4 +212,51 @@ func (p *Pvr) GetWorkingJson() ([]byte, error) {
 		return []byte{}, err
 	}
 	return json.Marshal(workingJson)
+}
+
+func (p *Pvr) Diff() (*[]byte, error) {
+	workingJson, err := p.GetWorkingJson()
+	if err != nil {
+		return nil, err
+	}
+
+	diff, err := jsonpatch.CreateMergePatch(p.PristineJson, workingJson)
+	return &diff, nil
+}
+
+func (p *Pvr) Status() (*PvrStatus, error) {
+	rs := PvrStatus{}
+
+	// produce diff of working dir to prisitine
+	diff, err := p.Diff()
+	if err != nil {
+		return nil, err
+	}
+
+	// make json map out of diff
+	diffJson := map[string]interface{}{}
+	err = json.Unmarshal(*diff, &diffJson)
+	if err != nil {
+		return nil, err
+	}
+
+	// run
+	for file := range diffJson {
+		val := diffJson[file]
+
+		if val == nil {
+			rs.RemovedFiles = append(rs.RemovedFiles, file)
+			continue
+		}
+
+		// if we have this key in pristine, then file was changed
+		if _, ok := p.PristineJsonMap[file]; ok {
+			rs.ChangedFiles = append(rs.ChangedFiles, file)
+			continue
+		} else {
+			rs.NewFiles = append(rs.NewFiles, file)
+		}
+	}
+
+	return &rs, nil
 }
