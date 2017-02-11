@@ -27,7 +27,7 @@ func CommandAdd() cli.Command {
 				return err
 			}
 
-			err = pvr.AddFile(os.Args[2:])
+			err = pvr.AddFile(c.Args())
 			if err != nil {
 				return err
 			}
