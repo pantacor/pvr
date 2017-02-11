@@ -92,18 +92,6 @@ func NewPvr(dir string) (*Pvr, error) {
 	return pvr, nil
 }
 
-func FiletoSha(path string) (string, error) {
-	data, err := ioutil.ReadFile(path)
-	// problems reading file here, just dont add, output warning
-	if err != nil {
-		return "", err
-	}
-
-	buf := sha256.Sum256(data)
-	shaBal := hex.EncodeToString(buf[:])
-	return shaBal, nil
-}
-
 func (p *Pvr) addPvrFile(path string) error {
 	shaBal, err := FiletoSha(path)
 	if err != nil {
@@ -351,4 +339,16 @@ func FormatJson(data []byte) ([]byte, error) {
 	}
 
 	return prettyJSON.Bytes(), nil
+}
+
+func FiletoSha(path string) (string, error) {
+	data, err := ioutil.ReadFile(path)
+	// problems reading file here, just dont add, output warning
+	if err != nil {
+		return "", err
+	}
+
+	buf := sha256.Sum256(data)
+	shaBal := hex.EncodeToString(buf[:])
+	return shaBal, nil
 }
