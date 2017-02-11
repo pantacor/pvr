@@ -33,7 +33,8 @@ func CommandDiff() cli.Command {
 				return err
 			}
 
-			fmt.Println(string(*jsonDiff))
+			jsonDiffF, err := FormatJson(*jsonDiff)
+			fmt.Println(string(jsonDiffF))
 
 			return nil
 		},

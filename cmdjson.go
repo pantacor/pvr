@@ -33,7 +33,8 @@ func CommandJson() cli.Command {
 				return err
 			}
 
-			fmt.Println(string(result))
+			resultF, err := FormatJson(result)
+			fmt.Println(string(resultF))
 
 			return nil
 		},

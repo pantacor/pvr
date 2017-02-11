@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -340,4 +341,14 @@ func Copy(dst, src string) error {
 		return err
 	}
 	return cerr
+}
+
+func FormatJson(data []byte) ([]byte, error) {
+	var prettyJSON bytes.Buffer
+	error := json.Indent(&prettyJSON, data, "", "\t")
+	if error != nil {
+		return []byte(""), error
+	}
+
+	return prettyJSON.Bytes(), nil
 }
