@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -17,6 +19,8 @@ import (
 
 type Pvr struct {
 	Dir             string
+	Pvrdir          string
+	Objdir          string
 	PristineJson    []byte
 	PristineJsonMap PvrMap
 	NewFiles        PvrIndex
@@ -52,7 +56,9 @@ func (p Pvr) String() string {
 
 func NewPvr(dir string) (*Pvr, error) {
 	pvr := &Pvr{
-		Dir: dir,
+		Dir:    dir,
+		Pvrdir: path.Join(dir, ".pvr"),
+		Objdir: path.Join(dir, ".pvr", "objects"),
 	}
 	fileInfo, err := os.Stat(dir)
 	if err != nil {
@@ -262,27 +268,28 @@ func (p *Pvr) Commit(msg string) error {
 		if err != nil {
 			return err
 		}
-		err = Copy(p.Dir+".pvr/objects/"+sha, v)
+		err = Copy(path.Join(p.Objdir, sha), v)
 		if err != nil {
 			return err
 		}
 	}
 
+	// copy all objects with atomic commit
 	for _, v := range status.NewFiles {
 		sha, err := FiletoSha(v)
 		if err != nil {
 			return err
 		}
-		_, err = os.Stat(p.Dir + ".pvr/objects/" + sha)
+		_, err = os.Stat(path.Join(p.Objdir, sha))
 		// if not exists, then copy; otherwise continue
 		if err != nil {
 
-			err = Copy(p.Dir+".pvr/objects/"+sha+".new", v)
+			err = Copy(path.Join(p.Objdir, sha+".new"), v)
 			if err != nil {
 				return err
 			}
-			err = os.Rename(p.Dir+".pvr/objects/"+sha+".new",
-				p.Dir+".pvr/objects/"+sha)
+			err = os.Rename(path.Join(p.Objdir, sha+".new"),
+				path.Join(p.Objdir, sha))
 			if err != nil {
 				return err
 			}
@@ -292,7 +299,11 @@ func (p *Pvr) Commit(msg string) error {
 		}
 	}
 
-	ioutil.WriteFile(p.Dir+".pvr/commitmsg", []byte(msg), 0644)
+	ioutil.WriteFile(p.Dir+".pvr/commitmsg.new", []byte(msg), 0644)
+	err = os.Rename(p.Dir+".pvr/commitmsg.new", p.Dir+".pvr/commitmsg")
+	if err != nil {
+		return err
+	}
 
 	newJson, err := jsonpatch.MergePatch(p.PristineJson, *status.JsonDiff)
 	if err != nil {
@@ -307,4 +318,77 @@ func (p *Pvr) Commit(msg string) error {
 	err = os.Rename(p.Dir+".pvr/json.new", p.Dir+".pvr/json")
 
 	return err
+}
+
+func (p *Pvr) PushLocal(repoPath string) error {
+
+	_, err := os.Stat(repoPath)
+	if err != os.ErrNotExist {
+		err = os.MkdirAll(repoPath, 0755)
+	}
+	if err != nil {
+		return err
+	}
+
+	objectsPath := path.Join(repoPath, "objects")
+	info, err := os.Stat(objectsPath)
+	if err == nil && !info.IsDir() {
+		return errors.New("PVR repo directory in inusable state (objects is not a directory)")
+	} else if err != nil {
+		err = os.MkdirAll(objectsPath, 0755)
+	}
+	if err != nil {
+		return err
+	}
+
+	// push all objects
+	for k := range p.PristineJsonMap {
+		if strings.HasSuffix(k, ".json") {
+			continue
+		}
+		v := p.PristineJsonMap[k].(string)
+		Copy(path.Join(objectsPath, v)+".new", path.Join(p.Dir, ".pvr", v))
+
+	}
+	err = filepath.Walk(p.Objdir, func(filePath string, info os.FileInfo, err error) error {
+		// ignore directories
+		if info.IsDir() {
+			return nil
+		}
+		base := path.Base(filePath)
+		err = Copy(path.Join(objectsPath, base+".new"), filePath)
+		if err != nil {
+			return err
+		}
+
+		err = os.Rename(path.Join(objectsPath, base+".new"),
+			path.Join(objectsPath, base))
+		return err
+	})
+
+	err = Copy(path.Join(repoPath, "json.new"), path.Join(p.Pvrdir, "json"))
+	if err != nil {
+		return err
+	}
+
+	return os.Rename(path.Join(repoPath, "json.new"),
+		path.Join(repoPath, "json"))
+}
+
+func (p *Pvr) PushRemote(repoPath string) error {
+	return errors.New("Not Implemented")
+}
+
+func (p *Pvr) Push(uri string) error {
+	url, err := url.Parse(uri)
+
+	if err != nil {
+		return err
+	}
+
+	if url.Scheme == "" {
+		return p.PushLocal(uri)
+	}
+
+	return p.PushRemote(uri)
 }

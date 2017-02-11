@@ -49,6 +49,7 @@ func main() {
 		CommandDiff(),
 		CommandStatus(),
 		CommandCommit(),
+		CommandPush(),
 	}
 	app.Run(os.Args)
 }
