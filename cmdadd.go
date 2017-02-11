@@ -34,11 +34,5 @@ func CommandAdd() cli.Command {
 
 			return nil
 		},
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:  "revision, r",
-				Usage: "do not get latest state, but rather `REV`",
-			},
-		},
 	}
 }
