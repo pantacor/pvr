@@ -264,6 +264,9 @@ func (p *Pvr) Commit(msg string) error {
 	}
 
 	for _, v := range status.ChangedFiles {
+		if strings.HasSuffix(v, ".json") {
+			continue
+		}
 		sha, err := FiletoSha(v)
 		if err != nil {
 			return err
@@ -276,6 +279,9 @@ func (p *Pvr) Commit(msg string) error {
 
 	// copy all objects with atomic commit
 	for _, v := range status.NewFiles {
+		if strings.HasSuffix(v, ".json") {
+			continue
+		}
 		sha, err := FiletoSha(v)
 		if err != nil {
 			return err
