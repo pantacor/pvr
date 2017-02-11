@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ type PvrStatus struct {
 	NewFiles     []string
 	RemovedFiles []string
 	ChangedFiles []string
+	JsonDiff     *[]byte
 }
 
 func (p *PvrStatus) String() string {
@@ -232,10 +234,11 @@ func (p *Pvr) Status() (*PvrStatus, error) {
 	if err != nil {
 		return nil, err
 	}
+	rs.JsonDiff = diff
 
 	// make json map out of diff
 	diffJson := map[string]interface{}{}
-	err = json.Unmarshal(*diff, &diffJson)
+	err = json.Unmarshal(*rs.JsonDiff, &diffJson)
 	if err != nil {
 		return nil, err
 	}
@@ -259,4 +262,82 @@ func (p *Pvr) Status() (*PvrStatus, error) {
 	}
 
 	return &rs, nil
+}
+
+func (p *Pvr) Commit(msg string) error {
+	status, err := p.Status()
+
+	if err != nil {
+		return err
+	}
+
+	for _, v := range status.ChangedFiles {
+		sha, err := FiletoSha(v)
+		if err != nil {
+			return err
+		}
+		err = Copy(p.Dir+".pvr/objects/"+sha, v)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, v := range status.NewFiles {
+		sha, err := FiletoSha(v)
+		if err != nil {
+			return err
+		}
+		_, err = os.Stat(p.Dir + ".pvr/objects/" + sha)
+		// if not exists, then copy; otherwise continue
+		if err != nil {
+
+			err = Copy(p.Dir+".pvr/objects/"+sha+".new", v)
+			if err != nil {
+				return err
+			}
+			err = os.Rename(p.Dir+".pvr/objects/"+sha+".new",
+				p.Dir+".pvr/objects/"+sha)
+			if err != nil {
+				return err
+			}
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	ioutil.WriteFile(p.Dir+".pvr/commitmsg", []byte(msg), 0644)
+
+	newJson, err := jsonpatch.MergePatch(p.PristineJson, *status.JsonDiff)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(p.Dir+".pvr/json.new", newJson, 0644)
+
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(p.Dir+".pvr/json.new", p.Dir+".pvr/json")
+
+	return err
+}
+
+func Copy(dst, src string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	cerr := out.Close()
+	if err != nil {
+		return err
+	}
+	return cerr
 }
