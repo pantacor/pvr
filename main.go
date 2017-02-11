@@ -4,32 +4,21 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/urfave/cli"
 )
 
-var (
-	hubBaseUrl string
-)
-
 func main() {
-
-	hubBaseUrl = "https://pantahub.appspot.com/api"
 
 	app := cli.NewApp()
 	app.Name = "pvr"
-	app.Usage = "PantaVisor Remote"
+	app.Usage = "PantaVisor Repo"
 	app.Version = "0.0.1"
-	app.Action = func(c *cli.Context) error {
-		fmt.Println("boom! I say!")
-		return nil
-	}
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:  "access-token, a",
+			Name:  "auth, a",
 			Usage: "Use `ACCESS_TOKEN` for authorization with core services",
 		},
 		cli.StringFlag{
@@ -38,8 +27,21 @@ func main() {
 		},
 	}
 
-	if os.Getenv("PANTAHUB_BASE") != "" {
-		hubBaseUrl = os.Getenv("PANTAHUB_BASE")
+	app.Before = func(c *cli.Context) error {
+		app.Metadata["PANTAHUB_BASE"] = "https://pantahub.appspot.com/api"
+		if os.Getenv("PANTAHUB_BASE") != "" {
+			app.Metadata["PANTAHUB_BASE"] = os.Getenv("PANTAHUB_BASE")
+		}
+		if c.GlobalString("baseurl") != "" {
+			app.Metadata["PANTAHUB_BASE"] = c.GlobalString("baseurl")
+		}
+		if os.Getenv("PANTAHUB_AUTH") != "" {
+			app.Metadata["PANTAHUB_AUTH"] = os.Getenv("PANTAHUB_AUTH")
+		}
+		if c.GlobalString("auth") != "" {
+			app.Metadata["PANTAHUB_AUTH"] = c.GlobalString("auth")
+		}
+		return nil
 	}
 
 	app.Commands = []cli.Command{
