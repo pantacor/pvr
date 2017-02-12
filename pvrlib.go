@@ -24,6 +24,7 @@ type PvrStatus struct {
 	JsonDiff     *[]byte
 }
 
+// stringify of file status for "pvr status" list...
 func (p *PvrStatus) String() string {
 	str := ""
 	for _, f := range p.NewFiles {
@@ -264,6 +265,7 @@ func (p *Pvr) Commit(msg string) error {
 	}
 
 	for _, v := range status.ChangedFiles {
+		fmt.Println("Committing " + v)
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
@@ -279,6 +281,7 @@ func (p *Pvr) Commit(msg string) error {
 
 	// copy all objects with atomic commit
 	for _, v := range status.NewFiles {
+		fmt.Println("Adding " + v)
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
@@ -303,6 +306,10 @@ func (p *Pvr) Commit(msg string) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	for _, v := range status.RemovedFiles {
+		fmt.Println("Removing " + v)
 	}
 
 	ioutil.WriteFile(p.Dir+".pvr/commitmsg.new", []byte(msg), 0644)
