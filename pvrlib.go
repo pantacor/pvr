@@ -334,9 +334,10 @@ func (p *Pvr) Commit(msg string) error {
 		return err
 	}
 
-	err = os.Remove(path.Join(p.Pvrdir, "new"))
+	// ignore error here as new might not exist
+	os.Remove(path.Join(p.Pvrdir, "new"))
 
-	return err
+	return nil
 }
 
 func (p *Pvr) PushLocal(repoPath string) error {
@@ -441,9 +442,9 @@ func (p *Pvr) GetRepoLocal(repoPath string) error {
 			continue
 		}
 		getPath := path.Join(repoPath, "objects", v.(string))
-		objPathNew := path.Join(p.Pvrdir, v.(string)+".new")
-		objPath := path.Join(p.Pvrdir, v.(string))
-		fmt.Println("pulling objects file " + getPath)
+		objPathNew := path.Join(p.Objdir, v.(string)+".new")
+		objPath := path.Join(p.Objdir, v.(string))
+		fmt.Println("pulling objects file " + getPath + "-> " + objPathNew)
 		err := Copy(objPathNew, getPath)
 		if err != nil {
 			return err
