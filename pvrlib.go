@@ -330,6 +330,12 @@ func (p *Pvr) Commit(msg string) error {
 
 	err = os.Rename(p.Dir+".pvr/json.new", p.Dir+".pvr/json")
 
+	if err != nil {
+		return err
+	}
+
+	err = os.Remove(path.Join(p.Pvrdir, "new"))
+
 	return err
 }
 
