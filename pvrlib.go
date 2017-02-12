@@ -476,5 +476,62 @@ func (p *Pvr) GetRepo(repoPath string) error {
 	}
 
 	return p.GetRepoRemote(repoPath)
+}
 
+func (p *Pvr) Reset() error {
+	data, err := ioutil.ReadFile(path.Join(p.Pvrdir, "json"))
+
+	if err != nil {
+		return err
+	}
+	jsonMap := map[string]interface{}{}
+
+	err = json.Unmarshal(data, &jsonMap)
+
+	if err != nil {
+		return err
+	}
+
+	for k, v := range jsonMap {
+		if strings.HasSuffix(k, ".json") {
+			data, err := json.Marshal(v)
+			if err != nil {
+				return err
+			}
+			err = ioutil.WriteFile(path.Join(p.Dir, k+".new"), data, 0644)
+			if err != nil {
+				return err
+			}
+			err = os.Rename(path.Join(p.Dir, k+".new"),
+				path.Join(p.Dir, k))
+
+		} else if strings.HasPrefix(k, "#spec") {
+			continue
+		} else {
+			objectP := path.Join(p.Objdir, v.(string))
+			targetP := path.Join(p.Dir, k)
+			targetD := path.Dir(targetP)
+			targetDInfo, err := os.Stat(targetD)
+			if err != nil {
+				err = os.MkdirAll(targetD, 0755)
+			} else if !targetDInfo.IsDir() {
+				return errors.New("Not a directory " + targetD)
+			}
+			if err != nil {
+				return err
+			}
+
+			err = Copy(targetP+".new", objectP)
+			if err != nil {
+				return err
+			}
+			err = os.Rename(targetP+".new", targetP)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	os.Remove(path.Join(p.Pvrdir, "new"))
+	return nil
 }
