@@ -52,6 +52,7 @@ func main() {
 		CommandStatus(),
 		CommandCommit(),
 		CommandPush(),
+		CommandGet(),
 	}
 	app.Run(os.Args)
 }

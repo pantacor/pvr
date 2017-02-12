@@ -398,3 +398,70 @@ func (p *Pvr) Push(uri string) error {
 
 	return p.PushRemote(uri)
 }
+
+func (p *Pvr) GetRepoLocal(repoPath string) error {
+
+	// first copy new json, but only rename at the very end after all else succeed
+	jsonNew := path.Join(p.Pvrdir, "json.new")
+	err := Copy(jsonNew, path.Join(repoPath, "json"))
+	rs := map[string]interface{}{}
+
+	if err != nil {
+		return err
+	}
+
+	data, err := ioutil.ReadFile(jsonNew)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(data, &rs)
+	if err != nil {
+		return err
+	}
+
+	for k, v := range rs {
+		if strings.HasSuffix(k, ".json") {
+			continue
+		}
+		if strings.HasPrefix(k, "#spec") {
+			continue
+		}
+		getPath := path.Join(repoPath, "objects", v.(string))
+		objPathNew := path.Join(p.Pvrdir, v.(string)+".new")
+		objPath := path.Join(p.Pvrdir, v.(string))
+		fmt.Println("pulling objects file " + getPath)
+		err := Copy(objPathNew, getPath)
+		if err != nil {
+			return err
+		}
+		err = os.Rename(objPathNew, objPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	// all succeeded, atomically commiting the json
+	err = os.Rename(jsonNew, strings.TrimSuffix(jsonNew, ".new"))
+
+	return err
+}
+
+func (p *Pvr) GetRepoRemote(repoPath string) error {
+	return errors.New("Not Implemented.")
+}
+
+func (p *Pvr) GetRepo(repoPath string) error {
+	url, err := url.Parse(repoPath)
+
+	if err != nil {
+		return err
+	}
+
+	if url.Scheme == "" {
+		return p.GetRepoLocal(repoPath)
+	}
+
+	return p.GetRepoRemote(repoPath)
+
+}
