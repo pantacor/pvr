@@ -17,15 +17,6 @@ import (
 	"github.com/evanphx/json-patch"
 )
 
-type Pvr struct {
-	Dir             string
-	Pvrdir          string
-	Objdir          string
-	PristineJson    []byte
-	PristineJsonMap PvrMap
-	NewFiles        PvrIndex
-}
-
 type PvrStatus struct {
 	NewFiles     []string
 	RemovedFiles []string
@@ -50,7 +41,16 @@ func (p *PvrStatus) String() string {
 type PvrMap map[string]interface{}
 type PvrIndex map[string]string
 
-func (p Pvr) String() string {
+type Pvr struct {
+	Dir             string
+	Pvrdir          string
+	Objdir          string
+	PristineJson    []byte
+	PristineJsonMap PvrMap
+	NewFiles        PvrIndex
+}
+
+func (p *Pvr) String() string {
 	return "PVR: " + p.Dir
 }
 
