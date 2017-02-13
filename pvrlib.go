@@ -82,7 +82,7 @@ func NewPvr(dir string) (*Pvr, error) {
 
 	err = json.Unmarshal(pvr.PristineJson, &pvr.PristineJsonMap)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(dir+"/.pvr/json", pvr.Dir) + "): " + err.Error())
 	}
 
 	// new files is a json file we will parse happily
@@ -167,8 +167,8 @@ func (p *Pvr) GetWorkingJson() ([]byte, error) {
 	workingJson := map[string]interface{}{}
 	workingJson["#spec"] = "pantavisor-multi-platform@1"
 
-	err := filepath.Walk(p.Dir, func(path string, info os.FileInfo, err error) error {
-		relPath := strings.TrimPrefix(path, p.Dir)
+	err := filepath.Walk(p.Dir, func(filePath string, info os.FileInfo, err error) error {
+		relPath := strings.TrimPrefix(filePath, p.Dir)
 		// ignore .pvr directory
 		if _, ok := p.PristineJsonMap[relPath]; !ok {
 			if _, ok1 := p.NewFiles[relPath]; !ok1 {
@@ -179,21 +179,21 @@ func (p *Pvr) GetWorkingJson() ([]byte, error) {
 			return nil
 		}
 		// inline json
-		if strings.HasSuffix(filepath.Base(path), ".json") {
+		if strings.HasSuffix(filepath.Base(filePath), ".json") {
 			jsonFile := map[string]interface{}{}
 
-			data, err := ioutil.ReadFile(path)
+			data, err := ioutil.ReadFile(filePath)
 			if err != nil {
 				return err
 			}
 
 			err = json.Unmarshal(data, &jsonFile)
 			if err != nil {
-				return err
+				return errors.New("JSON Unmarshal (" + strings.TrimPrefix(filePath, p.Dir) + "): " + err.Error())
 			}
 			workingJson[relPath] = jsonFile
 		} else {
-			sha, err := FiletoSha(path)
+			sha, err := FiletoSha(filePath)
 			if err != nil {
 				return err
 			}
@@ -431,7 +431,7 @@ func (p *Pvr) GetRepoLocal(repoPath string) error {
 
 	err = json.Unmarshal(data, &rs)
 	if err != nil {
-		return err
+		return errors.New("JSON Unmarshal (" + strings.TrimPrefix(jsonNew, p.Dir) + "): " + err.Error())
 	}
 
 	for k, v := range rs {
@@ -490,7 +490,7 @@ func (p *Pvr) Reset() error {
 	err = json.Unmarshal(data, &jsonMap)
 
 	if err != nil {
-		return err
+		return errors.New("JSON Unmarshal (" + strings.TrimPrefix(path.Join(p.Pvrdir, "json"), p.Dir) + "): " + err.Error())
 	}
 
 	for k, v := range jsonMap {
