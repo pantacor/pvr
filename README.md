@@ -6,13 +6,11 @@
 
 # Features
 
- * repository format with single json file and object store
- * create file tree from repo
- * commit file tree to repo
- * json file is a path to object map; json content inlined
- * json diffs describe all changes to file tree
- * json diffs can be patched in as incremental updates
- * all repo operations are atomic and can be recovered from
+ * simple repository in json format with object store
+ * checkout and commit any working directory to repository
+ * look at working tree diffs with `status` and `diff` commands
+ * get, push and apply patches as incremental updates
+ * all repo operations are atomic and can be recovered
  * object store can be local or in cloud/CDN
 
 # Install
@@ -149,14 +147,13 @@ cat json
 }
 ```
 
-Cloud Restendpoints are expected to have an objects endpoint in parallel that will
-resolve the right GET and PUT Urls for a requested resource.
+Cloud Restendpoints are expected to have an objects endpoint in parallel that will resolve the right GET and PUT Urls for a requested resource.
 
-The client will request:
+The client will request objects like:
 
- http GET http://someurl.tld/path/to/json/parent/objects/:id
+```http GET http://someurl.tld/path/to/json/parent/objects/:id```
 
-and 
+The server is supposed to either deliver the object or redirect to the right location.
 
 # Commands
 
@@ -294,20 +291,18 @@ DONE [=============================================] 100%
 
 # References
 
-## Example system pvr json
+## Example pvr json
 
 ```
-"system.json":
+"pvr":
 {
 	"#spec": "pantavisor-multi-platform@1",
 	"myvideo.blob": "sha:xxxxxxxxxxxxxxxxxxxxxxxxxxx",
 	"config.json" {
-	  chipalo: "run quick and better"
+	  "key": "value"
 	},
-	"conf": {
-		"lxc-owrt-mips.conf": "sha:tttttttttttttttttttttt",
-		"lxc-ble-gw1.conf": "sha:rrrrrrrrrrrrrrrrrrrr"
-	},
+	"conf/lxc-owrt-mips.conf": "sha:tttttttttttttttttttttt",
+	"conf/lxc-ble-gw1.conf": "sha:rrrrrrrrrrrrrrrrrrrr",
 	"systemc.json" {
 		"spec": "pantavisor-systemc@1",
 		"linux": "/kernel.img",
@@ -334,138 +329,5 @@ DONE [=============================================] 100%
 		"lxc-shares": [],
 		"lxc-exec": "/init"
 	},
-}
-
-
-/
-/storage
-/storage/trails/
-/storage/trails/0.json
-/storage/trails/0/chipalo.json
-/storage/trails/0/systemc.json
-/storage/trails/0/lxc-azure-ble-gw1.json
-/storage/trails/0/kernel.img
-/storage/trails/0/conf
-/storage/trails/0/conf/lxc-ble-gw1.conf
-/storage/trails/0/conf/lxc-owrt-mips.conf
-/storage/objects/...
-```
-
-## Example trailsd config v2
-
-```
-spec: "com.pantacor.trails.state@0.2"
-
-"state":
-{
-    "rev": 0,
-    "kernel": "kernel.img",
-    "initrd": [
-      "0base.cpio.gz",
-      "asacrd.cpio.gz",
-    ],
-    "files": [
-    {
-      "key": "0base.cpio.gz",
-      "value": {
-        "file": "5895c285a5717a4d2000001b"
-      }
-    },
-    {
-      "key": "kernel.img",
-      "value": {
-        "file": "2670a7bca5717a1c2900000a"
-      }
-    },
-    {
-      "key": "kernel-dbg.img",
-      "value": {
-        "file": "2670a7bca5717a1c2900000a"
-      }
-    },
-    {
-      "key": "linaro-minimal-lxc.conf",
-      "value": {
-        "file": "2670a7bca5717a1c2900000a"
-      }
-    },
-    {
-      "key": "azuredemo-blegateway-lxc.conf",
-      "value": {
-        "file": "2670a7bca5717a1c2900000a"
-      }
-    },
-  ],
-  "volumes": [
-	{
-      "key": "blegateway-config.squashfs",
-      "value": {
-        "type": "ro",
-        "file": "5895c285a5717a4d2000001b"
-      }
-    },
-    {
-      "key": "blegateway-armv7.squashfs",
-      "value": {
-        "type": "ro",
-        "file": "5895dbd8a5717a02b0000001"
-      }
-    },
-    {
-      "key": "linaro-armv7.squashfs",
-      "value": {
-        "type": "ro",
-        "file": "58935de5a5717a798a000018"
-      }
-    },
-    {
-      "key": "writable-ble.ext4",
-      "value": {
-        "type": "rw",
-        "file": "5873c7bca5717a1c2900000e"
-      }
-    },
-    {
-      "key": "writable-linaro.ext4",
-      "value": {
-        "type": "rw",
-        "file": "5873c7bca5717a1c2900000e"
-      }
-    },
-    {
-      "key": "linaro-minimal-lxc.conf",
-      "value": {
-        "type": "ro",
-        "file": "5923a7bca5717a1c2900000e"
-      }
-    },
-    {
-      "key": "azuredemo-blegateway-lxc.conf",
-      "value": {
-        "type": "ro",
-        "file": "5873c7bca5717a1c2900000e"
-      }
-    },
-  ],
-  "platforms": {
-    "linaro-minimal": {
-      "type": "lxc",
-      "parent": null,
-      "config": "linaro-minimal-lxc.conf",
-      "exec": "/sbin/init",
-      "share": [
-        "NETWORK",
-        "UTS",
-        "IPC",
-      ]
-    },
-    "azuredemo-blegateway": {
-      "type": "lxc",
-      "parent": linaro-minimal,
-      "config": "azuredemo-blegateway-lxc.conf",
-      "exec": "/sbin/init",
-      "share": []
-    }
-  },
 }
 ```
