@@ -39,18 +39,83 @@ To leverage the features of json diff/merge etc. all json files found in a direc
 get inlined while all other objects will get a sha reference entry with the files themselves
 getting stored in a flat objects directory.
 
-# pvr basics
+# Basics
 
-You can checkout a pvr directory to your working directory
-
-```
-# by default it will expect a pvr repo at .pvr/ in cwd
-pvr checkout
-
-# alternatively you can also just refer to a directory elsewhere
-pvr checkout $HOME/my/pvrrepo/
+To start a pvr from scratch you use the pvr init command which sets you up.
 
 ```
+example1$ pvr init
+pvc directory ready for use.
+```
+
+However, more likely is that you want to consume an existing pvr made by you
+or someone else and maybe change things against it:
+
+```
+pvr clone /path/to/pvr/repo example2
+ -> mkdir example2
+ -> pvr init
+ -> pvr get /path/to/pvr/repo
+ -> pvr checkout
+```
+
+While working on changes to your local checkout, you can use `status` and `diff`
+to observe your current changes:
+
+```
+example2$ ../pvr status
+A newfile.txt
+D deleted.txt
+C some.json
+C working.txt
+```
+
+This means that `newfile.txt` is new, working.txt and some.json changed and
+`deleted.txt` got removed from your working directory.
+
+You can introspect the changes through the `diff` command:
+
+```
+example2$ ../pvr diff
+{
+	"deleted.txt": null,
+	"newfile.txt": "dc460da4ad72c482231e28e688e01f2778a88ce31a08826899d54ef7183998b5",
+	"some.json": {
+		"values": "2"
+	},
+	"working.txt": "9c7ab50fa91f3d78744043af5f88dce6bacd336f47733ff6a38090da3ff1a5de"
+}
+```
+
+Being happy with what you see, you can checkpoint your working state using the
+`commit` command:
+
+```
+example2$ ../pvr commit
+Committing some.json
+Committing working.txt
+Adding newfile.txt
+Removing deleted.txt
+```
+This will atomically update the json file in your repo after ensuring all the
+right objects have been synched into the objects store of that pvr repo.
+
+After committing your changes you might want to store your current repository
+state for reuse or archiving purpose. You can do so using the `push` command:
+
+```
+example2$ pvr push /tmp/myrepo
+```
+
+You can also push your repository to a pvr compliant REST backend.
+
+```
+example2: pvr push https://pantahub.com/pvr/v1/my-repo1
+```
+
+You can later clone that very repo to use it as a starting point or get 
+its content to update another repo.
+
 
 # Internals
 
@@ -83,6 +148,15 @@ cat json
   }
 }
 ```
+
+Cloud Restendpoints are expected to have an objects endpoint in parallel that will
+resolve the right GET and PUT Urls for a requested resource.
+
+The client will request:
+
+ http GET http://someurl.tld/path/to/json/parent/objects/:id
+
+and 
 
 # Commands
 
