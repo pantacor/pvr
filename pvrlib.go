@@ -43,6 +43,7 @@ type PvrMap map[string]interface{}
 type PvrIndex map[string]string
 
 type Pvr struct {
+	Initialized     bool
 	Dir             string
 	Pvrdir          string
 	Objdir          string
@@ -57,36 +58,31 @@ func (p *Pvr) String() string {
 
 func NewPvr(dir string) (*Pvr, error) {
 	pvr := &Pvr{
-		Dir:    dir,
-		Pvrdir: path.Join(dir, ".pvr"),
-		Objdir: path.Join(dir, ".pvr", "objects"),
+		Dir:         path.Join(dir),
+		Pvrdir:      path.Join(dir, ".pvr"),
+		Objdir:      path.Join(dir, ".pvr", "objects"),
+		Initialized: false,
 	}
-	fileInfo, err := os.Stat(dir)
+	fileInfo, err := os.Stat(pvr.Dir)
 	if err != nil {
 		return nil, err
 	}
 	if !fileInfo.IsDir() {
 		return nil, errors.New("pvr path is not a directory: " + dir)
 	}
-	pvr.Dir += "/"
 
-	// trim all double /
-	tmp := strings.TrimSuffix(pvr.Dir, "//")
-	for ; tmp != pvr.Dir; tmp = strings.TrimSuffix(pvr.Dir, "//") {
-	}
-
-	byteJson, err := ioutil.ReadFile(dir + "/.pvr/json")
+	byteJson, err := ioutil.ReadFile(path.Join(pvr.Pvrdir, "json"))
 	// pristine json we keep as string as this will allow users load into
 	// convenient structs
 	pvr.PristineJson = byteJson
 
 	err = json.Unmarshal(pvr.PristineJson, &pvr.PristineJsonMap)
 	if err != nil {
-		return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(dir+"/.pvr/json", pvr.Dir) + "): " + err.Error())
+		return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(path.Join(pvr.Pvrdir, "json"), pvr.Dir) + "): " + err.Error())
 	}
 
 	// new files is a json file we will parse happily
-	bytesNew, err := ioutil.ReadFile(dir + "/.pvr/new")
+	bytesNew, err := ioutil.ReadFile(path.Join(pvr.Pvrdir, "new"))
 	if err == nil {
 		err = json.Unmarshal(bytesNew, &pvr.NewFiles)
 	} else {
@@ -108,31 +104,31 @@ func (p *Pvr) addPvrFile(path string) error {
 // XXX: make this git style
 func (p *Pvr) AddFile(globs []string) error {
 
-	err := filepath.Walk(p.Dir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(p.Dir, func(walkPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if strings.HasPrefix(path, p.Dir+".pvr") {
+		if strings.HasPrefix(walkPath, p.Pvrdir) {
 			return nil
 		}
 
 		// no globs specified: add all
 		if len(globs) == 0 || (len(globs) == 1 && globs[0] == ".") {
-			p.addPvrFile(path)
+			p.addPvrFile(walkPath)
 		}
 		for _, glob := range globs {
 			absglob := glob
 			if absglob[0] != '/' {
 				absglob = p.Dir + glob
 			}
-			matched, err := filepath.Match(absglob, path)
+			matched, err := filepath.Match(absglob, walkPath)
 			if err != nil {
-				fmt.Println("WARNING: cannot read file (" + err.Error() + "):" + path)
+				fmt.Println("WARNING: cannot read file (" + err.Error() + "):" + walkPath)
 				return err
 			}
 			if matched {
-				err = p.addPvrFile(path)
+				err = p.addPvrFile(walkPath)
 				if err != nil {
 					return nil
 				}
@@ -150,11 +146,11 @@ func (p *Pvr) AddFile(globs []string) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(p.Dir+"/.pvr/new.XXX", jsonData, 0644)
+	err = ioutil.WriteFile(path.Join(p.Pvrdir, "new.XXX"), jsonData, 0644)
 	if err != nil {
 		return err
 	}
-	err = os.Rename(p.Dir+"/.pvr/new.XXX", p.Dir+"/.pvr/new")
+	err = os.Rename(path.Join(p.Pvrdir, "new.XXX"), path.Join(p.Pvrdir, "new"))
 	if err != nil {
 		return err
 	}
@@ -312,8 +308,8 @@ func (p *Pvr) Commit(msg string) error {
 		fmt.Println("Removing " + v)
 	}
 
-	ioutil.WriteFile(p.Dir+".pvr/commitmsg.new", []byte(msg), 0644)
-	err = os.Rename(p.Dir+".pvr/commitmsg.new", p.Dir+".pvr/commitmsg")
+	ioutil.WriteFile(path.Join(p.Pvrdir, "commitmsg.new"), []byte(msg), 0644)
+	err = os.Rename(path.Join(p.Pvrdir, "commitmsg.new"), path.Join(p.Pvrdir, "commitmsg"))
 	if err != nil {
 		return err
 	}
@@ -322,13 +318,13 @@ func (p *Pvr) Commit(msg string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(p.Dir+".pvr/json.new", newJson, 0644)
+	err = ioutil.WriteFile(path.Join(p.Pvrdir, ".pvr/json.new"), newJson, 0644)
 
 	if err != nil {
 		return err
 	}
 
-	err = os.Rename(p.Dir+".pvr/json.new", p.Dir+".pvr/json")
+	err = os.Rename(path.Join(p.Pvrdir, "json.new"), path.Join(p.Pvrdir, "json"))
 
 	if err != nil {
 		return err
