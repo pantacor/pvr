@@ -19,7 +19,7 @@ var SYSTEMC_TEMPLATE string = `
 			""	
 		],
 		"platforms:": [],
-		"volumes": {}
+		"volumes": []
 	}
 }`
 
@@ -49,7 +49,7 @@ func CommandInit() cli.Command {
 
 			jsonFile.Write([]byte(SYSTEMC_TEMPLATE))
 
-			fmt.Println("pvc directory ready for use.")
+			fmt.Println("pvr directory ready for use.")
 			return err
 		},
 	}
