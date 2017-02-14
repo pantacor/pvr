@@ -10,13 +10,13 @@ import (
 	"github.com/urfave/cli"
 )
 
-func CommandPush() cli.Command {
+func CommandPut() cli.Command {
 	return cli.Command{
-		Name:        "push",
+		Name:        "put",
 		Aliases:     []string{"p"},
-		ArgsUsage:   "[remote-location]",
-		Usage:       "push to a remote location.",
-		Description: "Pointed to local pvr repository or pvr REST endpoint",
+		ArgsUsage:   "[target-repo]",
+		Usage:       "put local repository to a target respository.",
+		Description: "Can put to local and REST repos",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -32,7 +32,7 @@ func CommandPush() cli.Command {
 				return err
 			}
 
-			err = pvr.Push(c.Args()[0])
+			err = pvr.Put(c.Args()[0])
 			if err != nil {
 				return err
 			}
