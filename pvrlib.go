@@ -755,7 +755,101 @@ func (p *Pvr) GetRepoLocal(repoPath string) error {
 	return err
 }
 
+func (p *Pvr) getObjects(pvrRemote PvrRemote) error {
+
+	// push all objects
+	response, err := resty.R().
+		SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
+		Get(pvrRemote.JsonGetUrl)
+
+	if err != nil {
+		return err
+	}
+
+	jsonNew := response.Body()
+	jsonMap := map[string]interface{}{}
+	err = json.Unmarshal(response.Body(), &jsonMap)
+
+	for k := range jsonMap {
+		if strings.HasSuffix(k, ".json") {
+			continue
+		}
+		if strings.HasPrefix(k, "#spec") {
+			continue
+		}
+		v := jsonMap[k].(string)
+
+		response, err := resty.R().
+			SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
+			Get(pvrRemote.ObjectsEndpointUrl + "/" + v)
+
+		if err != nil {
+			return err
+		}
+		if response.StatusCode() != 200 {
+			return errors.New("REST call failed. " +
+				strconv.Itoa(response.StatusCode()) + "  " + response.Status())
+		}
+
+		remoteObject := ObjectWithAccess{}
+		err = json.Unmarshal(response.Body(), &remoteObject)
+
+		if err != nil {
+			return err
+		}
+
+		fmt.Print("Downloading object" + remoteObject.SignedGetUrl)
+
+		if err != nil {
+			return err
+		}
+
+		response, err = resty.R().SetContentLength(true).Get(remoteObject.SignedGetUrl)
+
+		if err != nil {
+			return err
+		}
+		if response.StatusCode() != 200 {
+			return errors.New("REST call failed. " +
+				strconv.Itoa(response.StatusCode()) + "  " + response.Status())
+		}
+
+		ioutil.WriteFile(path.Join(p.Objdir, v), response.Body(), 644)
+		fmt.Println("Downloaded Object " + v)
+	}
+	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), jsonNew, 0644)
+
+	if err != nil {
+		return err
+	}
+
+	return os.Rename(path.Join(p.Pvrdir, "json.new"), path.Join(p.Pvrdir, "json"))
+}
+
 func (p *Pvr) GetRepoRemote(repoPath string) error {
+
+	url, err := url.Parse(repoPath)
+
+	if err != nil {
+		return err
+	}
+
+	if url.Scheme == "" {
+		return errors.New("Post must be a remote REST endpoint, not: " + url.String())
+	}
+
+	remotePvr, err := p.initializeRemote(repoPath)
+
+	if err != nil {
+		return err
+	}
+
+	err = p.getObjects(remotePvr)
+
+	if err != nil {
+		return err
+	}
+
 	return errors.New("Not Implemented.")
 }
 
