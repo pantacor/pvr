@@ -304,15 +304,14 @@ DONE [=============================================] 100%
 	"conf/lxc-owrt-mips.conf": "sha:tttttttttttttttttttttt",
 	"conf/lxc-ble-gw1.conf": "sha:rrrrrrrrrrrrrrrrrrrr",
 	"systemc.json" {
-		"spec": "pantavisor-systemc@1",
 		"linux": "/kernel.img",
 		"initrd": [
 			"/0base.cpio.gz",
 			"/asacrd.cpio.gz",
 		],
 		"platforms:": ["lxc-owrt-mips.json"]
-		"volumes": []
-	},
+		"volumes": [],
+		},
 	"lxc-owrt-mips.json":
 	{
 		"spec": "pantavisor-lxc-runner@1",
