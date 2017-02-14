@@ -12,7 +12,7 @@ import (
 func CommandCommit() cli.Command {
 	return cli.Command{
 		Name:      "commit",
-		Aliases:   []string{"c"},
+		Aliases:   []string{"ci"},
 		ArgsUsage: "",
 		Usage:     "commit status changes",
 		Action: func(c *cli.Context) error {
@@ -21,7 +21,7 @@ func CommandCommit() cli.Command {
 				return err
 			}
 
-			pvr, err := NewPvr(wd)
+			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
 				return err
 			}

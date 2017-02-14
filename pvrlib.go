@@ -12,9 +12,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/evanphx/json-patch"
+	"github.com/go-resty/resty"
+	"github.com/urfave/cli"
 )
 
 type PvrStatus struct {
@@ -50,25 +53,38 @@ type Pvr struct {
 	PristineJson    []byte
 	PristineJsonMap PvrMap
 	NewFiles        PvrIndex
+	App             *cli.App
 }
 
 func (p *Pvr) String() string {
 	return "PVR: " + p.Dir
 }
 
-func NewPvr(dir string) (*Pvr, error) {
-	pvr := &Pvr{
-		Dir:         path.Join(dir),
+func NewPvr(app *cli.App, dir string) (*Pvr, error) {
+	pvr := Pvr{
+		Dir:         dir + "/",
 		Pvrdir:      path.Join(dir, ".pvr"),
 		Objdir:      path.Join(dir, ".pvr", "objects"),
 		Initialized: false,
+		App:         app,
 	}
+
 	fileInfo, err := os.Stat(pvr.Dir)
 	if err != nil {
 		return nil, err
 	}
 	if !fileInfo.IsDir() {
 		return nil, errors.New("pvr path is not a directory: " + dir)
+	}
+
+	fileInfo, err = os.Stat(path.Join(pvr.Pvrdir, "json"))
+
+	if err == nil && fileInfo.IsDir() {
+		return nil, errors.New("Repo is in bad state. .pvr/json is a directory")
+	}
+	if err != nil {
+		pvr.Initialized = false
+		return &pvr, nil
 	}
 
 	byteJson, err := ioutil.ReadFile(path.Join(pvr.Pvrdir, "json"))
@@ -87,8 +103,14 @@ func NewPvr(dir string) (*Pvr, error) {
 		err = json.Unmarshal(bytesNew, &pvr.NewFiles)
 	} else {
 		pvr.NewFiles = map[string]string{}
+		err = nil
 	}
-	return pvr, nil
+
+	if err != nil {
+		return &pvr, errors.New("Repo in bad state. JSON Unmarshal (" + strings.TrimPrefix(path.Join(pvr.Pvrdir, "json"), pvr.Dir) + ") Not possible. Make a copy of the repository for forensics, file a bug and maybe delete that file manually to try to recover: " + err.Error())
+	}
+
+	return &pvr, nil
 }
 
 func (p *Pvr) addPvrFile(path string) error {
@@ -205,6 +227,44 @@ func (p *Pvr) GetWorkingJson() ([]byte, error) {
 	return json.Marshal(workingJson)
 }
 
+func (p *Pvr) Init() error {
+
+	return p.InitCustom("")
+}
+
+func (p *Pvr) InitCustom(customInitJson string) error {
+
+	var EMPTY_PVR_JSON string = `
+{
+	"#spec": "pantavisor-multi-platform@1"
+}`
+
+	_, err := os.Stat(p.Pvrdir)
+
+	if err == nil {
+		return errors.New("pvr init: .pvr directory/file found (" + p.Pvrdir + "). Cannot initialize an existing repository.")
+	}
+
+	err = os.Mkdir(p.Pvrdir, 0755)
+	if err != nil {
+		return err
+	}
+	err = os.Mkdir(p.Objdir, 0755)
+
+	jsonFile, err := os.OpenFile(path.Join(p.Pvrdir, "json"), os.O_CREATE|os.O_WRONLY, 0644)
+
+	if err != nil {
+		return err
+	}
+
+	if customInitJson != "" {
+		_, err = jsonFile.Write([]byte(customInitJson))
+	} else {
+		_, err = jsonFile.Write([]byte(EMPTY_PVR_JSON))
+	}
+	return err
+}
+
 func (p *Pvr) Diff() (*[]byte, error) {
 	workingJson, err := p.GetWorkingJson()
 	if err != nil {
@@ -315,10 +375,11 @@ func (p *Pvr) Commit(msg string) error {
 	}
 
 	newJson, err := jsonpatch.MergePatch(p.PristineJson, *status.JsonDiff)
+
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(path.Join(p.Pvrdir, ".pvr/json.new"), newJson, 0644)
+	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), newJson, 0644)
 
 	if err != nil {
 		return err
@@ -336,7 +397,7 @@ func (p *Pvr) Commit(msg string) error {
 	return nil
 }
 
-func (p *Pvr) PushLocal(repoPath string) error {
+func (p *Pvr) PutLocal(repoPath string) error {
 
 	_, err := os.Stat(repoPath)
 	if err != os.ErrNotExist {
@@ -391,11 +452,184 @@ func (p *Pvr) PushLocal(repoPath string) error {
 		path.Join(repoPath, "json"))
 }
 
-func (p *Pvr) PushRemote(repoPath string) error {
-	return errors.New("Not Implemented")
+type PvrInfo struct {
+	jsonUrl string `json:json-url`
+	objUrl  string `json:object-url`
 }
 
-func (p *Pvr) Push(uri string) error {
+type Object struct {
+	Id         string `json:"id" bson:"id"`
+	StorageId  string `json:"storage-id" bson:"_id"`
+	Owner      string `json:"owner"`
+	ObjectName string `json:"objectname"`
+	Sha        string `json:"sha256sum"`
+	Size       string `json:"size"`
+	MimeType   string `json:"mime-type"`
+}
+
+type ObjectWithAccess struct {
+	Object       `bson:",inline"`
+	SignedPutUrl string `json:"signed-puturl"`
+	SignedGetUrl string `json:"signed-geturl"`
+	Now          string `json:"now"`
+	ExpireTime   string `json:"expire-time"`
+}
+
+type PvrRemote struct {
+	RemoteSpec         string   `json:"pvr-spec"`         // the pvr remote protocol spec available
+	JsonGetUrl         string   `json:"json-get-url"`     // where to pvr post stuff
+	JsonKey            string   `json:"json-key"`         // what key is to use in post json [default: json]
+	ObjectsEndpointUrl string   `json:"objects-endpoint"` // where to store/retrieve objects
+	PostUrl            string   `json:"post-url"`         // where to post/announce new revisions
+	PostFields         []string `json:"post-fields"`      // what fields require input
+	PostFieldsOpt      []string `json:"post-fields-opt"`  // what optional fields are available [default: <empty>]
+}
+
+func (p *Pvr) initializeRemote(repoPath string) (PvrRemote, error) {
+	res := PvrRemote{}
+	repoUrl, err := url.Parse(repoPath)
+
+	if err != nil {
+		return res, err
+	}
+
+	pvrRemoteUrl := repoUrl
+	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
+
+	response, err := resty.R().
+		SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
+		Get(pvrRemoteUrl.String())
+
+	if err != nil {
+		return res, err
+	}
+
+	if response.StatusCode() != 200 {
+		return res, errors.New("REST call failed. " +
+			strconv.Itoa(response.StatusCode()) + "  " + response.Status())
+	}
+
+	fmt.Println("qPvr Remote Info: " + string(response.Body()))
+	err = json.Unmarshal(response.Body(), &res)
+
+	if err != nil {
+		return res, err
+	}
+
+	return res, nil
+
+}
+
+func (p *Pvr) postObjects(pvrRemote PvrRemote) error {
+	// push all objects
+	for k := range p.PristineJsonMap {
+		if strings.HasSuffix(k, ".json") {
+			continue
+		}
+		if strings.HasPrefix(k, "#spec") {
+			continue
+		}
+		v := p.PristineJsonMap[k].(string)
+
+		info, err := os.Stat(path.Join(p.Objdir, v))
+		if err != nil {
+			return err
+		}
+		sizeString := fmt.Sprintf("%d", info.Size)
+
+		remoteObject := ObjectWithAccess{}
+		remoteObject.Object.Size = sizeString
+		remoteObject.MimeType = "application/octet-stream"
+		remoteObject.Sha = v
+		remoteObject.ObjectName = k
+
+		response, err := resty.R().SetBody(remoteObject).
+			SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
+			Post(pvrRemote.ObjectsEndpointUrl + "/")
+
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(response.Body(), &remoteObject)
+		if err != nil {
+			return err
+		}
+
+		fmt.Print("Uploading object to " + remoteObject.SignedPutUrl)
+
+		if err != nil {
+			return err
+		}
+
+		fileName := path.Join(p.Objdir, v)
+		fileBytes, _ := ioutil.ReadFile(fileName)
+		response, err = resty.R().SetBody(fileBytes).SetContentLength(true).Put(remoteObject.SignedPutUrl)
+
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("Upload done.")
+
+		if 200 != response.StatusCode() {
+			return errors.New("REST call failed. " +
+				strconv.Itoa(response.StatusCode()) + "  " + response.Status())
+
+		}
+	}
+	return nil
+}
+
+func (p *Pvr) PutRemote(repoPath string) error {
+
+	pvrRemote, err := p.initializeRemote(repoPath)
+
+	if err != nil {
+		return err
+	}
+
+	err = p.postObjects(pvrRemote)
+
+	if err != nil {
+		return err
+	}
+
+	data, err := ioutil.ReadFile(path.Join(p.Pvrdir, "json"))
+
+	if err != nil {
+		return err
+	}
+
+	body := map[string]interface{}{}
+	json.Unmarshal(data, &body)
+
+	response, err := resty.R().SetBody(body).
+		SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
+		Put(pvrRemote.JsonGetUrl)
+
+	if err != nil {
+		return err
+	}
+
+	if 200 != response.StatusCode() {
+		return errors.New("REST call failed. " +
+			strconv.Itoa(response.StatusCode()) + "  " + response.Status())
+
+	}
+
+	err = json.Unmarshal(response.Body(), &body)
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Body: " + string(response.Body()))
+
+	return nil
+}
+
+func (p *Pvr) Put(uri string) error {
 	url, err := url.Parse(uri)
 
 	if err != nil {
@@ -403,10 +637,73 @@ func (p *Pvr) Push(uri string) error {
 	}
 
 	if url.Scheme == "" {
-		return p.PushLocal(uri)
+		return p.PutLocal(uri)
 	}
 
-	return p.PushRemote(uri)
+	return p.PutRemote(uri)
+}
+
+// make a json post to a REST endpoint. You can provide metainfo etc. in post
+// argument as json. postKey if set will be used as key that refers to the posted
+// json. Example usage: json blog post, json revision repo with commit message etc
+func (p *Pvr) Post(uri string, envelope string) error {
+	url, err := url.Parse(uri)
+
+	if err != nil {
+		return err
+	}
+
+	if url.Scheme == "" {
+		return errors.New("Post must be a remote REST endpoint, not: " + url.String())
+	}
+
+	remotePvr, err := p.initializeRemote(uri)
+
+	if err != nil {
+		return err
+	}
+
+	err = p.postObjects(remotePvr)
+
+	if err != nil {
+		return err
+	}
+
+	envJson := map[string]interface{}{}
+	err = json.Unmarshal([]byte(envelope), &envJson)
+
+	if err != nil {
+		return err
+	}
+
+	if remotePvr.JsonKey != "" {
+		envJson[remotePvr.JsonKey] = p.PristineJsonMap
+	} else {
+		envJson["post"] = p.PristineJsonMap
+	}
+
+	data, err := json.Marshal(envJson)
+
+	if err != nil {
+		return err
+	}
+
+	response, err := resty.R().SetBody(data).SetContentLength(true).
+		SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
+		Post(remotePvr.PostUrl)
+
+	if err != nil {
+		return err
+	}
+
+	if response.StatusCode() != 200 {
+		return errors.New("REST call failed. " +
+			strconv.Itoa(response.StatusCode()) + "  " + response.Status())
+	}
+
+	fmt.Println("Posted: " + string(response.Body()))
+
+	return nil
 }
 
 func (p *Pvr) GetRepoLocal(repoPath string) error {
@@ -427,7 +724,8 @@ func (p *Pvr) GetRepoLocal(repoPath string) error {
 
 	err = json.Unmarshal(data, &rs)
 	if err != nil {
-		return errors.New("JSON Unmarshal (" + strings.TrimPrefix(jsonNew, p.Dir) + "): " + err.Error())
+		return errors.New("JSON Unmarshal (" +
+			strings.TrimPrefix(jsonNew, p.Dir) + "): " + err.Error())
 	}
 
 	for k, v := range rs {
@@ -486,7 +784,9 @@ func (p *Pvr) Reset() error {
 	err = json.Unmarshal(data, &jsonMap)
 
 	if err != nil {
-		return errors.New("JSON Unmarshal (" + strings.TrimPrefix(path.Join(p.Pvrdir, "json"), p.Dir) + "): " + err.Error())
+		return errors.New("JSON Unmarshal (" +
+			strings.TrimPrefix(path.Join(p.Pvrdir, "json"), p.Dir) + "): " +
+			err.Error())
 	}
 
 	for k, v := range jsonMap {
@@ -528,7 +828,6 @@ func (p *Pvr) Reset() error {
 			}
 		}
 	}
-
 	os.Remove(path.Join(p.Pvrdir, "new"))
 	return nil
 }

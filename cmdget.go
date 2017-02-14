@@ -22,7 +22,7 @@ func CommandGet() cli.Command {
 				return err
 			}
 
-			pvr, err := NewPvr(wd)
+			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
 				return err
 			}

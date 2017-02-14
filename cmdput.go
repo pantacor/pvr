@@ -27,7 +27,7 @@ func CommandPut() cli.Command {
 				return errors.New("Push requires exactly 1 argument. See --help.")
 			}
 
-			pvr, err := NewPvr(wd)
+			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
 				return err
 			}

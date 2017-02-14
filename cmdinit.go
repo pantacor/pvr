@@ -10,19 +10,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-var SYSTEMC_TEMPLATE string = `
-{
-	"#spec": "pantavisor-multi-platform@1",
-	"systemc.json": {
-		"linux": "",
-		"initrd": [
-			""	
-		],
-		"platforms:": [],
-		"volumes": []
-	}
-}`
-
 func CommandInit() cli.Command {
 	return cli.Command{
 		Name:        "init",
@@ -35,21 +22,16 @@ func CommandInit() cli.Command {
 			if err != nil {
 				return err
 			}
-			err = os.Mkdir(wd+"/.pvr", 0755)
-			if err != nil {
-				return err
-			}
-			err = os.Mkdir(wd+"/.pvr/objects", 0755)
+			fmt.Println("NEW DIR INIT: " + wd)
 
-			jsonFile, err := os.OpenFile(wd+"/.pvr/json", os.O_CREATE|os.O_WRONLY, 0644)
+			pvr, err := NewPvr(c.App, wd)
 
 			if err != nil {
 				return err
 			}
+			// empty template as starting point; XXX; add Flag to pass custom json
+			err = pvr.Init()
 
-			jsonFile.Write([]byte(SYSTEMC_TEMPLATE))
-
-			fmt.Println("pvr directory ready for use.")
 			return err
 		},
 	}

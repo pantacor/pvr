@@ -12,7 +12,7 @@ import (
 func CommandReset() cli.Command {
 	return cli.Command{
 		Name:        "reset",
-		Aliases:     []string{"r", "checkout", "c"},
+		Aliases:     []string{"r", "checkout", "co"},
 		ArgsUsage:   "",
 		Usage:       "reset working directory to match the repo state",
 		Description: "reset/checkout also forgets about added files; pvr status and diff will yield empty",
@@ -22,7 +22,7 @@ func CommandReset() cli.Command {
 				return err
 			}
 
-			pvr, err := NewPvr(wd)
+			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
 				return err
 			}

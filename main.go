@@ -6,6 +6,9 @@ package main
 import (
 	"os"
 
+	"crypto/tls"
+
+	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
 )
 
@@ -28,19 +31,23 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
-		app.Metadata["PANTAHUB_BASE"] = "https://pantahub.appspot.com/api"
+		c.App.Metadata["PANTAHUB_BASE"] = "https://pantahub.appspot.com/api"
 		if os.Getenv("PANTAHUB_BASE") != "" {
-			app.Metadata["PANTAHUB_BASE"] = os.Getenv("PANTAHUB_BASE")
+			c.App.Metadata["PANTAHUB_BASE"] = os.Getenv("PANTAHUB_BASE")
 		}
 		if c.GlobalString("baseurl") != "" {
-			app.Metadata["PANTAHUB_BASE"] = c.GlobalString("baseurl")
+			c.App.Metadata["PANTAHUB_BASE"] = c.GlobalString("baseurl")
 		}
+		c.App.Metadata["PANTAHUB_AUTH"] = ""
 		if os.Getenv("PANTAHUB_AUTH") != "" {
-			app.Metadata["PANTAHUB_AUTH"] = os.Getenv("PANTAHUB_AUTH")
+			c.App.Metadata["PANTAHUB_AUTH"] = os.Getenv("PANTAHUB_AUTH")
 		}
 		if c.GlobalString("auth") != "" {
-			app.Metadata["PANTAHUB_AUTH"] = c.GlobalString("auth")
+			c.App.Metadata["PANTAHUB_AUTH"] = c.GlobalString("auth")
 		}
+		// XXX: make a --no-verify flag instead of thisr
+		resty.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+
 		return nil
 	}
 
@@ -51,9 +58,11 @@ func main() {
 		CommandDiff(),
 		CommandStatus(),
 		CommandCommit(),
-		CommandPush(),
+		CommandPut(),
+		CommandPost(),
 		CommandGet(),
 		CommandReset(),
+		CommandClone(),
 	}
 	app.Run(os.Args)
 }
