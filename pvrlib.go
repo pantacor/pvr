@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/evanphx/json-patch"
+	"github.com/asac/json-patch"
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
 )
