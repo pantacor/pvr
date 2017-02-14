@@ -786,6 +786,7 @@ func (p *Pvr) getObjects(pvrRemote PvrRemote) error {
 		if err != nil {
 			return err
 		}
+
 		if response.StatusCode() != 200 {
 			return errors.New("REST call failed. " +
 				strconv.Itoa(response.StatusCode()) + "  " + response.Status())
@@ -798,13 +799,13 @@ func (p *Pvr) getObjects(pvrRemote PvrRemote) error {
 			return err
 		}
 
-		fmt.Print("Downloading object" + remoteObject.SignedGetUrl)
+		fmt.Print("Downloading object " + remoteObject.SignedGetUrl)
 
 		if err != nil {
 			return err
 		}
 
-		response, err = resty.R().SetContentLength(true).Get(remoteObject.SignedGetUrl)
+		response, err = resty.R().Get(remoteObject.SignedGetUrl)
 
 		if err != nil {
 			return err
@@ -814,7 +815,7 @@ func (p *Pvr) getObjects(pvrRemote PvrRemote) error {
 				strconv.Itoa(response.StatusCode()) + "  " + response.Status())
 		}
 
-		ioutil.WriteFile(path.Join(p.Objdir, v), response.Body(), 644)
+		ioutil.WriteFile(path.Join(p.Objdir, v), response.Body(), 0644)
 		fmt.Println("Downloaded Object " + v)
 	}
 	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), jsonNew, 0644)
@@ -850,7 +851,7 @@ func (p *Pvr) GetRepoRemote(repoPath string) error {
 		return err
 	}
 
-	return errors.New("Not Implemented.")
+	return nil
 }
 
 func (p *Pvr) GetRepo(repoPath string) error {
