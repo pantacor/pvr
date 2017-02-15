@@ -509,7 +509,6 @@ func (p *Pvr) initializeRemote(repoPath string) (PvrRemote, error) {
 			strconv.Itoa(response.StatusCode()) + "  " + response.Status())
 	}
 
-	fmt.Println("qPvr Remote Info: " + string(response.Body()))
 	err = json.Unmarshal(response.Body(), &res)
 
 	if err != nil {
@@ -816,7 +815,6 @@ func (p *Pvr) getObjects(pvrRemote PvrRemote) error {
 		}
 
 		ioutil.WriteFile(path.Join(p.Objdir, v), response.Body(), 0644)
-		fmt.Println("Downloaded Object " + v)
 	}
 	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), jsonNew, 0644)
 
