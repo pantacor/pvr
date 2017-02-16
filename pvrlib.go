@@ -642,6 +642,24 @@ func (p *Pvr) Put(uri string) error {
 	return p.PutRemote(uri)
 }
 
+func (p *Pvr) PutObjects(uri string) error {
+	url, err := url.Parse(uri)
+
+	if err != nil {
+		return err
+	}
+
+	if url.Scheme == "" {
+		return errors.New("not implemented PutObjects Local")
+	}
+
+	pvr := PvrRemote{
+		ObjectsEndpointUrl: uri,
+	}
+
+	return p.postObjects(pvr)
+}
+
 // make a json post to a REST endpoint. You can provide metainfo etc. in post
 // argument as json. postKey if set will be used as key that refers to the posted
 // json. Example usage: json blog post, json revision repo with commit message etc
@@ -767,6 +785,8 @@ func (p *Pvr) getObjects(pvrRemote PvrRemote) error {
 
 	jsonNew := response.Body()
 	jsonMap := map[string]interface{}{}
+
+	fmt.Println("Body: " + string(response.Body()))
 	err = json.Unmarshal(response.Body(), &jsonMap)
 
 	for k := range jsonMap {
@@ -815,6 +835,7 @@ func (p *Pvr) getObjects(pvrRemote PvrRemote) error {
 		}
 
 		ioutil.WriteFile(path.Join(p.Objdir, v), response.Body(), 0644)
+		fmt.Println("Downloaded Object " + v)
 	}
 	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), jsonNew, 0644)
 
