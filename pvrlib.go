@@ -18,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 
+	"pvr/api"
+
 	"github.com/asac/json-patch"
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
@@ -478,18 +480,8 @@ type ObjectWithAccess struct {
 	ExpireTime   string `json:"expire-time"`
 }
 
-type PvrRemote struct {
-	RemoteSpec         string   `json:"pvr-spec"`         // the pvr remote protocol spec available
-	JsonGetUrl         string   `json:"json-get-url"`     // where to pvr post stuff
-	JsonKey            string   `json:"json-key"`         // what key is to use in post json [default: json]
-	ObjectsEndpointUrl string   `json:"objects-endpoint"` // where to store/retrieve objects
-	PostUrl            string   `json:"post-url"`         // where to post/announce new revisions
-	PostFields         []string `json:"post-fields"`      // what fields require input
-	PostFieldsOpt      []string `json:"post-fields-opt"`  // what optional fields are available [default: <empty>]
-}
-
-func (p *Pvr) initializeRemote(repoPath string) (PvrRemote, error) {
-	res := PvrRemote{}
+func (p *Pvr) initializeRemote(repoPath string) (pvrapi.PvrRemote, error) {
+	res := pvrapi.PvrRemote{}
 	repoUrl, err := url.Parse(repoPath)
 
 	if err != nil {
@@ -544,7 +536,7 @@ func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
 	return filesAndObjects, nil
 }
 
-func (p *Pvr) postObjects(pvrRemote PvrRemote) error {
+func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote) error {
 
 	filesAndObjects, err := p.listFilesAndObjects()
 	if err != nil {
@@ -674,7 +666,7 @@ func (p *Pvr) PutObjects(uri string) error {
 		return errors.New("not implemented PutObjects Local")
 	}
 
-	pvr := PvrRemote{
+	pvr := pvrapi.PvrRemote{
 		ObjectsEndpointUrl: uri,
 	}
 
@@ -793,7 +785,7 @@ func (p *Pvr) GetRepoLocal(repoPath string) error {
 	return err
 }
 
-func (p *Pvr) getObjects(pvrRemote PvrRemote) error {
+func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote) error {
 
 	// push all objects
 	response, err := resty.R().
