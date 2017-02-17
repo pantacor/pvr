@@ -4,7 +4,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/urfave/cli"
@@ -22,7 +21,6 @@ func CommandInit() cli.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println("NEW DIR INIT: " + wd)
 
 			pvr, err := NewPvr(c.App, wd)
 

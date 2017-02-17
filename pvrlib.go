@@ -646,8 +646,6 @@ func (p *Pvr) PutRemote(repoPath string) error {
 		return err
 	}
 
-	fmt.Println("Body: " + string(response.Body()))
-
 	return nil
 }
 
@@ -741,7 +739,7 @@ func (p *Pvr) Post(uri string, envelope string) error {
 			strconv.Itoa(response.StatusCode()) + "  " + response.Status())
 	}
 
-	fmt.Println("Posted: " + string(response.Body()))
+	fmt.Println("Posted JSON: " + string(response.Body()))
 
 	return nil
 }
@@ -809,7 +807,6 @@ func (p *Pvr) getObjects(pvrRemote PvrRemote) error {
 	jsonNew := response.Body()
 	jsonMap := map[string]interface{}{}
 
-	fmt.Println("Body: " + string(response.Body()))
 	err = json.Unmarshal(response.Body(), &jsonMap)
 
 	for k := range jsonMap {
@@ -836,12 +833,6 @@ func (p *Pvr) getObjects(pvrRemote PvrRemote) error {
 
 		remoteObject := ObjectWithAccess{}
 		err = json.Unmarshal(response.Body(), &remoteObject)
-
-		if err != nil {
-			return err
-		}
-
-		fmt.Print("Downloading object " + remoteObject.SignedGetUrl)
 
 		if err != nil {
 			return err
@@ -981,7 +972,6 @@ func addToTar(writer *tar.Writer, archivePath, sourcePath string) error {
 		return errors.New("pvr repo broken state: object file '" + sourcePath + "'is a directory")
 	}
 
-	fmt.Println("opening " + sourcePath)
 	object, err := os.Open(sourcePath)
 	if err != nil {
 		return err
@@ -998,8 +988,7 @@ func addToTar(writer *tar.Writer, archivePath, sourcePath string) error {
 	if err != nil {
 		return err
 	}
-	written, err := io.Copy(writer, object)
-	fmt.Printf("wrote: %d \n", uint64(written))
+	_, err = io.Copy(writer, object)
 	if err != nil {
 		return err
 	}
