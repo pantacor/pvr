@@ -64,6 +64,8 @@ func main() {
 		CommandReset(),
 		CommandClone(),
 		CommandPutObjects(),
+		CommandExport(),
+		CommandImport(),
 	}
 	app.Run(os.Args)
 }

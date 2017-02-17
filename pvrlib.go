@@ -4,9 +4,12 @@
 package main
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -519,17 +522,37 @@ func (p *Pvr) initializeRemote(repoPath string) (PvrRemote, error) {
 
 }
 
-func (p *Pvr) postObjects(pvrRemote PvrRemote) error {
+// list all objects reffed by current repo json
+func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
+
+	filesAndObjects := map[string]string{}
 	// push all objects
-	for k := range p.PristineJsonMap {
+	for k, v := range p.PristineJsonMap {
 		if strings.HasSuffix(k, ".json") {
 			continue
 		}
 		if strings.HasPrefix(k, "#spec") {
 			continue
 		}
-		v := p.PristineJsonMap[k].(string)
+		objId, ok := v.(string)
 
+		if !ok {
+			return map[string]string{}, errors.New("bad object id for file '" + k + "' in pristine pvr json")
+		}
+		filesAndObjects[k] = objId
+	}
+	return filesAndObjects, nil
+}
+
+func (p *Pvr) postObjects(pvrRemote PvrRemote) error {
+
+	filesAndObjects, err := p.listFilesAndObjects()
+	if err != nil {
+		return err
+	}
+
+	// push all objects
+	for k, v := range filesAndObjects {
 		info, err := os.Stat(path.Join(p.Objdir, v))
 		if err != nil {
 			return err
@@ -943,5 +966,153 @@ func (p *Pvr) Reset() error {
 		}
 	}
 	os.Remove(path.Join(p.Pvrdir, "new"))
+	return nil
+}
+
+func addToTar(writer *tar.Writer, archivePath, sourcePath string) error {
+
+	stat, err := os.Stat(sourcePath)
+
+	if err != nil {
+		return err
+	}
+
+	if stat.IsDir() {
+		return errors.New("pvr repo broken state: object file '" + sourcePath + "'is a directory")
+	}
+
+	fmt.Println("opening " + sourcePath)
+	object, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer object.Close()
+
+	header := new(tar.Header)
+	header.Name = archivePath
+	header.Size = stat.Size()
+	header.Mode = int64(stat.Mode())
+	header.ModTime = stat.ModTime()
+
+	err = writer.WriteHeader(header)
+	if err != nil {
+		return err
+	}
+	written, err := io.Copy(writer, object)
+	fmt.Printf("wrote: %d \n", uint64(written))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *Pvr) Export(dst string) error {
+
+	file, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var fileWriter io.WriteCloser
+
+	if strings.HasSuffix(strings.ToLower(dst), ".gz") ||
+		strings.HasSuffix(strings.ToLower(dst), ".tgz") {
+
+		fileWriter = gzip.NewWriter(file)
+		if err != nil {
+			return err
+		}
+		defer fileWriter.Close()
+	} else {
+		fileWriter = file
+	}
+
+	tw := tar.NewWriter(fileWriter)
+	defer tw.Close()
+
+	filesAndObjects, err := p.listFilesAndObjects()
+	if err != nil {
+		return err
+	}
+
+	for _, v := range filesAndObjects {
+		apath := "objects/" + v
+		ipath := path.Join(p.Objdir, v)
+		err := addToTar(tw, apath, ipath)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := addToTar(tw, "json", path.Join(p.Pvrdir, "json")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *Pvr) Import(src string) error {
+	file, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var fileReader io.ReadCloser
+
+	if strings.HasSuffix(strings.ToLower(src), ".gz") ||
+		strings.HasSuffix(strings.ToLower(src), ".tgz") {
+
+		fileReader, err = gzip.NewReader(file)
+		if err != nil {
+			return err
+		}
+		defer fileReader.Close()
+	} else {
+		fileReader = file
+	}
+
+	tw := tar.NewReader(fileReader)
+
+	for {
+		header, err := tw.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		fileInfo := header.FileInfo()
+
+		// we do not make directories as the only directory
+		// .pvr/objects must exist in inititialized pvrs
+		if fileInfo.IsDir() {
+			continue
+		}
+
+		filePath := path.Join(p.Pvrdir, header.Name)
+		filePathNew := filePath + ".new"
+
+		file, err := os.OpenFile(filePathNew, os.O_CREATE|os.O_TRUNC|os.O_WRONLY,
+			fileInfo.Mode())
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		_, err = io.Copy(file, tw)
+		if err != nil {
+			return err
+		}
+		err = os.Rename(filePathNew, filePath)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
