@@ -1,5 +1,5 @@
 /*
- * Copyright 2017  Alexander Sack <asac129@gmail.com>
+ * (c) Copyright 2017  Alexander Sack <asac129@gmail.com>
  */
 package main
 
