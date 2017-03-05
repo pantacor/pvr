@@ -16,15 +16,21 @@ func CommandPut() cli.Command {
 		Aliases:     []string{"p"},
 		ArgsUsage:   "[target-repo]",
 		Usage:       "put local repository to a target respository.",
-		Description: "Can put to local and REST repos",
+		Description: "Can put to local and REST repos. If no repository is provided the previously used one is used.",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
 				return err
 			}
 
-			if c.NArg() != 1 {
-				return errors.New("Push requires exactly 1 argument. See --help.")
+			var repoPath string
+
+			if c.NArg() > 1 {
+				return errors.New("Push can have at most 1 argument. See --help.")
+			} else if c.NArg() == 0 {
+				repoPath = ""
+			} else {
+				repoPath = c.Args()[0]
 			}
 
 			pvr, err := NewPvr(c.App, wd)
@@ -32,11 +38,10 @@ func CommandPut() cli.Command {
 				return err
 			}
 
-			err = pvr.Put(c.Args()[0])
+			err = pvr.Put(repoPath)
 			if err != nil {
 				return err
 			}
-
 			return nil
 		},
 	}

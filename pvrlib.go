@@ -55,10 +55,17 @@ type Pvr struct {
 	Dir             string
 	Pvrdir          string
 	Objdir          string
+	Pvrconfig       PvrConfig
 	PristineJson    []byte
 	PristineJsonMap PvrMap
 	NewFiles        PvrIndex
 	App             *cli.App
+}
+
+type PvrConfig struct {
+	DefaultGetUrl  string
+	DefaultPutUrl  string
+	DefaultPostUrl string
 }
 
 func (p *Pvr) String() string {
@@ -113,6 +120,19 @@ func NewPvr(app *cli.App, dir string) (*Pvr, error) {
 
 	if err != nil {
 		return &pvr, errors.New("Repo in bad state. JSON Unmarshal (" + strings.TrimPrefix(path.Join(pvr.Pvrdir, "json"), pvr.Dir) + ") Not possible. Make a copy of the repository for forensics, file a bug and maybe delete that file manually to try to recover: " + err.Error())
+	}
+
+	fileInfo, err = os.Stat(path.Join(pvr.Pvrdir, "config"))
+
+	if err == nil && fileInfo.IsDir() {
+		return nil, errors.New("Repo is in bad state. .pvr/json is a directory")
+	} else if err == nil {
+		byteJson, err := ioutil.ReadFile(path.Join(pvr.Pvrdir, "config"))
+
+		err = json.Unmarshal(byteJson, &pvr.Pvrconfig)
+		if err != nil {
+			return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(path.Join(pvr.Pvrdir, "json"), pvr.Dir) + "): " + err.Error())
+		}
 	}
 
 	return &pvr, nil
@@ -642,6 +662,11 @@ func (p *Pvr) PutRemote(repoPath string) error {
 }
 
 func (p *Pvr) Put(uri string) error {
+
+	if uri == "" {
+		uri = p.Pvrconfig.DefaultPutUrl
+	}
+
 	url, err := url.Parse(uri)
 
 	if err != nil {
@@ -649,10 +674,36 @@ func (p *Pvr) Put(uri string) error {
 	}
 
 	if url.Scheme == "" {
-		return p.PutLocal(uri)
+		err = p.PutLocal(uri)
+	} else {
+		err = p.PutRemote(uri)
 	}
 
-	return p.PutRemote(uri)
+	p.Pvrconfig.DefaultPutUrl = uri
+	if p.Pvrconfig.DefaultGetUrl == "" {
+		p.Pvrconfig.DefaultGetUrl = uri
+	}
+	if p.Pvrconfig.DefaultPutUrl == "" {
+		p.Pvrconfig.DefaultPostUrl = uri
+	}
+
+	// XXX: spaghetti code - refactor a simple json atomic write function here
+	if err == nil {
+		p.Pvrconfig.DefaultPutUrl = uri
+		configNew := path.Join(p.Pvrdir, "config.new")
+		configPath := path.Join(p.Pvrdir, "config")
+		byteJson, err := json.Marshal(p.Pvrconfig)
+		if err != nil {
+			return err
+		}
+		err = ioutil.WriteFile(configNew, byteJson, 0644)
+		if err != nil {
+			return err
+		}
+		err = os.Rename(configNew, configPath)
+	}
+
+	return err
 }
 
 func (p *Pvr) PutObjects(uri string) error {
@@ -677,6 +728,10 @@ func (p *Pvr) PutObjects(uri string) error {
 // argument as json. postKey if set will be used as key that refers to the posted
 // json. Example usage: json blog post, json revision repo with commit message etc
 func (p *Pvr) Post(uri string, envelope string) error {
+
+	if uri == "" {
+		uri = p.Pvrconfig.DefaultPostUrl
+	}
 	url, err := url.Parse(uri)
 
 	if err != nil {
@@ -732,6 +787,28 @@ func (p *Pvr) Post(uri string, envelope string) error {
 	}
 
 	fmt.Println("Posted JSON: " + string(response.Body()))
+
+	// XXX: spaghetti code ... refactor this into single atomic write
+	p.Pvrconfig.DefaultPostUrl = uri
+	if p.Pvrconfig.DefaultGetUrl == "" {
+		p.Pvrconfig.DefaultGetUrl = uri
+	}
+
+	if p.Pvrconfig.DefaultPutUrl == "" {
+		p.Pvrconfig.DefaultPutUrl = uri
+	}
+
+	configNew := path.Join(p.Pvrdir, "config.new")
+	configPath := path.Join(p.Pvrdir, "config")
+	byteJson, err := json.Marshal(p.Pvrconfig)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(configNew, byteJson, 0644)
+	if err != nil {
+		return err
+	}
+	err = os.Rename(configNew, configPath)
 
 	return nil
 }
@@ -879,18 +956,54 @@ func (p *Pvr) GetRepoRemote(repoPath string) error {
 	return nil
 }
 
-func (p *Pvr) GetRepo(repoPath string) error {
-	url, err := url.Parse(repoPath)
+func (p *Pvr) GetRepo(uri string) error {
+
+	if uri == "" {
+		uri = p.Pvrconfig.DefaultPutUrl
+	}
+
+	url, err := url.Parse(uri)
 
 	if err != nil {
 		return err
 	}
 
 	if url.Scheme == "" {
-		return p.GetRepoLocal(repoPath)
+		err = p.GetRepoLocal(uri)
+	} else {
+		err = p.GetRepoRemote(uri)
+	}
+	if err != nil {
+		return err
 	}
 
-	return p.GetRepoRemote(repoPath)
+	p.Pvrconfig.DefaultGetUrl = uri
+
+	if p.Pvrconfig.DefaultPutUrl == "" {
+		p.Pvrconfig.DefaultPutUrl = uri
+	}
+
+	if p.Pvrconfig.DefaultPostUrl == "" {
+		p.Pvrconfig.DefaultPostUrl = uri
+	}
+
+	// XXX: spaghetti code - refactor a simple json atomic write function here
+	if err == nil {
+		p.Pvrconfig.DefaultPutUrl = uri
+		configNew := path.Join(p.Pvrdir, "config.new")
+		configPath := path.Join(p.Pvrdir, "config")
+		byteJson, err := json.Marshal(p.Pvrconfig)
+		if err != nil {
+			return err
+		}
+		err = ioutil.WriteFile(configNew, byteJson, 0644)
+		if err != nil {
+			return err
+		}
+		err = os.Rename(configNew, configPath)
+	}
+
+	return err
 }
 
 func (p *Pvr) Reset() error {

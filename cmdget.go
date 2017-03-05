@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 
 	"github.com/urfave/cli"
@@ -13,9 +14,9 @@ func CommandGet() cli.Command {
 	return cli.Command{
 		Name:        "get",
 		Aliases:     []string{"g"},
-		ArgsUsage:   "<repository> [target-repository]",
+		ArgsUsage:   "[repository [target-repository]]",
 		Usage:       "get update target-repository from repository",
-		Description: "default target-repository is the local .pvr one",
+		Description: "default target-repository is the local .pvr one. If not <repository> is provided the last one is used.",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -27,7 +28,17 @@ func CommandGet() cli.Command {
 				return err
 			}
 
-			err = pvr.GetRepo(c.Args()[0])
+			var repoPath string
+
+			if c.NArg() > 1 {
+				return errors.New("Get can have at most 1 argument. See --help.")
+			} else if c.NArg() == 0 {
+				repoPath = ""
+			} else {
+				repoPath = c.Args()[0]
+			}
+
+			err = pvr.GetRepo(repoPath)
 			if err != nil {
 				return err
 			}
