@@ -9,3 +9,17 @@ type PvrRemote struct {
 	PostFields         []string `json:"post-fields"`      // what fields require input
 	PostFieldsOpt      []string `json:"post-fields-opt"`  // what optional fields are available [default: <empty>]
 }
+
+type PvrRemoteObject struct {
+	Id           string `json:"id" bson:"id"`
+	StorageId    string `json:"storage-id" bson:"_id"`
+	Owner        string `json:"owner"`
+	ObjectName   string `json:"objectname"`
+	Sha          string `json:"sha256sum"`
+	Size         string `json:"size"`
+	MimeType     string `json:"mime-type"`
+	SignedPutUrl string `json:"signed-puturl"`
+	SignedGetUrl string `json:"signed-geturl"`
+	Now          string `json:"now"`
+	ExpireTime   string `json:"expire-time"`
+}
