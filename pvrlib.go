@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -556,7 +557,7 @@ func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
 	return filesAndObjects, nil
 }
 
-func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote) error {
+func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	filesAndObjects, err := p.listFilesAndObjects()
 	if err != nil {
@@ -583,6 +584,15 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote) error {
 
 		if err != nil {
 			return err
+		}
+
+		if response.StatusCode() != http.StatusOK &&
+			response.StatusCode() != http.StatusConflict {
+			return errors.New("Error posting object " + strconv.Itoa(response.StatusCode()))
+		}
+
+		if response.StatusCode() == http.StatusConflict && !force {
+			fmt.Println("Upload skipped.")
 		}
 
 		err = json.Unmarshal(response.Body(), &remoteObject)
@@ -615,7 +625,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote) error {
 	return nil
 }
 
-func (p *Pvr) PutRemote(repoPath string) error {
+func (p *Pvr) PutRemote(repoPath string, force bool) error {
 
 	pvrRemote, err := p.initializeRemote(repoPath)
 
@@ -623,7 +633,7 @@ func (p *Pvr) PutRemote(repoPath string) error {
 		return err
 	}
 
-	err = p.postObjects(pvrRemote)
+	err = p.postObjects(pvrRemote, force)
 
 	if err != nil {
 		return err
@@ -661,7 +671,7 @@ func (p *Pvr) PutRemote(repoPath string) error {
 	return nil
 }
 
-func (p *Pvr) Put(uri string) error {
+func (p *Pvr) Put(uri string, force bool) error {
 
 	if uri == "" {
 		uri = p.Pvrconfig.DefaultPutUrl
@@ -676,7 +686,7 @@ func (p *Pvr) Put(uri string) error {
 	if url.Scheme == "" {
 		err = p.PutLocal(uri)
 	} else {
-		err = p.PutRemote(uri)
+		err = p.PutRemote(uri, force)
 	}
 
 	p.Pvrconfig.DefaultPutUrl = uri
@@ -706,7 +716,7 @@ func (p *Pvr) Put(uri string) error {
 	return err
 }
 
-func (p *Pvr) PutObjects(uri string) error {
+func (p *Pvr) PutObjects(uri string, force bool) error {
 	url, err := url.Parse(uri)
 
 	if err != nil {
@@ -721,13 +731,13 @@ func (p *Pvr) PutObjects(uri string) error {
 		ObjectsEndpointUrl: uri,
 	}
 
-	return p.postObjects(pvr)
+	return p.postObjects(pvr, force)
 }
 
 // make a json post to a REST endpoint. You can provide metainfo etc. in post
 // argument as json. postKey if set will be used as key that refers to the posted
 // json. Example usage: json blog post, json revision repo with commit message etc
-func (p *Pvr) Post(uri string, envelope string) error {
+func (p *Pvr) Post(uri string, envelope string, force bool) error {
 
 	if uri == "" {
 		uri = p.Pvrconfig.DefaultPostUrl
@@ -748,7 +758,7 @@ func (p *Pvr) Post(uri string, envelope string) error {
 		return err
 	}
 
-	err = p.postObjects(remotePvr)
+	err = p.postObjects(remotePvr, force)
 
 	if err != nil {
 		return err

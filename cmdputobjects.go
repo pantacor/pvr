@@ -31,12 +31,18 @@ func CommandPutObjects() cli.Command {
 				return err
 			}
 
-			err = pvr.PutObjects(c.Args()[0])
+			err = pvr.PutObjects(c.Args()[0], c.Bool("force"))
 			if err != nil {
 				return err
 			}
 
 			return nil
+		},
+		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name:  "force, f",
+				Usage: "force reupload of existing objects",
+			},
 		},
 	}
 }

@@ -38,11 +38,17 @@ func CommandPut() cli.Command {
 				return err
 			}
 
-			err = pvr.Put(repoPath)
+			err = pvr.Put(repoPath, c.Bool("force"))
 			if err != nil {
 				return err
 			}
 			return nil
+		},
+		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name:  "force, f",
+				Usage: "force reupload of existing objects",
+			},
 		},
 	}
 }

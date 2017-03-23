@@ -38,7 +38,7 @@ func CommandPost() cli.Command {
 				return err
 			}
 
-			err = pvr.Post(repoPath, c.String("envelope")) // XXX add surrounding flags etc
+			err = pvr.Post(repoPath, c.String("envelope"), c.Bool("force")) // XXX add surrounding flags etc
 			if err != nil {
 				return err
 			}
@@ -49,6 +49,10 @@ func CommandPost() cli.Command {
 			cli.StringFlag{
 				Name:  "envelope, e",
 				Usage: "provide the json envelope to wrap around the pvr post.",
+			},
+			cli.BoolFlag{
+				Name:  "force, f",
+				Usage: "force reupload of existing objects",
 			},
 		},
 	}
