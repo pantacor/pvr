@@ -593,6 +593,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 		if response.StatusCode() == http.StatusConflict && !force {
 			fmt.Println("Upload skipped.")
+			continue
 		}
 
 		err = json.Unmarshal(response.Body(), &remoteObject)
