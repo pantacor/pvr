@@ -5,6 +5,7 @@ package main
 
 import (
 	"archive/tar"
+	"bufio"
 	"compress/gzip"
 	"encoding/json"
 	"errors"
@@ -18,12 +19,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"pvr/api"
 
 	"github.com/asac/json-patch"
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 type PvrStatus struct {
@@ -67,6 +71,10 @@ type PvrConfig struct {
 	DefaultGetUrl  string
 	DefaultPutUrl  string
 	DefaultPostUrl string
+
+	// tokens by realm
+	AccessTokens  map[string]string
+	RefreshTokens map[string]string
 }
 
 func (p *Pvr) String() string {
@@ -81,6 +89,9 @@ func NewPvr(app *cli.App, dir string) (*Pvr, error) {
 		Initialized: false,
 		App:         app,
 	}
+
+	pvr.Pvrconfig.AccessTokens = make(map[string]string)
+	pvr.Pvrconfig.RefreshTokens = make(map[string]string)
 
 	fileInfo, err := os.Stat(pvr.Dir)
 	if err != nil {
@@ -512,8 +523,16 @@ func (p *Pvr) initializeRemote(repoPath string) (pvrapi.PvrRemote, error) {
 	pvrRemoteUrl := repoUrl
 	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
 
+	bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
+	if bearer == "" {
+		bearer, err = p.getBearerFor(repoUrl.String())
+		if err != nil {
+			return res, err
+		}
+	}
+
 	response, err := resty.R().
-		SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
+		SetAuthToken(bearer).
 		Get(pvrRemoteUrl.String())
 
 	if err != nil {
@@ -557,6 +576,126 @@ func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
 	return filesAndObjects, nil
 }
 
+func readCredentials() (string, string) {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Username: ")
+	username, _ := reader.ReadString('\n')
+
+	fmt.Print("Password: ")
+	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+	fmt.Println("*****")
+	if err != nil {
+		fmt.Println("Error: " + err.Error())
+	}
+	password := string(bytePassword)
+
+	return strings.TrimSpace(username), strings.TrimSpace(password)
+}
+
+func getWwwAuthenticateInfo(resp *http.Response) (string, map[string]string) {
+	header := resp.Header.Get("www-authenticate")
+	parts := strings.SplitN(header, " ", 2)
+	authType := parts[0]
+	parts = strings.Split(parts[1], ", ")
+	opts := make(map[string]string)
+
+	for _, part := range parts {
+		fmt.Println("Part: ", part)
+		vals := strings.SplitN(part, "=", 2)
+		key := vals[0]
+		val := strings.Trim(vals[1], "\",")
+		opts[key] = val
+	}
+	return authType, opts
+}
+
+func (p *Pvr) doAuthenticate(authEp, username, password string) (string, string, error) {
+
+	m := map[string]string{
+		"username": username,
+		"password": password,
+	}
+
+	if username == "" {
+		return "", "", errors.New("doAuthenticate: no username provided.")
+	}
+	if password == "" {
+		return "", "", errors.New("doAuthenticate: no password provided.")
+	}
+	if authEp == "" {
+		return "", "", errors.New("doAuthenticate: no authentication endpoint provided.")
+	}
+
+	response, err := resty.R().SetBody(m).
+		Post(authEp + "/login")
+
+	m1 := map[string]interface{}{}
+	err = json.Unmarshal(response.Body(), &m1)
+
+	if err != nil {
+		return "", "", err
+	}
+
+	return m1["token"].(string), m1["token"].(string), nil
+}
+
+func (p *Pvr) getBearerFor(uri string) (string, error) {
+
+	response, err := resty.R().SetBody(map[string]string{}).
+		Get(uri)
+
+	if err != nil {
+		return "", err
+	}
+
+	authHeader := response.Header().Get("Www-Authenticate")
+
+	fmt.Println("Auth Header " + authHeader)
+	// no auth header; nothing we can do magic here...
+	if authHeader == "" {
+		return "", nil
+	} else {
+		authType, opts := getWwwAuthenticateInfo(response.RawResponse)
+		if authType != "JWT" && authType != "Bearer" {
+			return "", errors.New("Invalid www-authenticate header retrieved")
+		}
+
+		realm := opts["realm"]
+		authEpString := opts["ph-aeps"]
+		authEps := strings.Split(authEpString, ",")
+
+		if len(authEps) == 0 {
+			return "", errors.New("Bad Server Behaviour. Need ph-aeps token in Www-Authenticate header. Check your server version")
+		}
+
+		authEp := authEps[0]
+
+		if p.Pvrconfig.AccessTokens[authEp+" realm="+realm] != "" {
+			return p.Pvrconfig.AccessTokens[authEp+" realm="+realm], nil
+		} else {
+			for i := 0; i < 3; i++ {
+				fmt.Println("Authenticate with: " + authEp + " realm=" + realm)
+				username, password := readCredentials()
+				accessToken, refreshToken, err := p.doAuthenticate(authEp, username, password)
+				if err != nil {
+					return "", err
+				}
+
+				if accessToken != "" {
+					p.Pvrconfig.AccessTokens[authEp+" realm="+realm] = accessToken
+					p.Pvrconfig.RefreshTokens[authEp+" realm="+realm] = refreshToken
+					p.SaveConfig()
+
+					return accessToken, nil
+				}
+			}
+		}
+	}
+
+	return "", err
+}
+
 func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	filesAndObjects, err := p.listFilesAndObjects()
@@ -578,9 +717,19 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		remoteObject.Sha = v
 		remoteObject.ObjectName = k
 
+		uri := pvrRemote.ObjectsEndpointUrl + "/"
+
+		bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
+		if bearer == "" {
+			bearer, err = p.getBearerFor(uri)
+			if err != nil {
+				return err
+			}
+		}
+
 		response, err := resty.R().SetBody(remoteObject).
-			SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
-			Post(pvrRemote.ObjectsEndpointUrl + "/")
+			SetAuthToken(bearer).
+			Post(uri)
 
 		if err != nil {
 			return err
@@ -646,12 +795,25 @@ func (p *Pvr) PutRemote(repoPath string, force bool) error {
 		return err
 	}
 
+	uri := pvrRemote.JsonGetUrl
 	body := map[string]interface{}{}
-	json.Unmarshal(data, &body)
+	err = json.Unmarshal(data, &body)
+
+	if err != nil {
+		return err
+	}
+
+	bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
+	if bearer == "" {
+		bearer, err = p.getBearerFor(uri)
+		if err != nil {
+			return err
+		}
+	}
 
 	response, err := resty.R().SetBody(body).
-		SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
-		Put(pvrRemote.JsonGetUrl)
+		SetAuthToken(bearer).
+		Put(uri)
 
 	if err != nil {
 		return err
@@ -701,19 +863,24 @@ func (p *Pvr) Put(uri string, force bool) error {
 	// XXX: spaghetti code - refactor a simple json atomic write function here
 	if err == nil {
 		p.Pvrconfig.DefaultPutUrl = uri
-		configNew := path.Join(p.Pvrdir, "config.new")
-		configPath := path.Join(p.Pvrdir, "config")
-		byteJson, err := json.Marshal(p.Pvrconfig)
-		if err != nil {
-			return err
-		}
-		err = ioutil.WriteFile(configNew, byteJson, 0644)
-		if err != nil {
-			return err
-		}
-		err = os.Rename(configNew, configPath)
+		err = p.SaveConfig()
 	}
 
+	return err
+}
+
+func (p *Pvr) SaveConfig() error {
+	configNew := path.Join(p.Pvrdir, "config.new")
+	configPath := path.Join(p.Pvrdir, "config")
+	byteJson, err := json.Marshal(p.Pvrconfig)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(configNew, byteJson, 0644)
+	if err != nil {
+		return err
+	}
+	err = os.Rename(configNew, configPath)
 	return err
 }
 
@@ -784,8 +951,16 @@ func (p *Pvr) Post(uri string, envelope string, force bool) error {
 		return err
 	}
 
+	bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
+	if bearer == "" {
+		bearer, err = p.getBearerFor(uri)
+		if err != nil {
+			return err
+		}
+	}
+
 	response, err := resty.R().SetBody(data).SetContentLength(true).
-		SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
+		SetAuthToken(bearer).
 		Post(remotePvr.PostUrl)
 
 	if err != nil {
@@ -809,17 +984,11 @@ func (p *Pvr) Post(uri string, envelope string, force bool) error {
 		p.Pvrconfig.DefaultPutUrl = uri
 	}
 
-	configNew := path.Join(p.Pvrdir, "config.new")
-	configPath := path.Join(p.Pvrdir, "config")
-	byteJson, err := json.Marshal(p.Pvrconfig)
+	err = p.SaveConfig()
+
 	if err != nil {
-		return err
+		fmt.Println("WARNING: couldnt save config " + err.Error())
 	}
-	err = ioutil.WriteFile(configNew, byteJson, 0644)
-	if err != nil {
-		return err
-	}
-	err = os.Rename(configNew, configPath)
 
 	return nil
 }
@@ -875,9 +1044,18 @@ func (p *Pvr) GetRepoLocal(repoPath string) error {
 
 func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote) error {
 
+	var err error
+	bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
+	if bearer == "" {
+		bearer, err = p.getBearerFor(pvrRemote.JsonGetUrl)
+		if err != nil {
+			return err
+		}
+	}
+
 	// push all objects
 	response, err := resty.R().
-		SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
+		SetAuthToken(bearer).
 		Get(pvrRemote.JsonGetUrl)
 
 	if err != nil {
@@ -898,9 +1076,19 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote) error {
 		}
 		v := jsonMap[k].(string)
 
+		uri := pvrRemote.ObjectsEndpointUrl + "/" + v
+
+		bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
+		if bearer == "" {
+			bearer, err = p.getBearerFor(uri)
+			if err != nil {
+				return err
+			}
+		}
+
 		response, err := resty.R().
-			SetAuthToken(p.App.Metadata["PANTAHUB_AUTH"].(string)).
-			Get(pvrRemote.ObjectsEndpointUrl + "/" + v)
+			SetAuthToken(bearer).
+			Get(uri)
 
 		if err != nil {
 			return err
@@ -1001,17 +1189,7 @@ func (p *Pvr) GetRepo(uri string) error {
 	// XXX: spaghetti code - refactor a simple json atomic write function here
 	if err == nil {
 		p.Pvrconfig.DefaultPutUrl = uri
-		configNew := path.Join(p.Pvrdir, "config.new")
-		configPath := path.Join(p.Pvrdir, "config")
-		byteJson, err := json.Marshal(p.Pvrconfig)
-		if err != nil {
-			return err
-		}
-		err = ioutil.WriteFile(configNew, byteJson, 0644)
-		if err != nil {
-			return err
-		}
-		err = os.Rename(configNew, configPath)
+		err = p.SaveConfig()
 	}
 
 	return err
