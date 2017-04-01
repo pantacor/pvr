@@ -905,7 +905,7 @@ func (p *Pvr) PutObjects(uri string, force bool) error {
 // make a json post to a REST endpoint. You can provide metainfo etc. in post
 // argument as json. postKey if set will be used as key that refers to the posted
 // json. Example usage: json blog post, json revision repo with commit message etc
-func (p *Pvr) Post(uri string, envelope string, force bool) error {
+func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force bool) error {
 
 	if uri == "" {
 		uri = p.Pvrconfig.DefaultPostUrl
@@ -932,11 +932,23 @@ func (p *Pvr) Post(uri string, envelope string, force bool) error {
 		return err
 	}
 
+	if envelope == "" {
+		envelope = "{}"
+	}
+
 	envJson := map[string]interface{}{}
 	err = json.Unmarshal([]byte(envelope), &envJson)
 
 	if err != nil {
 		return err
+	}
+
+	if commitMsg != "" {
+		envJson["commit-msg"] = commitMsg
+	}
+
+	if rev != 0 {
+		envJson["rev"] = rev
 	}
 
 	if remotePvr.JsonKey != "" {

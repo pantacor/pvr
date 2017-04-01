@@ -7,6 +7,8 @@ import (
 	"errors"
 	"os"
 
+	"fmt"
+
 	"github.com/urfave/cli"
 )
 
@@ -38,8 +40,11 @@ func CommandPost() cli.Command {
 				return err
 			}
 
-			err = pvr.Post(repoPath, c.String("envelope"), c.Bool("force")) // XXX add surrounding flags etc
+			err = pvr.Post(repoPath, c.String("envelope"), c.String("commit-msg"),
+				c.Int("rev"), c.Bool("force"))
+
 			if err != nil {
+				fmt.Println("ERROR: " + err.Error())
 				return err
 			}
 
@@ -48,7 +53,15 @@ func CommandPost() cli.Command {
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "envelope, e",
-				Usage: "provide the json envelope to wrap around the pvr post.",
+				Usage: "provide the json envelope to wrap around the pvr post. use {} when not provided",
+			},
+			cli.StringFlag{
+				Name:  "commit-msg",
+				Usage: "add 'commit-msg' field to envelope",
+			},
+			cli.StringFlag{
+				Name:  "rev",
+				Usage: "add 'rev' fieldcall to envelope",
 			},
 			cli.BoolFlag{
 				Name:  "force, f",
