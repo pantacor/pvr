@@ -601,7 +601,6 @@ func getWwwAuthenticateInfo(resp *http.Response) (string, map[string]string) {
 	opts := make(map[string]string)
 
 	for _, part := range parts {
-		fmt.Println("Part: ", part)
 		vals := strings.SplitN(part, "=", 2)
 		key := vals[0]
 		val := strings.Trim(vals[1], "\",")
@@ -651,7 +650,6 @@ func (p *Pvr) getBearerFor(uri string) (string, error) {
 
 	authHeader := response.Header().Get("Www-Authenticate")
 
-	fmt.Println("Auth Header " + authHeader)
 	// no auth header; nothing we can do magic here...
 	if authHeader == "" {
 		return "", nil
@@ -741,7 +739,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		}
 
 		if response.StatusCode() == http.StatusConflict && !force {
-			fmt.Println("Upload skipped.")
+			fmt.Println("Uploaded.")
 			continue
 		}
 
