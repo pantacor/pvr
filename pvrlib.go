@@ -819,7 +819,7 @@ func (p *Pvr) PutRemote(repoPath string, force bool) error {
 
 	if 200 != response.StatusCode() {
 		return errors.New("REST call failed. " +
-			strconv.Itoa(response.StatusCode()) + "  " + response.Status())
+			strconv.Itoa(response.StatusCode()) + "  " + response.Status() + "\n\n   " + string(response.Body()))
 
 	}
 
@@ -979,7 +979,8 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 
 	if response.StatusCode() != 200 {
 		return errors.New("REST call failed. " +
-			strconv.Itoa(response.StatusCode()) + "  " + response.Status())
+			strconv.Itoa(response.StatusCode()) + "  " + response.Status() +
+			"\n\t" + string(response.Body()))
 	}
 
 	fmt.Println("Posted JSON: " + string(response.Body()))
