@@ -22,7 +22,7 @@ func CommandPost() cli.Command {
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 1)
 			}
 
 			var repoPath string
@@ -37,7 +37,7 @@ func CommandPost() cli.Command {
 
 			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 2)
 			}
 
 			err = pvr.Post(repoPath, c.String("envelope"), c.String("commit-msg"),
@@ -45,7 +45,7 @@ func CommandPost() cli.Command {
 
 			if err != nil {
 				fmt.Println("ERROR: " + err.Error())
-				return err
+				return cli.NewExitError(err, 3)
 			}
 
 			return nil
