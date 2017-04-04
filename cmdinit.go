@@ -19,18 +19,21 @@ func CommandInit() cli.Command {
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 1)
 			}
 
 			pvr, err := NewPvr(c.App, wd)
 
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 2)
 			}
 			// empty template as starting point; XXX; add Flag to pass custom json
 			err = pvr.Init()
 
-			return err
+			if err != nil {
+				cli.NewExitError(err, 3)
+			}
+			return nil
 		},
 	}
 }
