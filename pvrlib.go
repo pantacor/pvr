@@ -77,6 +77,8 @@ type PvrConfig struct {
 	RefreshTokens map[string]string
 }
 
+type WrappableCallFunc func(req *resty.Request) (*resty.Response, error)
+
 func (p *Pvr) String() string {
 	return "PVR: " + p.Dir
 }
@@ -523,17 +525,9 @@ func (p *Pvr) initializeRemote(repoPath string) (pvrapi.PvrRemote, error) {
 	pvrRemoteUrl := repoUrl
 	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
 
-	bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
-	if bearer == "" {
-		bearer, err = p.getBearerFor(repoUrl.String())
-		if err != nil {
-			return res, err
-		}
-	}
-
-	response, err := resty.R().
-		SetAuthToken(bearer).
-		Get(pvrRemoteUrl.String())
+	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(pvrRemoteUrl.String())
+	})
 
 	if err != nil {
 		return res, err
@@ -593,8 +587,7 @@ func readCredentials() (string, string) {
 	return strings.TrimSpace(username), strings.TrimSpace(password)
 }
 
-func getWwwAuthenticateInfo(resp *http.Response) (string, map[string]string) {
-	header := resp.Header.Get("www-authenticate")
+func getWwwAuthenticateInfo(header string) (string, map[string]string) {
 	parts := strings.SplitN(header, " ", 2)
 	authType := parts[0]
 	parts = strings.Split(parts[1], ", ")
@@ -636,62 +629,170 @@ func (p *Pvr) doAuthenticate(authEp, username, password string) (string, string,
 		return "", "", err
 	}
 
+	if response.StatusCode() != 200 {
+		return "", "", errors.New("Failed to Login: " + string(response.Body()))
+	}
+
+	_, ok := m1["token"]
+
+	if !ok {
+		return "", "", errors.New("Illegal response: " + string(response.Body()))
+	}
+
 	return m1["token"].(string), m1["token"].(string), nil
 }
 
-func (p *Pvr) getBearerFor(uri string) (string, error) {
-
-	response, err := resty.R().SetBody(map[string]string{}).
-		Get(uri)
-
-	if err != nil {
-		return "", err
+func (p *Pvr) doRefresh(authEp, token string) (string, string, error) {
+	m := map[string]string{
+		"token": token,
 	}
 
-	authHeader := response.Header().Get("Www-Authenticate")
+	if token == "" {
+		return "", "", errors.New("doRefresh: no token provided.")
+	}
+	if authEp == "" {
+		return "", "", errors.New("doAuthenticate: no authentication endpoint provided.")
+	}
+
+	response, err := resty.R().SetBody(m).
+		SetAuthToken(token).
+		Get(authEp + "/login")
+
+	m1 := map[string]interface{}{}
+	err = json.Unmarshal(response.Body(), &m1)
+
+	if err != nil {
+		return "", "", err
+	}
+
+	if response.StatusCode() != 200 {
+		return "", "", nil
+	}
+
+	return m1["token"].(string), m1["token"].(string), nil
+}
+
+func (p *Pvr) getCachedAccessToken(authHeader string) (string, error) {
 
 	// no auth header; nothing we can do magic here...
 	if authHeader == "" {
-		return "", nil
-	} else {
-		authType, opts := getWwwAuthenticateInfo(response.RawResponse)
-		if authType != "JWT" && authType != "Bearer" {
-			return "", errors.New("Invalid www-authenticate header retrieved")
+		return "", errors.New("Bad Parameter (authHeader empty)")
+	}
+
+	authType, opts := getWwwAuthenticateInfo(authHeader)
+	if authType != "JWT" && authType != "Bearer" {
+		return "", errors.New("Invalid www-authenticate header retrieved")
+	}
+
+	realm := opts["realm"]
+	authEpString := opts["ph-aeps"]
+	authEps := strings.Split(authEpString, ",")
+
+	if len(authEps) == 0 {
+		return "", errors.New("Bad Server Behaviour. Need ph-aeps token in Www-Authenticate header. Check your server version")
+	}
+
+	authEp := authEps[0]
+
+	if p.Pvrconfig.AccessTokens[authEp+" realm="+realm] != "" {
+		return p.Pvrconfig.AccessTokens[authEp+" realm="+realm], nil
+	}
+
+	return "", nil
+}
+
+func (p *Pvr) getNewAccessToken(authHeader string) (string, error) {
+
+	authType, opts := getWwwAuthenticateInfo(authHeader)
+	if authType != "JWT" && authType != "Bearer" {
+		return "", errors.New("Invalid www-authenticate header retrieved")
+	}
+
+	realm := opts["realm"]
+	authEpString := opts["ph-aeps"]
+	authEps := strings.Split(authEpString, ",")
+
+	if len(authEps) == 0 {
+		return "", errors.New("Bad Server Behaviour. Need ph-aeps token in Www-Authenticate header. Check your server version")
+	}
+
+	authEp := authEps[0]
+
+	p.Pvrconfig.AccessTokens[authEp+" realm="+realm] = ""
+
+	// if we have a refresh token
+	if p.Pvrconfig.RefreshTokens[authEp+" realm="+realm] != "" {
+		accessToken, refreshToken, err := p.doRefresh(authEp, p.Pvrconfig.RefreshTokens[authEp+" realm="+realm])
+
+		if err != nil {
+			return "", err
 		}
 
-		realm := opts["realm"]
-		authEpString := opts["ph-aeps"]
-		authEps := strings.Split(authEpString, ",")
+		p.Pvrconfig.RefreshTokens[authEp+" realm="+realm] = refreshToken
+		p.Pvrconfig.AccessTokens[authEp+" realm="+realm] = accessToken
+		p.SaveConfig()
 
-		if len(authEps) == 0 {
-			return "", errors.New("Bad Server Behaviour. Need ph-aeps token in Www-Authenticate header. Check your server version")
+		if accessToken != "" {
+			return accessToken, nil
+		}
+	}
+
+	var err error
+	// get fresh user/pass auth
+	for i := 0; i < 3; i++ {
+		var accessToken, refreshToken string
+		fmt.Println("Authenticate with: " + authEp + " realm=" + realm)
+		username, password := readCredentials()
+		accessToken, refreshToken, err = p.doAuthenticate(authEp, username, password)
+
+		if err != nil {
+			continue
 		}
 
-		authEp := authEps[0]
+		if accessToken != "" {
+			p.Pvrconfig.AccessTokens[authEp+" realm="+realm] = accessToken
+			p.Pvrconfig.RefreshTokens[authEp+" realm="+realm] = refreshToken
+			p.SaveConfig()
 
-		if p.Pvrconfig.AccessTokens[authEp+" realm="+realm] != "" {
-			return p.Pvrconfig.AccessTokens[authEp+" realm="+realm], nil
-		} else {
-			for i := 0; i < 3; i++ {
-				fmt.Println("Authenticate with: " + authEp + " realm=" + realm)
-				username, password := readCredentials()
-				accessToken, refreshToken, err := p.doAuthenticate(authEp, username, password)
-				if err != nil {
-					return "", err
-				}
-
-				if accessToken != "" {
-					p.Pvrconfig.AccessTokens[authEp+" realm="+realm] = accessToken
-					p.Pvrconfig.RefreshTokens[authEp+" realm="+realm] = refreshToken
-					p.SaveConfig()
-
-					return accessToken, nil
-				}
-			}
+			return accessToken, nil
 		}
 	}
 
 	return "", err
+}
+
+func (p *Pvr) doAuthCall(fn WrappableCallFunc) (*resty.Response, error) {
+
+	var bearer string
+	var err error
+	var response *resty.Response
+
+	// legacy flat -a from CLI will give a default token
+	bearer = p.App.Metadata["PANTAHUB_AUTH"].(string)
+	response, err = fn(resty.R().SetAuthToken(bearer))
+
+	// if we see www-authenticate, we need to auth ...
+	authHeader := response.Header().Get("www-authenticate")
+
+	// first try cached accesstoken
+	if authHeader != "" {
+		bearer, err = p.getCachedAccessToken(authHeader)
+		if bearer != "" {
+			response, err = fn(resty.R().SetAuthToken(bearer))
+			authHeader = response.Header().Get("Www-Authenticate")
+		}
+	}
+
+	// then get new accesstoken
+	if authHeader != "" {
+		bearer, err = p.getNewAccessToken(authHeader)
+		if bearer != "" {
+			response, err = fn(resty.R().SetAuthToken(bearer))
+			authHeader = response.Header().Get("Www-Authenticate")
+		}
+	}
+
+	return response, err
 }
 
 func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
@@ -715,22 +816,18 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		remoteObject.Sha = v
 		remoteObject.ObjectName = k
 
-		uri := pvrRemote.ObjectsEndpointUrl + "/"
+		uri := pvrRemote.ObjectsEndpointUrl
 
-		bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
-		if bearer == "" {
-			bearer, err = p.getBearerFor(uri)
-			if err != nil {
-				return err
-			}
-		}
-
-		response, err := resty.R().SetBody(remoteObject).
-			SetAuthToken(bearer).
-			Post(uri)
+		response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+			return req.SetBody(remoteObject).Post(uri)
+		})
 
 		if err != nil {
 			return err
+		}
+
+		if response == nil {
+			return errors.New("BAD STATE; no respo")
 		}
 
 		if response.StatusCode() != http.StatusOK &&
@@ -801,17 +898,9 @@ func (p *Pvr) PutRemote(repoPath string, force bool) error {
 		return err
 	}
 
-	bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
-	if bearer == "" {
-		bearer, err = p.getBearerFor(uri)
-		if err != nil {
-			return err
-		}
-	}
-
-	response, err := resty.R().SetBody(body).
-		SetAuthToken(bearer).
-		Put(uri)
+	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.SetBody(body).Put(uri)
+	})
 
 	if err != nil {
 		return err
@@ -820,7 +909,6 @@ func (p *Pvr) PutRemote(repoPath string, force bool) error {
 	if 200 != response.StatusCode() {
 		return errors.New("REST call failed. " +
 			strconv.Itoa(response.StatusCode()) + "  " + response.Status() + "\n\n   " + string(response.Body()))
-
 	}
 
 	err = json.Unmarshal(response.Body(), &body)
@@ -848,6 +936,10 @@ func (p *Pvr) Put(uri string, force bool) error {
 		err = p.PutLocal(uri)
 	} else {
 		err = p.PutRemote(uri, force)
+	}
+
+	if err != nil {
+		return err
 	}
 
 	p.Pvrconfig.DefaultPutUrl = uri
@@ -961,17 +1053,9 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 		return err
 	}
 
-	bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
-	if bearer == "" {
-		bearer, err = p.getBearerFor(uri)
-		if err != nil {
-			return err
-		}
-	}
-
-	response, err := resty.R().SetBody(data).SetContentLength(true).
-		SetAuthToken(bearer).
-		Post(remotePvr.PostUrl)
+	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.SetBody(data).SetContentLength(true).Post(remotePvr.PostUrl)
+	})
 
 	if err != nil {
 		return err
@@ -1055,19 +1139,9 @@ func (p *Pvr) GetRepoLocal(repoPath string) error {
 
 func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote) error {
 
-	var err error
-	bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
-	if bearer == "" {
-		bearer, err = p.getBearerFor(pvrRemote.JsonGetUrl)
-		if err != nil {
-			return err
-		}
-	}
-
-	// push all objects
-	response, err := resty.R().
-		SetAuthToken(bearer).
-		Get(pvrRemote.JsonGetUrl)
+	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(pvrRemote.JsonGetUrl)
+	})
 
 	if err != nil {
 		return err
@@ -1089,17 +1163,9 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote) error {
 
 		uri := pvrRemote.ObjectsEndpointUrl + "/" + v
 
-		bearer := p.App.Metadata["PANTAHUB_AUTH"].(string)
-		if bearer == "" {
-			bearer, err = p.getBearerFor(uri)
-			if err != nil {
-				return err
-			}
-		}
-
-		response, err := resty.R().
-			SetAuthToken(bearer).
-			Get(uri)
+		response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+			return req.Get(uri)
+		})
 
 		if err != nil {
 			return err
