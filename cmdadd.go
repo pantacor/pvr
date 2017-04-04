@@ -19,17 +19,17 @@ func CommandAdd() cli.Command {
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 1)
 			}
 
 			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 2)
 			}
 
 			err = pvr.AddFile(c.Args())
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 3)
 			}
 
 			return nil
