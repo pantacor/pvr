@@ -20,20 +20,24 @@ func CommandDiff() cli.Command {
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 1)
 			}
 
 			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 2)
 			}
 
 			jsonDiff, err := pvr.Diff()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 3)
 			}
 
 			jsonDiffF, err := FormatJson(*jsonDiff)
+
+			if err != nil {
+				cli.NewExitError(err, 4)
+			}
 			fmt.Println(string(jsonDiffF))
 
 			return nil
