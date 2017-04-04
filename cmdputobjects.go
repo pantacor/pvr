@@ -19,21 +19,21 @@ func CommandPutObjects() cli.Command {
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 1)
 			}
 
 			if c.NArg() != 1 {
-				return errors.New("Push requires exactly 1 argument. See --help.")
+				return cli.NewExitError("Push requires exactly 1 argument. See --help.", 2)
 			}
 
 			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 3)
 			}
 
 			err = pvr.PutObjects(c.Args()[0], c.Bool("force"))
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 4)
 			}
 
 			return nil
