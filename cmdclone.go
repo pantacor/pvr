@@ -4,12 +4,9 @@
 package main
 
 import (
-	"errors"
 	"net/url"
 	"os"
 	"path"
-
-	"fmt"
 
 	"github.com/urfave/cli"
 )
@@ -24,16 +21,16 @@ func CommandClone() cli.Command {
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 1)
 			}
 
 			if c.NArg() < 1 {
-				return errors.New("clone needs need repository argument. See --help")
+				return cli.NewExitError("clone needs need repository argument. See --help", 2)
 			}
 
 			newUrl, err := url.Parse(c.Args().Get(0))
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 3)
 			}
 
 			base := path.Base(newUrl.Path)
@@ -42,31 +39,33 @@ func CommandClone() cli.Command {
 				base = c.Args().Get(1)
 			}
 
-			fmt.Println("base: " + base)
-
 			err = os.Mkdir(base, 0755)
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 4)
 			}
 
 			pvr, err := NewPvr(c.App, base)
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 5)
 			}
 
 			err = pvr.Init()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 6)
 			}
 
 			err = pvr.GetRepo(newUrl.String())
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 7)
 			}
 
 			err = pvr.Reset()
 
-			return err
+			if err != nil {
+				return cli.NewExitError(err, 8)
+			}
+
+			return nil
 		},
 	}
 }
