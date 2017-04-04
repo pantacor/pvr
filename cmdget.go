@@ -20,12 +20,12 @@ func CommandGet() cli.Command {
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 1)
 			}
 
 			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 2)
 			}
 
 			var repoPath string
@@ -40,7 +40,7 @@ func CommandGet() cli.Command {
 
 			err = pvr.GetRepo(repoPath)
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 3)
 			}
 
 			return nil
