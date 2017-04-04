@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"os"
 
 	"github.com/urfave/cli"
