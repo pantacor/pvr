@@ -19,17 +19,17 @@ func CommandStatus() cli.Command {
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 1)
 			}
 
 			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 2)
 			}
 
 			status, err := pvr.Status()
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 3)
 			}
 
 			fmt.Println(status)
