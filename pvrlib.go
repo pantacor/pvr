@@ -941,15 +941,12 @@ func (p *Pvr) Put(uri string, force bool) error {
 		return err
 	}
 
-	p.Pvrconfig.DefaultPutUrl = uri
 	if p.Pvrconfig.DefaultGetUrl == "" {
 		p.Pvrconfig.DefaultGetUrl = uri
 	}
 	if p.Pvrconfig.DefaultPutUrl == "" {
 		p.Pvrconfig.DefaultPostUrl = uri
 	}
-
-	// XXX: spaghetti code - refactor a simple json atomic write function here
 	if err == nil {
 		p.Pvrconfig.DefaultPutUrl = uri
 		err = p.SaveConfig()
