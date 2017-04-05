@@ -1065,7 +1065,6 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 
 	fmt.Println("Posted JSON: " + string(response.Body()))
 
-	// XXX: spaghetti code ... refactor this into single atomic write
 	p.Pvrconfig.DefaultPostUrl = uri
 	if p.Pvrconfig.DefaultGetUrl == "" {
 		p.Pvrconfig.DefaultGetUrl = uri
@@ -1259,7 +1258,6 @@ func (p *Pvr) GetRepo(uri string) error {
 		p.Pvrconfig.DefaultPostUrl = uri
 	}
 
-	// XXX: spaghetti code - refactor a simple json atomic write function here
 	if err == nil {
 		p.Pvrconfig.DefaultPutUrl = uri
 		err = p.SaveConfig()
