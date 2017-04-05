@@ -570,10 +570,10 @@ func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
 	return filesAndObjects, nil
 }
 
-func readCredentials() (string, string) {
+func readCredentials(targetPrompt string) (string, string) {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Print("Username: ")
+	fmt.Print("Username for " + targetPrompt + ": ")
 	username, _ := reader.ReadString('\n')
 
 	fmt.Print("Password: ")
@@ -741,8 +741,7 @@ func (p *Pvr) getNewAccessToken(authHeader string) (string, error) {
 	// get fresh user/pass auth
 	for i := 0; i < 3; i++ {
 		var accessToken, refreshToken string
-		fmt.Println("Authenticate with: " + authEp + " realm=" + realm)
-		username, password := readCredentials()
+		username, password := readCredentials(authEp + " (realm=" + realm + ")")
 		accessToken, refreshToken, err = p.doAuthenticate(authEp, username, password)
 
 		if err != nil {
