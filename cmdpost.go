@@ -56,8 +56,8 @@ func CommandPost() cli.Command {
 				Usage: "provide the json envelope to wrap around the pvr post. use {} when not provided",
 			},
 			cli.StringFlag{
-				Name:  "commit-msg",
-				Usage: "add 'commit-msg' field to envelope",
+				Name: "commit-msg",
+				Usage: "add 'commit-msg' field 	to envelope",
 			},
 			cli.StringFlag{
 				Name:  "rev",
