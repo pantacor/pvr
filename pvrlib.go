@@ -807,7 +807,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		if err != nil {
 			return err
 		}
-		sizeString := fmt.Sprintf("%d", info.Size)
+		sizeString := fmt.Sprintf("%d", info.Size())
 
 		remoteObject := ObjectWithAccess{}
 		remoteObject.Object.Size = sizeString
