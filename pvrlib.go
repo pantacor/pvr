@@ -816,6 +816,9 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		remoteObject.ObjectName = k
 
 		uri := pvrRemote.ObjectsEndpointUrl
+		if ! strings.HasSuffix(uri,"/") {
+			uri += "/"
+		}
 
 		response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
 			return req.SetBody(remoteObject).Post(uri)
