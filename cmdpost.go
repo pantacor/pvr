@@ -74,6 +74,7 @@ func CommandPost() cli.Command {
 			cli.StringFlag{
 				Name:  "rev",
 				Usage: "add 'rev' fieldcall to envelope",
+				Value: "-1",
 			},
 			cli.BoolFlag{
 				Name:  "force, f",
