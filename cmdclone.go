@@ -66,7 +66,7 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 6)
 			}
 
-			err = pvr.GetRepo(newUrl.String())
+			err = pvr.GetRepo(newUrl.String(), false)
 			if err != nil {
 				return cli.NewExitError(err, 7)
 			}

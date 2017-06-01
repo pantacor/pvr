@@ -828,7 +828,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		remoteObject.ObjectName = k
 
 		uri := pvrRemote.ObjectsEndpointUrl
-		if ! strings.HasSuffix(uri,"/") {
+		if !strings.HasSuffix(uri, "/") {
 			uri += "/"
 		}
 
@@ -1098,7 +1098,7 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	return nil
 }
 
-func (p *Pvr) GetRepoLocal(repoPath string) error {
+func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 
 	// first copy new json, but only rename at the very end after all else succeed
 	jsonNew := path.Join(p.Pvrdir, "json.new")
@@ -1147,20 +1147,29 @@ func (p *Pvr) GetRepoLocal(repoPath string) error {
 	return err
 }
 
-func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote) error {
+func (p *Pvr) getJsonBuf(pvrRemote pvrapi.PvrRemote) ([]byte, error) {
 
 	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		return req.Get(pvrRemote.JsonGetUrl)
 	})
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	jsonNew := response.Body()
+	jsonData := response.Body()
+
+	return jsonData, nil
+}
+
+func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
+
 	jsonMap := map[string]interface{}{}
 
-	err = json.Unmarshal(response.Body(), &jsonMap)
+	err := json.Unmarshal(jsonData, &jsonMap)
+	if err != nil {
+		return err
+	}
 
 	for k := range jsonMap {
 		if strings.HasSuffix(k, ".json") {
@@ -1206,16 +1215,11 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote) error {
 		ioutil.WriteFile(path.Join(p.Objdir, v), response.Body(), 0644)
 		fmt.Println("Downloaded Object " + v)
 	}
-	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), jsonNew, 0644)
 
-	if err != nil {
-		return err
-	}
-
-	return os.Rename(path.Join(p.Pvrdir, "json.new"), path.Join(p.Pvrdir, "json"))
+	return nil
 }
 
-func (p *Pvr) GetRepoRemote(repoPath string) error {
+func (p *Pvr) GetRepoRemote(repoPath string, merge bool) error {
 
 	url, err := url.Parse(repoPath)
 
@@ -1233,16 +1237,40 @@ func (p *Pvr) GetRepoRemote(repoPath string) error {
 		return err
 	}
 
-	err = p.getObjects(remotePvr)
+	jsonData, err := p.getJsonBuf(remotePvr)
 
 	if err != nil {
 		return err
 	}
 
-	return nil
+	err = p.getObjects(remotePvr, jsonData)
+
+	if err != nil {
+		return err
+	}
+
+	var jsonMerged []byte
+
+	if merge {
+		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonData)
+	} else {
+		jsonMerged = jsonData
+	}
+
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
+
+	if err != nil {
+		return err
+	}
+
+	return os.Rename(path.Join(p.Pvrdir, "json.new"), path.Join(p.Pvrdir, "json"))
 }
 
-func (p *Pvr) GetRepo(uri string) error {
+func (p *Pvr) GetRepo(uri string, merge bool) error {
 
 	if uri == "" {
 		uri = p.Pvrconfig.DefaultPutUrl
@@ -1255,9 +1283,9 @@ func (p *Pvr) GetRepo(uri string) error {
 	}
 
 	if url.Scheme == "" {
-		err = p.GetRepoLocal(uri)
+		err = p.GetRepoLocal(uri, merge)
 	} else {
-		err = p.GetRepoRemote(uri)
+		err = p.GetRepoRemote(uri, merge)
 	}
 	if err != nil {
 		return err

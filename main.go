@@ -73,6 +73,7 @@ func main() {
 		CommandPut(),
 		CommandPost(),
 		CommandGet(),
+		CommandMerge(),
 		CommandReset(),
 		CommandClone(),
 		CommandPutObjects(),
