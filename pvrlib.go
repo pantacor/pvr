@@ -1100,24 +1100,19 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 
 func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 
-	// first copy new json, but only rename at the very end after all else succeed
-	jsonNew := path.Join(p.Pvrdir, "json.new")
-	err := Copy(jsonNew, path.Join(repoPath, "json"))
 	rs := map[string]interface{}{}
 
+	// first copy new json, but only rename at the very end after all else succeed
+	jsonRepo := path.Join(repoPath, "json")
+
+	jsonData, err := ioutil.ReadFile(jsonRepo)
 	if err != nil {
 		return err
 	}
 
-	data, err := ioutil.ReadFile(jsonNew)
+	err = json.Unmarshal(jsonData, &rs)
 	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(data, &rs)
-	if err != nil {
-		return errors.New("JSON Unmarshal (" +
-			strings.TrimPrefix(jsonNew, p.Dir) + "): " + err.Error())
+		return errors.New("JSON Unmarshal (json.new):" + err.Error())
 	}
 
 	for k, v := range rs {
@@ -1141,8 +1136,27 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 		}
 	}
 
+	var jsonMerged []byte
+
+	if merge {
+		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonData)
+	} else {
+		jsonMerged = jsonData
+	}
+
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
+
+	if err != nil {
+		return err
+	}
+
+
 	// all succeeded, atomically commiting the json
-	err = os.Rename(jsonNew, strings.TrimSuffix(jsonNew, ".new"))
+	err = os.Rename(path.Join(p.Pvrdir, "json.new"), path.Join(p.Pvrdir, "json"))
 
 	return err
 }
