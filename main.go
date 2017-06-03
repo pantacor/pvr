@@ -67,6 +67,7 @@ func main() {
 		CommandInit(),
 		CommandAdd(),
 		CommandJson(),
+		CommandClaim(),
 		CommandDiff(),
 		CommandStatus(),
 		CommandCommit(),

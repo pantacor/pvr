@@ -583,6 +583,16 @@ func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
 	return filesAndObjects, nil
 }
 
+func readChallenge(targetPrompt string) string {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println("*** Claim with challenge @ " + targetPrompt + " ***")
+	fmt.Print("Enter Challenge: ")
+	challenge, _ := reader.ReadString('\n')
+
+	return challenge
+}
+
 func readCredentials(targetPrompt string) (string, string) {
 	reader := bufio.NewReader(os.Stdin)
 
@@ -699,6 +709,37 @@ func (p *Pvr) doAuthenticate(authEp, username, password string) (string, string,
 	}
 
 	return m1["token"].(string), m1["token"].(string), nil
+}
+
+func (p *Pvr) doClaim(deviceEp, challenge string) error {
+
+	u, err := url.Parse(deviceEp)
+
+	if err != nil {
+		return errors.New("Parsing device URL failed with err=" + err.Error())
+	}
+
+	if challenge == "" {
+		challenge = readChallenge(deviceEp)
+	}
+
+	uV := u.Query()
+	uV.Set("challenge", challenge)
+	u.RawQuery = uV.Encode()
+
+	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Put(u.String())
+	})
+
+	if err != nil {
+		return errors.New("Claiming device failed with err=" + err.Error())
+	}
+
+	if response.StatusCode() != http.StatusOK {
+		return errors.New("Claiming device failed (code=" + string(response.StatusCode()) + "): " + string(response.Body()))
+	}
+
+	return nil
 }
 
 func (p *Pvr) doRefresh(authEp, token string) (string, string, error) {
