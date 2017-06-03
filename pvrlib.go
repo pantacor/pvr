@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -585,8 +586,15 @@ func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
 func readCredentials(targetPrompt string) (string, string) {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Print("Username for " + targetPrompt + ": ")
+	fmt.Println("*** Login (/type [R] to register) @ " + targetPrompt + " ***")
+	fmt.Print("Username: ")
 	username, _ := reader.ReadString('\n')
+
+	username = strings.TrimSpace(username)
+
+	if username == "REGISTER" || username == "REG" || username == "R" {
+		return "REGISTER", ""
+	}
 
 	fmt.Print("Password: ")
 	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
@@ -597,6 +605,45 @@ func readCredentials(targetPrompt string) (string, string) {
 	password := string(bytePassword)
 
 	return strings.TrimSpace(username), strings.TrimSpace(password)
+}
+
+func readRegistration(targetPrompt string) (string, string, string) {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println("\n*** REGISTER ACCOUNT @ " + targetPrompt + "***")
+	fmt.Print(" 1. Email: ")
+	email, _ := reader.ReadString('\n')
+	fmt.Print(" 2. Username: ")
+	username, _ := reader.ReadString('\n')
+
+	password := ""
+
+	for {
+		fmt.Print(" 3. Password: ")
+		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+		fmt.Println("*****")
+		if err != nil {
+			fmt.Println("Error: " + err.Error())
+			continue
+		}
+		password = string(bytePassword)
+
+		fmt.Print(" 4. Password Repeat: ")
+		bytePassword, err = terminal.ReadPassword(int(syscall.Stdin))
+		fmt.Println("*****")
+		if err != nil {
+			fmt.Println("Error: " + err.Error())
+			continue
+		}
+		if password != string(bytePassword) {
+			fmt.Println("Passwords do not match. Try again!")
+			continue
+		}
+		password = string(bytePassword)
+		break
+	}
+
+	return strings.TrimSpace(email), strings.TrimSpace(username), strings.TrimSpace(password)
 }
 
 func getWwwAuthenticateInfo(header string) (string, map[string]string) {
@@ -684,6 +731,59 @@ func (p *Pvr) doRefresh(authEp, token string) (string, string, error) {
 	return m1["token"].(string), m1["token"].(string), nil
 }
 
+func (p *Pvr) doRegister(authEp, email, username, password string) error {
+
+	if authEp == "" {
+		return errors.New("doRegister: no authentication endpoint provided.")
+	}
+	if email == "" {
+		return errors.New("doRegister: no email provided.")
+	}
+	if username == "" {
+		return errors.New("doRegister: no username provided.")
+	}
+	if password == "" {
+		return errors.New("doRegister: no password provided.")
+	}
+
+	u1, err := url.Parse(authEp)
+	if err != nil {
+		return errors.New("doRegister: error parsing EP url.")
+	}
+
+	accountsEp := u1.String() + "/accounts"
+
+	m := map[string]string{
+		"email":    email,
+		"nick":     username,
+		"password": password,
+	}
+
+	response, err := resty.R().SetBody(m).
+		Post(accountsEp)
+
+	if err != nil {
+		log.Fatal("Error calling POST for registration: " + err.Error())
+		return err
+	}
+
+	m1 := map[string]interface{}{}
+	err = json.Unmarshal(response.Body(), &m1)
+
+	if err != nil {
+		log.Fatal("Error parsing Register body(" + err.Error() + ") for " + accountsEp + ": " + string(response.Body()))
+		return err
+	}
+
+	if response.StatusCode() != 200 {
+		return errors.New("Failed to register: " + string(response.Body()))
+	}
+
+	log.Print("Registration Response: " + string(response.Body()))
+
+	return nil
+}
+
 func (p *Pvr) getCachedAccessToken(authHeader string) (string, error) {
 
 	// no auth header; nothing we can do magic here...
@@ -754,6 +854,15 @@ func (p *Pvr) getNewAccessToken(authHeader string) (string, error) {
 	for i := 0; i < 3; i++ {
 		var accessToken, refreshToken string
 		username, password := readCredentials(authEp + " (realm=" + realm + ")")
+		if username == "REGISTER" {
+			email, username, password := readRegistration(authEp + " (realm=" + realm + ")")
+			err = p.doRegister(authEp, email, username, password)
+
+			if err != nil {
+				log.Fatal("error registering with PH: " + err.Error())
+				os.Exit(122)
+			}
+		}
 		accessToken, refreshToken, err = p.doAuthenticate(authEp, username, password)
 
 		if err != nil {
@@ -1153,7 +1262,6 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 	if err != nil {
 		return err
 	}
-
 
 	// all succeeded, atomically commiting the json
 	err = os.Rename(path.Join(p.Pvrdir, "json.new"), path.Join(p.Pvrdir, "json"))

@@ -79,6 +79,7 @@ func main() {
 		CommandPutObjects(),
 		CommandExport(),
 		CommandImport(),
+		CommandRegister(),
 	}
 	app.Run(os.Args)
 }
