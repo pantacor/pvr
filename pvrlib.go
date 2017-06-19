@@ -34,7 +34,7 @@ import (
 	"strings"
 	"syscall"
 
-	"pvr/api"
+	"gitlab.com/pantacor/pvr/api"
 
 	"github.com/asac/json-patch"
 	"github.com/go-resty/resty"
