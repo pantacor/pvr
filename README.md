@@ -20,6 +20,7 @@
 $ go get gitlab.com/pantacor/pvr
 $ go build -o ~/bin/pvr gitlab.com/pantacor/pvr
 ```
+
 # Get Started
 
 pvr is about transforming a directory structure that contains files as well as json files into
