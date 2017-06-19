@@ -15,19 +15,11 @@
 
 # Install
 
-1. Get latest pvr from your distribution, e.g.
-
-    ```
-    $ apt-get install pvr
-    ```
-
-2. Download latest binary matching your architecture:
-
-    ```
-    $ wget http://downloads.pantahub.com/x86-64/pvr
-    $ chmod a+x pvr
-    ```
-
+1. From gitlab:
+  ```
+$ go get gitlab.com/pantacor/pvr
+$ go build -o ~/bin/pvr gitlab.com/pantacor/pvr
+```
 # Get Started
 
 pvr is about transforming a directory structure that contains files as well as json files into
@@ -43,7 +35,6 @@ To start a pvr from scratch you use the pvr init command which sets you up.
 
 ```
 example1$ pvr init
-pvc directory ready for use.
 ```
 
 However, more likely is that you want to consume an existing pvr made by you
@@ -105,15 +96,22 @@ state for reuse or archiving purpose. You can do so using the `push` command:
 example2$ pvr push /tmp/myrepo
 ```
 
-You can also push your repository to a pvr compliant REST backend.
+You can always get a birds view on things in your repo by dumping the complete
+current json:
+```
+example2$ pvr json
+{...}
+```
+
+You can also push your repository to a pvr compliant REST backend. In this
+case to a device trails (replace device id with your device)
 
 ```
-example2: pvr push https://pantahub.com/pvr/v1/my-repo1
+example2: pvr push https://api.pantahub.com/trails/<DEVICEID>
 ```
 
 You can later clone that very repo to use it as a starting point or get 
 its content to update another repo.
-
 
 # Internals
 
@@ -147,44 +145,16 @@ cat json
 }
 ```
 
-Cloud Restendpoints are expected to have an objects endpoint in parallel that will resolve the right GET and PUT Urls for a requested resource.
-
-The client will request objects like:
-
-```http GET http://someurl.tld/path/to/json/parent/objects/:id```
-
-The server is supposed to either deliver the object or redirect to the right location.
-
 # Commands
 
-## pvr init <SPEC>
+## pvr init
 ```
-$ pvr init pantavisor-multi-platform@1
-Created empty pantavisor-multi-platform@1 project.
+$ pvr init
+$ cat .pvr/json 
 
-$ cat .pvr/system.json
 {
-	"#spec": "pantavisor-multi-platform@1",
-	"systemc.json" {
-		"linux": "",
-		"initrd": [
-			"",
-		],
-		"platforms:": [],
-		"volumes": {},
-	}
+	"#spec": "pantavisor-multi-platform@1"
 }
-```
-
-As you can see the init program has created a template for you
-that needs filling up.
-
-```
-$ ls -a
-.
-..
-.pvr
-systemc.json
 ```
 
 You would now continue editing this directory as it pleases you. and you can refer to any file you put here in your configs just using the absolute path (e.g. /systemc.json).
@@ -210,7 +180,7 @@ You can look at your current changes to working directory using the diff command
 $ pvr diff
 {
 	"lxc-platform.conf": "sha1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-	"lxc-platform.conf": "sha1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+	"lxc-platform.json": { ... }
 }
 ```
 
@@ -218,7 +188,7 @@ $ pvr diff
 Committing your pvr will update the .pvr directory so it can be pushed to pantahub.
 
 ```
-$ pvr commit -m "my commit message"
+$ pvr commit
 Adding file xxx
 Changing File yyy
 Commit Done
@@ -226,107 +196,81 @@ Commit Done
 
 You can then continue editing and see your changes compared to the committed baseline using `pvr diff` again.
 
-## pvr push <destination>
+## pvr put <destination>
 
-Push local:
+Put local:
 ```
-$ pvr push /some/local/repopath
-[=============================================] 100%
+$ pvr put /some/local/repopath
+
 $ find /some/local/repopath
 /some/local/repopath/json
-/some/local/repopath/rev
-/some/local/repopath/commitmsg
-/some/local/repopath/objects/sha1:xxxxxxxxxxxxxxxxxxxxxx
-/some/local/repopath/objects/sha1:yyyyyyyyyyyyyyyyyyyyyy
+/some/local/repopath/objects/xxxxxxxxxxxxxxxxxxxxxx
+/some/local/repopath/objects/yyyyyyyyyyyyyyyyyyyyyy
 ```
 
-Push to your device:
+# pvr post <remote-device-ep>
+
+Post local pvr as a new revision to your device endpoint:
 ```
-$ pvr push https://localhost:12366/pvr/api/v1/DEVICEID/system
-DONE [=============================================] 100%
+$ pvr post https://api.pantahub.com/trails/<YOURDEVICE>
+...
 ```
 
-Talk about your device on panta blog:
+## pvr clone <LOCATION>
+
+you can clone a remote device state as follows:
 
 ```
-$ pvr post -h https://plog.pantahub.com/ricmm/
-Title: My first raspberry pi system!
-Tags: rpi3 yocto minimal system
-Summary: Install this following the instructions and
-  post your comments through disqus.
-Instructions:
-# MD Format Instructions
-here.
-<EMPTYLINE>
-<EMPTYLINE>
-Posted: https://plog.pantahub.com/ricmm/my-first-raspberry-pi-system
-$
+$ pvr clone https://api.pantahub.com/trails/<YOURDEVICE>
+...
 ```
 
-## pvr get <LOCATION> (Blog)
-
-A reader wants to use your first raspberry pi system and apply it to one of his rpi3s
-
+Alternatively you can get a specific revision:
 ```
-$ pvr get https://plog.pantahub.com/ricmm/my-first-raspberry-pi-system
-DONE [=============================================] 100%
-$ pvr push https://localhost:12366/pantavisor/api/v1/DEVICEID/system
-DONE [=============================================] 100%
+$ pvr clone https://api.pantahub.com/trails/<YOURDEVICE>/steps/<REV>
+...
 ```
-
-## pvr get <LOCATION> (Device)
-
-A developer or admin or app wants to get state from a device instead of a post. He can also do that using `pvr get` primitive:
-```
-$ pvr get https://localhost:12366/pantavisor/api/v1/DEVICEID/system
-```
-
-```
-$ pvr get https://localhost:12366/pantavisor/api/v1/DEVICEID1/system#latest
-DONE [=============================================] 100%
-$ pvr push https://localhost:12366/pantavisor/api/v1/DEVICEID2/system
-DONE [=============================================] 100%
-```
-
 
 # References
 
 ## Example pvr json
 
 ```
-"pvr":
 {
 	"#spec": "pantavisor-multi-platform@1",
-	"myvideo.blob": "sha:xxxxxxxxxxxxxxxxxxxxxxxxxxx",
-	"config.json" {
-	  "key": "value"
-	},
-	"conf/lxc-owrt-mips.conf": "sha:tttttttttttttttttttttt",
-	"conf/lxc-ble-gw1.conf": "sha:rrrrrrrrrrrrrrrrrrrr",
-	"systemc.json" {
-		"linux": "/kernel.img",
-		"initrd": [
-			"/0base.cpio.gz",
-			"/asacrd.cpio.gz",
+	"0base.cpio.xz": "d58791088d7e6be67b43b927f06b2deee3bf0ab0a73509852d3c1e47d0e09296",
+	"alpine-mini.json": {
+		"configs": [
+			"lxc-alpine.config"
 		],
-		"platforms:": ["lxc-owrt-mips.json"]
-		"volumes": [],
-		},
-	"lxc-owrt-mips.json":
-	{
-		"spec": "pantavisor-lxc-runner@1",
-		"parent": null,
-		"lxc-config": "/owrt.json",
-		"lxc-shares": [ NETWORK, UTS, IPC ],
-		"lxc-exec": "/init"
+		"exec": "/sbin/init",
+		"name": "alpine-mini",
+		"share": [
+			"NETWORK",
+			"UTS",
+			"IPC"
+		],
+		"type": "lxc"
 	},
-	"lxc-azure-ble-gw1.json":
-	{
-		"parent": lxc-owrt-mips,
-		"runner": "lxc",
-		"lxc-config": "/files/lxc-ble-gw1.conf",
-		"lxc-shares": [],
-		"lxc-exec": "/init"
-	},
+	"alpine-mini.squashfs": "219e14651a6f2158bead0bcf37c9efa7dca2b9a96f3661d9d78e1f7d4118e7a1",
+	"firmware.squashfs": "dfbfa0ffebf8fd75d0e07eb4ee8228b167b928831449f66e511182da6e3027dd",
+	"kernel.img": "fec9b1db203e4ceb3b45d6bf09b6d1c971d9db0e90498b9142ee53c578269497",
+	"lxc-alpine.config": "de878a7e0a3b4f23ea5b47520c8105d569f543d76c49ab0b2f6b3a5472cd5162",
+	"modules.squashfs": "abe82a1b95c7314355da396ee7a25459aace231ad3057692572d90c6799d432b",
+	"pantavisor.json": {
+		"firmware": "/volumes/firmware.squashfs",
+		"initrd": [
+			"0base.cpio.gz"
+		],
+		"linux": "kernel.img",
+		"platforms:": [
+			"alpine-mini"
+		],
+		"volumes": [
+			"alpine-mini.squashfs",
+			"firmware.squashfs",
+			"modules.squashfs"
+		]
+	}
 }
 ```
