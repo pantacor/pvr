@@ -590,7 +590,7 @@ func readChallenge(targetPrompt string) string {
 	fmt.Print("Enter Challenge: ")
 	challenge, _ := reader.ReadString('\n')
 
-	return challenge
+	return strings.TrimRight(challenge, "\n")
 }
 
 func readCredentials(targetPrompt string) (string, string) {
