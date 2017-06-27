@@ -34,18 +34,24 @@ func CommandInit() cli.Command {
 				return cli.NewExitError(err, 1)
 			}
 
-			pvr, err := NewPvr(c.App, wd)
+			pvr, err := NewPvrInit(c.App, wd)
 
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
 			// empty template as starting point; XXX; add Flag to pass custom json
-			err = pvr.Init()
+			err = pvr.Init(c.String("objects"))
 
 			if err != nil {
 				cli.NewExitError(err, 3)
 			}
 			return nil
+		},
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "objects, o",
+				Usage: "Use `OBJECTS` directory for storing the file objects. Can be absolue or relative to .pvr directory.",
+			},
 		},
 	}
 }

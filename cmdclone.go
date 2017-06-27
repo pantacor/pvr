@@ -56,12 +56,12 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 4)
 			}
 
-			pvr, err := NewPvr(c.App, base)
+			pvr, err := NewPvrInit(c.App, base)
 			if err != nil {
 				return cli.NewExitError(err, 5)
 			}
 
-			err = pvr.Init()
+			err = pvr.Init(c.String("objects"))
 			if err != nil {
 				return cli.NewExitError(err, 6)
 			}
@@ -79,5 +79,12 @@ func CommandClone() cli.Command {
 
 			return nil
 		},
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "objects, o",
+				Usage: "Use `OBJECTS` directory for storing the file objects. Can be absolue or relative to .pvr directory.",
+			},
+		},
 	}
+
 }

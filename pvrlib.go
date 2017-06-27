@@ -84,6 +84,7 @@ type PvrConfig struct {
 	DefaultGetUrl  string
 	DefaultPutUrl  string
 	DefaultPostUrl string
+	ObjectsDir     string
 
 	// tokens by realm
 	AccessTokens  map[string]string
@@ -97,6 +98,10 @@ func (p *Pvr) String() string {
 }
 
 func NewPvr(app *cli.App, dir string) (*Pvr, error) {
+	return NewPvrInit(app, dir)
+}
+
+func NewPvrInit(app *cli.App, dir string) (*Pvr, error) {
 	pvr := Pvr{
 		Dir:         dir + "/",
 		Pvrdir:      path.Join(dir, ".pvr"),
@@ -121,6 +126,7 @@ func NewPvr(app *cli.App, dir string) (*Pvr, error) {
 	if err == nil && fileInfo.IsDir() {
 		return nil, errors.New("Repo is in bad state. .pvr/json is a directory")
 	}
+
 	if err != nil {
 		pvr.Initialized = false
 		return &pvr, nil
@@ -160,6 +166,12 @@ func NewPvr(app *cli.App, dir string) (*Pvr, error) {
 		if err != nil {
 			return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(path.Join(pvr.Pvrdir, "json"), pvr.Dir) + "): " + err.Error())
 		}
+	} else {
+		// not exist
+	}
+
+	if pvr.Pvrconfig.ObjectsDir != "" {
+		pvr.Objdir = pvr.Pvrconfig.ObjectsDir
 	}
 
 	return &pvr, nil
@@ -279,12 +291,12 @@ func (p *Pvr) GetWorkingJson() ([]byte, error) {
 	return json.Marshal(workingJson)
 }
 
-func (p *Pvr) Init() error {
+func (p *Pvr) Init(objectsDir string) error {
 
-	return p.InitCustom("")
+	return p.InitCustom("", objectsDir)
 }
 
-func (p *Pvr) InitCustom(customInitJson string) error {
+func (p *Pvr) InitCustom(customInitJson string, objectsDir string) error {
 
 	var EMPTY_PVR_JSON string = `
 {
@@ -301,6 +313,19 @@ func (p *Pvr) InitCustom(customInitJson string) error {
 	if err != nil {
 		return err
 	}
+
+	// allow overwrite and remember abs path in config
+	if objectsDir != "" {
+		p.Objdir, err = filepath.Abs(objectsDir)
+
+		if err != nil {
+			return errors.New("Unexpected Error 1: " + err.Error())
+		}
+
+		p.Pvrconfig.ObjectsDir = p.Objdir
+		p.SaveConfig()
+	}
+
 	err = os.Mkdir(p.Objdir, 0755)
 
 	jsonFile, err := os.OpenFile(path.Join(p.Pvrdir, "json"), os.O_CREATE|os.O_WRONLY, 0644)
@@ -373,7 +398,7 @@ func (p *Pvr) Commit(msg string) error {
 	}
 
 	for _, v := range status.ChangedFiles {
-		fmt.Println("Committing " + v)
+		fmt.Println("Committing " + p.Objdir + "/" + v)
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
@@ -1123,6 +1148,7 @@ func (p *Pvr) Put(uri string, force bool) error {
 func (p *Pvr) SaveConfig() error {
 	configNew := path.Join(p.Pvrdir, "config.new")
 	configPath := path.Join(p.Pvrdir, "config")
+
 	byteJson, err := json.Marshal(p.Pvrconfig)
 	if err != nil {
 		return err
@@ -1341,6 +1367,7 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 		if strings.HasPrefix(k, "#spec") {
 			continue
 		}
+
 		v := jsonMap[k].(string)
 
 		uri := pvrRemote.ObjectsEndpointUrl + "/" + v
@@ -1376,7 +1403,7 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 		}
 
 		ioutil.WriteFile(path.Join(p.Objdir, v), response.Body(), 0644)
-		fmt.Println("Downloaded Object " + v)
+		fmt.Println("Downloaded Object " + p.Objdir + "/" + v)
 	}
 
 	return nil
