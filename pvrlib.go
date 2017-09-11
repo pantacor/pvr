@@ -33,14 +33,18 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"gitlab.com/pantacor/pvr/api"
 
 	"github.com/asac/json-patch"
+	"github.com/cavaliercoder/grab"
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
 
 	"golang.org/x/crypto/ssh/terminal"
+
+	"gopkg.in/cheggaaa/pb.v1"
 )
 
 type PvrStatus struct {
@@ -1351,6 +1355,102 @@ func (p *Pvr) getJsonBuf(pvrRemote pvrapi.PvrRemote) ([]byte, error) {
 	return jsonData, nil
 }
 
+func (p *Pvr) grabObjects(requests ...*grab.Request) error {
+	client := grab.NewClient()
+
+	client.UserAgent = "PVR client"
+	respch := client.DoBatch(4, requests...)
+
+	// start a ticker to update progress every 200ms
+	t := time.NewTicker(200 * time.Millisecond)
+
+	progressBars := map[*grab.Request]*pb.ProgressBar{}
+	progressBarSlice := make([]*pb.ProgressBar, 0)
+
+	for _, v := range requests {
+		shortFile := filepath.Base(v.Filename)[:15]
+		progressBars[v] = pb.New(0).Prefix(shortFile)
+		progressBars[v].ShowCounters = false
+		progressBarSlice = append(progressBarSlice, progressBars[v])
+	}
+
+	// monitor downloads
+	completed := 0
+	inProgress := 0
+	responses := make([]*grab.Response, 0)
+
+	pool, err := pb.StartPool(progressBarSlice...)
+	if err != nil {
+		goto err
+	}
+
+	for completed < len(requests) {
+		select {
+		case resp := <-respch:
+			// a new response has been received and has started downloading
+			// (nil is received once, when the channel is closed by grab)
+			if resp != nil {
+				responses = append(responses, resp)
+			}
+
+		case <-t.C:
+			// update completed downloads
+			for i, resp := range responses {
+				if resp != nil && resp.IsComplete() {
+					req := resp.Request
+					// print final result
+					if resp.Err() != nil {
+						progressBars[req].Finish()
+						progressBars[req].ShowBar = false
+						progressBars[req].ShowPercent = false
+						progressBars[req].ShowCounters = false
+						progressBars[req].ShowFinalTime = false
+						goto err
+
+					} else {
+						progressBars[req].Finish()
+						progressBars[req].ShowFinalTime = false
+						progressBars[req].ShowPercent = false
+						progressBars[req].ShowCounters = false
+						progressBars[req].ShowTimeLeft = false
+						progressBars[req].ShowBar = false
+						progressBars[req].Postfix(" [OK] Total: " + strconv.Itoa(int(resp.BytesComplete())) +
+							" Bytes at " + strconv.Itoa(int(resp.BytesPerSecond())) +
+							" Bytes/Sec")
+						progressBars[req].Set64(progressBars[req].Total)
+					}
+
+					// mark completed
+					responses[i] = nil
+					completed++
+				}
+			}
+
+			// update downloads in progress
+			inProgress = 0
+			for _, resp := range responses {
+				if resp != nil {
+					req := resp.Request
+					inProgress++
+					progressBars[req].Total = resp.HTTPResponse.ContentLength
+					progressBars[req].ShowTimeLeft = true
+					progressBars[req].ShowCounters = true
+					progressBars[req].ShowPercent = true
+					progressBars[req].Set64(resp.BytesComplete())
+				}
+			}
+		}
+	}
+
+err:
+	if pool != nil {
+		pool.Stop()
+	}
+	t.Stop()
+
+	return nil
+}
+
 func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 
 	jsonMap := map[string]interface{}{}
@@ -1359,6 +1459,8 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 	if err != nil {
 		return err
 	}
+
+	grabs := make([]*grab.Request, 0)
 
 	for k := range jsonMap {
 		if strings.HasSuffix(k, ".json") {
@@ -1392,19 +1494,15 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 			return err
 		}
 
-		response, err = resty.R().Get(remoteObject.SignedGetUrl)
-
+		req, err := grab.NewRequest(path.Join(p.Objdir, v), remoteObject.SignedGetUrl)
 		if err != nil {
 			return err
 		}
-		if response.StatusCode() != 200 {
-			return errors.New("REST call failed. " +
-				strconv.Itoa(response.StatusCode()) + "  " + response.Status())
-		}
 
-		ioutil.WriteFile(path.Join(p.Objdir, v), response.Body(), 0644)
-		fmt.Println("Downloaded Object " + p.Objdir + "/" + v)
+		grabs = append(grabs, req)
 	}
+
+	p.grabObjects(grabs...)
 
 	return nil
 }
