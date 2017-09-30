@@ -95,7 +95,7 @@ type PvrConfig struct {
 	RefreshTokens map[string]string
 }
 
-type WrappableCallFunc func(req *resty.Request) (*resty.Response, error)
+type WrappableRestyCallFunc func(req *resty.Request) (*resty.Response, error)
 
 func (p *Pvr) String() string {
 	return "PVR: " + p.Dir
@@ -951,7 +951,7 @@ func (p *Pvr) getNewAccessToken(authHeader string) (string, error) {
 	return "", err
 }
 
-func (p *Pvr) doAuthCall(fn WrappableCallFunc) (*resty.Response, error) {
+func (p *Pvr) doAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error) {
 
 	var bearer string
 	var err error
@@ -985,12 +985,132 @@ func (p *Pvr) doAuthCall(fn WrappableCallFunc) (*resty.Response, error) {
 	return response, err
 }
 
+type FilePut struct {
+	sourceFile string
+	putUrl     string
+	objName    string
+	res        *http.Response
+	err        error
+	bar        *pb.ProgressBar
+}
+
+const (
+	PoolSize = 5
+)
+
+type AsyncBody struct {
+	Delegate io.ReadCloser
+	bar      *pb.ProgressBar
+}
+
+func (a *AsyncBody) Read(p []byte) (n int, err error) {
+
+	n, err = a.Delegate.Read(p)
+	a.bar.Add(n)
+
+	return n, err
+}
+
+func worker(jobs chan FilePut, done chan FilePut) {
+
+	for j := range jobs {
+		fstat, err := os.Stat(j.sourceFile)
+		if err != nil {
+			fmt.Errorf("ERROR: " + err.Error())
+			continue
+		}
+		reader, err := os.Open(j.sourceFile)
+		if err != nil {
+			fmt.Errorf("ERROR: " + err.Error())
+			continue
+		}
+
+		j.bar.Total = fstat.Size()
+		j.bar.Units = pb.U_BYTES
+		j.bar.UnitsWidth = 25
+		j.bar.ShowSpeed = true
+		j.bar.Prefix(filepath.Base(j.objName)[:Min(len(j.objName)-1, 12)] + " ")
+		j.bar.ShowCounters = false
+
+		defer reader.Close()
+		r := &AsyncBody{
+			Delegate: reader,
+			bar:      j.bar,
+		}
+
+		req, err := http.NewRequest(http.MethodPut, j.putUrl, r)
+
+		if err != nil {
+			j.bar.Finish()
+			j.err = err
+			j.res = nil
+
+			done <- j
+			continue
+		}
+
+		res, err := http.DefaultClient.Do(req)
+
+		j.bar.ShowFinalTime = true
+		j.bar.ShowPercent = false
+		j.bar.ShowCounters = false
+		j.bar.ShowTimeLeft = false
+		j.bar.ShowSpeed = false
+		j.bar.ShowBar = true
+		j.bar.Set64(j.bar.Total)
+		j.bar.UnitsWidth = 25
+		if err != nil {
+			j.bar.Postfix(" [ERROR]")
+		} else {
+			j.bar.Postfix(" [OK]")
+		}
+
+		j.bar.Finish()
+
+		j.err = err
+		j.res = res
+		done <- j
+	}
+}
+
+func (p *Pvr) putFiles(filePut ...FilePut) []FilePut {
+	jobs := make(chan FilePut, 100)
+	results := make(chan FilePut, 100)
+
+	fileOutPut := []FilePut{}
+
+	pool, _ := pb.StartPool()
+
+	for i := 0; i < PoolSize; i++ {
+		go worker(jobs, results)
+	}
+
+	for _, p := range filePut {
+		p.bar = pb.New(1)
+		pool.Add(p.bar)
+		jobs <- p
+	}
+	close(jobs)
+
+	for i := 0; i < len(filePut); i++ {
+		p := <-results
+		fileOutPut = append(fileOutPut, p)
+		p.bar.Finish()
+	}
+	close(results)
+	pool.Stop()
+
+	return fileOutPut
+}
+
 func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	filesAndObjects, err := p.listFilesAndObjects()
 	if err != nil {
 		return err
 	}
+
+	filePuts := []FilePut{}
 
 	// push all objects
 	for k, v := range filesAndObjects {
@@ -1029,7 +1149,8 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		}
 
 		if response.StatusCode() == http.StatusConflict && !force {
-			fmt.Println("Uploaded.")
+			_str := remoteObject.ObjectName[0:Min(len(remoteObject.ObjectName)-1, 12)] + " "
+			fmt.Println(_str + "[OK]")
 			continue
 		}
 
@@ -1038,28 +1159,25 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			return err
 		}
 
-		fmt.Print("Uploading object to " + remoteObject.SignedPutUrl)
-
-		if err != nil {
-			return err
-		}
-
 		fileName := path.Join(p.Objdir, v)
-		fileBytes, _ := ioutil.ReadFile(fileName)
-		response, err = resty.R().SetBody(fileBytes).SetContentLength(true).Put(remoteObject.SignedPutUrl)
+		filePuts = append(filePuts, FilePut{
+			sourceFile: fileName,
+			objName:    remoteObject.ObjectName,
+			putUrl:     remoteObject.SignedPutUrl,
+		})
+	}
 
-		if err != nil {
-			return err
-		}
+	filePutResults := p.putFiles(filePuts...)
 
-		fmt.Println("Upload done.")
+	for _, v := range filePutResults {
 
-		if 200 != response.StatusCode() {
+		if 200 != v.res.StatusCode {
 			return errors.New("REST call failed. " +
-				strconv.Itoa(response.StatusCode()) + "  " + response.Status())
+				strconv.Itoa(v.res.StatusCode) + "  " + v.res.Status)
 
 		}
 	}
+
 	return nil
 }
 
