@@ -65,3 +65,17 @@ func FiletoSha(path string) (string, error) {
 	shaBal := hex.EncodeToString(buf[:])
 	return shaBal, nil
 }
+
+func Min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
+}
+
+func Max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
