@@ -81,6 +81,7 @@ func main() {
 		CommandExport(),
 		CommandImport(),
 		CommandRegister(),
+		CommandDockerLxc(),
 	}
 	app.Run(os.Args)
 }
