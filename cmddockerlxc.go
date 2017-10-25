@@ -18,8 +18,8 @@ package main
 import (
 	"log"
 	"os"
-	"strings"
 
+	"github.com/docker/docker/registry"
 	"github.com/urfave/cli"
 )
 
@@ -50,37 +50,8 @@ func CommandDockerLxc() cli.Command {
 					log.Println("docker-lxc in dir " + pvr.Dir)
 
 					arg := c.Args()[0]
-					n := strings.Index(arg, "/")
 
-					repoTags := strings.SplitN(arg, ":", 2)
-					urlWords := strings.Split(repoTags[0], "/")
-
-					var registryUrl string
-					m := 0
-
-					if strings.Index(urlWords[m], ".") > -1 {
-						registryUrl = "https://" + urlWords[m]
-						m++
-					} else {
-						registryUrl = "https://registry-1.docker.io/"
-					}
-
-					repoPath := ""
-					for _, w := range urlWords[m:] {
-						repoPath = repoPath + w + "/"
-					}
-					repoPath = strings.TrimRight(repoPath, "/")
-
-					repoTag := ""
-					if len(repoTags) > 1 {
-						repoTag = repoTags[1]
-					} else {
-						repoTag = "latest"
-					}
-
-					log.Printf("found / in %d: registry: %s  repo: %s  tag: %s\n", n, registryUrl, repoPath, repoTag)
-
-					err = pvr.AddDockerLxc(registryUrl, repoPath, repoTag)
+					err = pvr.AddDockerLxc(arg, registry.ServiceOptions{})
 					if err != nil {
 						return cli.NewExitError(err, 5)
 					}

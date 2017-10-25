@@ -29,6 +29,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/client"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/cli/config"
 	"github.com/docker/docker/registry"
 )
 
@@ -64,62 +65,71 @@ func (p *Pvr) manifestToDir2(manifest *schema2.Manifest, targetDir string) error
 	return err
 }
 
-func (p *Pvr) AddDockerLxc(dockerRegistryUrl string, dockerRepo string, dockerTag string) error {
+func (p *Pvr) AddDockerLxc(dockerRef string, dockerServiceOptions registry.ServiceOptions) error {
 
-	repoNamed, err := reference.WithName(dockerRepo)
+	defaultService, err := registry.NewService(dockerServiceOptions)
+
 	if err != nil {
 		return err
 	}
 
-	fullRef, err := reference.WithTag(repoNamed, dockerTag)
+	named, err := reference.ParseNamed(dockerRef)
+
 	if err != nil {
 		return err
 	}
 
-	if dockerRegistryUrl == "" {
-		dockerRegistryUrl = ""
+	repoInfo, err := defaultService.ResolveRepository(named)
+
+	if err != nil {
+		return err
 	}
 
-	localRepoPath := path.Join(p.Dir, dockerRepo, dockerTag)
+	configDir := config.Dir()
+
+	file, err := os.Open(path.Join(configDir, "config.json"))
+	var buf []byte
+
+	if err == nil {
+		buf, err = ioutil.ReadAll(file)
+	} else {
+		err = nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	var config map[string]interface{}
+
+	if buf != nil {
+		err = json.Unmarshal(buf, config)
+	}
+
+	var auths map[string]types.AuthConfig
+
+	if config["auths"] != nil {
+		auths = config["auths"].(map[string]types.AuthConfig)
+	}
+
+	authConfig := registry.ResolveAuthConfig(auths, repoInfo.Index)
+
+	localRepoPath := path.Join(p.Dir, named.Name())
 	err = os.MkdirAll(localRepoPath, 0755)
 	if err != nil {
 		return err
 	}
+
+	transport := registry.AuthTransport(nil, &authConfig, false)
 
 	tmpdir, err := ioutil.TempDir("", "pvr-docker-lxc")
 	if err != nil {
 		return err
 	}
 
-	authConfig := &types.AuthConfig{}
+	defaultService.LookupPullEndpoints(repoInfo.Index.Name)
 
-	transport := registry.AuthTransport(nil, authConfig, false)
-	httpClient := registry.HTTPClient(transport)
-
-	session, err := registry.NewSession(httpClient, authConfig, nil)
-	if err != nil {
-		return err
-	}
-
-	log.Print("Openend registry Session")
-
-	jsonB, _, err := session.GetRemoteImageJSON("library/ubuntu:latest", "https://index.docker.io/v1/")
-	if err != nil {
-		return err
-	}
-
-	log.Print("Retrieved Image JSON through session")
-
-	var stringBuf string
-	err = json.Unmarshal(jsonB, &stringBuf)
-
-	if err != nil {
-		return err
-	}
-
-	log.Print("JSON: " + stringBuf)
-
-	repo, err := client.NewRepository(fullRef, dockerRegistryUrl, transport)
+	repo, err := client.NewRepository(named, dockerRegistryUrl, transport)
 	if err != nil {
 		return err
 	}
