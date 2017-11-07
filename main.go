@@ -40,6 +40,10 @@ func main() {
 			Name:  "baseurl, b",
 			Usage: "Use `BASEURL` for resolving prn URIs to core service endpoints",
 		},
+		cli.BoolFlag{
+			Name:  "debug, d",
+			Usage: "enable debugging output for rest calls",
+		},
 	}
 
 	app.Before = func(c *cli.Context) error {
@@ -59,6 +63,7 @@ func main() {
 		}
 		// XXX: make a --no-verify flag instead of thisr
 		resty.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+		resty.SetDebug(c.GlobalBool("debug"))
 
 		return nil
 	}
