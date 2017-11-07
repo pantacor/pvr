@@ -1489,6 +1489,7 @@ func (p *Pvr) grabObjects(requests ...*grab.Request) error {
 		shortFile := filepath.Base(v.Filename)[:15]
 		progressBars[v] = pb.New(0).Prefix(shortFile)
 		progressBars[v].ShowCounters = false
+		progressBars[v].SetUnits(pb.KB)
 		progressBarSlice = append(progressBarSlice, progressBars[v])
 	}
 
@@ -1532,9 +1533,7 @@ func (p *Pvr) grabObjects(requests ...*grab.Request) error {
 						progressBars[req].ShowCounters = false
 						progressBars[req].ShowTimeLeft = false
 						progressBars[req].ShowBar = false
-						progressBars[req].Postfix(" [OK] Total: " + strconv.Itoa(int(resp.BytesComplete())) +
-							" Bytes at " + strconv.Itoa(int(resp.BytesPerSecond())) +
-							" Bytes/Sec")
+						progressBars[req].Postfix(" [OK]")
 						progressBars[req].Set64(progressBars[req].Total)
 					}
 
@@ -1555,6 +1554,7 @@ func (p *Pvr) grabObjects(requests ...*grab.Request) error {
 					progressBars[req].ShowCounters = true
 					progressBars[req].ShowPercent = true
 					progressBars[req].Set64(resp.BytesComplete())
+					progressBars[req].SetUnits(pb.KB)
 				}
 			}
 		}
