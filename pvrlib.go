@@ -35,8 +35,6 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.com/pantacor/pvr/api"
-
 	"github.com/asac/json-patch"
 	"github.com/cavaliercoder/grab"
 	"github.com/go-resty/resty"
