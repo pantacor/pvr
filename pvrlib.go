@@ -107,9 +107,9 @@ func NewPvr(app *cli.App, dir string) (*Pvr, error) {
 
 func NewPvrInit(app *cli.App, dir string) (*Pvr, error) {
 	pvr := Pvr{
-		Dir:         dir + "/",
-		Pvrdir:      path.Join(dir, ".pvr"),
-		Objdir:      path.Join(dir, ".pvr", "objects"),
+		Dir:         dir + string(filepath.Separator),
+		Pvrdir:      filepath.Join(dir, ".pvr"),
+		Objdir:      filepath.Join(dir, ".pvr", "objects"),
 		Initialized: false,
 		App:         app,
 	}
@@ -125,7 +125,7 @@ func NewPvrInit(app *cli.App, dir string) (*Pvr, error) {
 		return nil, errors.New("pvr path is not a directory: " + dir)
 	}
 
-	fileInfo, err = os.Stat(path.Join(pvr.Pvrdir, "json"))
+	fileInfo, err = os.Stat(filepath.Join(pvr.Pvrdir, "json"))
 
 	if err == nil && fileInfo.IsDir() {
 		return nil, errors.New("Repo is in bad state. .pvr/json is a directory")
@@ -136,18 +136,18 @@ func NewPvrInit(app *cli.App, dir string) (*Pvr, error) {
 		return &pvr, nil
 	}
 
-	byteJson, err := ioutil.ReadFile(path.Join(pvr.Pvrdir, "json"))
+	byteJson, err := ioutil.ReadFile(filepath.Join(pvr.Pvrdir, "json"))
 	// pristine json we keep as string as this will allow users load into
 	// convenient structs
 	pvr.PristineJson = byteJson
 
 	err = json.Unmarshal(pvr.PristineJson, &pvr.PristineJsonMap)
 	if err != nil {
-		return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(path.Join(pvr.Pvrdir, "json"), pvr.Dir) + "): " + err.Error())
+		return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(filepath.Join(pvr.Pvrdir, "json"), pvr.Dir) + "): " + err.Error())
 	}
 
 	// new files is a json file we will parse happily
-	bytesNew, err := ioutil.ReadFile(path.Join(pvr.Pvrdir, "new"))
+	bytesNew, err := ioutil.ReadFile(filepath.Join(pvr.Pvrdir, "new"))
 	if err == nil {
 		err = json.Unmarshal(bytesNew, &pvr.NewFiles)
 	} else {
@@ -156,19 +156,19 @@ func NewPvrInit(app *cli.App, dir string) (*Pvr, error) {
 	}
 
 	if err != nil {
-		return &pvr, errors.New("Repo in bad state. JSON Unmarshal (" + strings.TrimPrefix(path.Join(pvr.Pvrdir, "json"), pvr.Dir) + ") Not possible. Make a copy of the repository for forensics, file a bug and maybe delete that file manually to try to recover: " + err.Error())
+		return &pvr, errors.New("Repo in bad state. JSON Unmarshal (" + strings.TrimPrefix(filepath.Join(pvr.Pvrdir, "json"), pvr.Dir) + ") Not possible. Make a copy of the repository for forensics, file a bug and maybe delete that file manually to try to recover: " + err.Error())
 	}
 
-	fileInfo, err = os.Stat(path.Join(pvr.Pvrdir, "config"))
+	fileInfo, err = os.Stat(filepath.Join(pvr.Pvrdir, "config"))
 
 	if err == nil && fileInfo.IsDir() {
 		return nil, errors.New("Repo is in bad state. .pvr/json is a directory")
 	} else if err == nil {
-		byteJson, err := ioutil.ReadFile(path.Join(pvr.Pvrdir, "config"))
+		byteJson, err := ioutil.ReadFile(filepath.Join(pvr.Pvrdir, "config"))
 
 		err = json.Unmarshal(byteJson, &pvr.Pvrconfig)
 		if err != nil {
-			return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(path.Join(pvr.Pvrdir, "json"), pvr.Dir) + "): " + err.Error())
+			return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(filepath.Join(pvr.Pvrdir, "json"), pvr.Dir) + "): " + err.Error())
 		}
 	} else {
 		// not exist
@@ -236,11 +236,11 @@ func (p *Pvr) AddFile(globs []string) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(path.Join(p.Pvrdir, "new.XXX"), jsonData, 0644)
+	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "new.XXX"), jsonData, 0644)
 	if err != nil {
 		return err
 	}
-	err = os.Rename(path.Join(p.Pvrdir, "new.XXX"), path.Join(p.Pvrdir, "new"))
+	err = os.Rename(filepath.Join(p.Pvrdir, "new.XXX"), filepath.Join(p.Pvrdir, "new"))
 	if err != nil {
 		return err
 	}
@@ -332,7 +332,7 @@ func (p *Pvr) InitCustom(customInitJson string, objectsDir string) error {
 
 	err = os.Mkdir(p.Objdir, 0755)
 
-	jsonFile, err := os.OpenFile(path.Join(p.Pvrdir, "json"), os.O_CREATE|os.O_WRONLY, 0644)
+	jsonFile, err := os.OpenFile(filepath.Join(p.Pvrdir, "json"), os.O_CREATE|os.O_WRONLY, 0644)
 
 	if err != nil {
 		return err
@@ -402,7 +402,7 @@ func (p *Pvr) Commit(msg string) error {
 	}
 
 	for _, v := range status.ChangedFiles {
-		fmt.Println("Committing " + p.Objdir + "/" + v)
+		fmt.Println("Committing " + filepath.Join(p.Objdir+v))
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
@@ -410,7 +410,7 @@ func (p *Pvr) Commit(msg string) error {
 		if err != nil {
 			return err
 		}
-		err = Copy(path.Join(p.Objdir, sha), v)
+		err = Copy(filepath.Join(p.Objdir, sha), v)
 		if err != nil {
 			return err
 		}
@@ -426,15 +426,15 @@ func (p *Pvr) Commit(msg string) error {
 		if err != nil {
 			return err
 		}
-		_, err = os.Stat(path.Join(p.Objdir, sha))
+		_, err = os.Stat(filepath.Join(p.Objdir, sha))
 		// if not exists, then copy; otherwise continue
 		if err != nil {
 
-			err = Copy(path.Join(p.Objdir, sha+".new"), v)
+			err = Copy(filepath.Join(p.Objdir, sha+".new"), v)
 			if err != nil {
 				return err
 			}
-			err = os.Rename(path.Join(p.Objdir, sha+".new"),
+			err = os.Rename(filepath.Join(p.Objdir, sha+".new"),
 				path.Join(p.Objdir, sha))
 			if err != nil {
 				return err
@@ -449,8 +449,8 @@ func (p *Pvr) Commit(msg string) error {
 		fmt.Println("Removing " + v)
 	}
 
-	ioutil.WriteFile(path.Join(p.Pvrdir, "commitmsg.new"), []byte(msg), 0644)
-	err = os.Rename(path.Join(p.Pvrdir, "commitmsg.new"), path.Join(p.Pvrdir, "commitmsg"))
+	ioutil.WriteFile(filepath.Join(p.Pvrdir, "commitmsg.new"), []byte(msg), 0644)
+	err = os.Rename(filepath.Join(p.Pvrdir, "commitmsg.new"), filepath.Join(p.Pvrdir, "commitmsg"))
 	if err != nil {
 		return err
 	}
@@ -460,20 +460,20 @@ func (p *Pvr) Commit(msg string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), newJson, 0644)
+	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), newJson, 0644)
 
 	if err != nil {
 		return err
 	}
 
-	err = os.Rename(path.Join(p.Pvrdir, "json.new"), path.Join(p.Pvrdir, "json"))
+	err = os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
 
 	if err != nil {
 		return err
 	}
 
 	// ignore error here as new might not exist
-	os.Remove(path.Join(p.Pvrdir, "new"))
+	os.Remove(filepath.Join(p.Pvrdir, "new"))
 
 	return nil
 }
@@ -488,7 +488,7 @@ func (p *Pvr) PutLocal(repoPath string) error {
 		return err
 	}
 
-	objectsPath := path.Join(repoPath, "objects")
+	objectsPath := filepath.Join(repoPath, "objects")
 	info, err := os.Stat(objectsPath)
 	if err == nil && !info.IsDir() {
 		return errors.New("PVR repo directory in inusable state (objects is not a directory)")
@@ -505,7 +505,7 @@ func (p *Pvr) PutLocal(repoPath string) error {
 			continue
 		}
 		v := p.PristineJsonMap[k].(string)
-		Copy(path.Join(objectsPath, v)+".new", path.Join(p.Dir, ".pvr", v))
+		Copy(filepath.Join(objectsPath, v)+".new", filepath.Join(p.Dir, ".pvr", v))
 
 	}
 	err = filepath.Walk(p.Objdir, func(filePath string, info os.FileInfo, err error) error {
@@ -514,22 +514,22 @@ func (p *Pvr) PutLocal(repoPath string) error {
 			return nil
 		}
 		base := path.Base(filePath)
-		err = Copy(path.Join(objectsPath, base+".new"), filePath)
+		err = Copy(filepath.Join(objectsPath, base+".new"), filePath)
 		if err != nil {
 			return err
 		}
 
-		err = os.Rename(path.Join(objectsPath, base+".new"),
+		err = os.Rename(filepath.Join(objectsPath, base+".new"),
 			path.Join(objectsPath, base))
 		return err
 	})
 
-	err = Copy(path.Join(repoPath, "json.new"), path.Join(p.Pvrdir, "json"))
+	err = Copy(filepath.Join(repoPath, "json.new"), filepath.Join(p.Pvrdir, "json"))
 	if err != nil {
 		return err
 	}
 
-	return os.Rename(path.Join(repoPath, "json.new"),
+	return os.Rename(filepath.Join(repoPath, "json.new"),
 		path.Join(repoPath, "json"))
 }
 
@@ -849,7 +849,7 @@ func (p *Pvr) doRegister(authEp, email, username, password string) error {
 		return errors.New("Failed to register: " + string(response.Body()))
 	}
 
-	log.Print("Registration Response: " + string(response.Body()))
+	fmt.Println("Registration Response: " + string(response.Body()))
 
 	return nil
 }
@@ -1114,7 +1114,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	// push all objects
 	for k, v := range filesAndObjects {
-		info, err := os.Stat(path.Join(p.Objdir, v))
+		info, err := os.Stat(filepath.Join(p.Objdir, v))
 		if err != nil {
 			return err
 		}
@@ -1127,8 +1127,8 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		remoteObject.ObjectName = k
 
 		uri := pvrRemote.ObjectsEndpointUrl
-		if !strings.HasSuffix(uri, "/") {
-			uri += "/"
+		if !strings.HasSuffix(uri, string(filepath.Separator)) {
+			uri += string(filepath.Separator)
 		}
 
 		response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
@@ -1159,7 +1159,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			return err
 		}
 
-		fileName := path.Join(p.Objdir, v)
+		fileName := filepath.Join(p.Objdir, v)
 		filePuts = append(filePuts, FilePut{
 			sourceFile: fileName,
 			objName:    remoteObject.ObjectName,
@@ -1195,7 +1195,7 @@ func (p *Pvr) PutRemote(repoPath string, force bool) error {
 		return err
 	}
 
-	data, err := ioutil.ReadFile(path.Join(p.Pvrdir, "json"))
+	data, err := ioutil.ReadFile(filepath.Join(p.Pvrdir, "json"))
 
 	if err != nil {
 		return err
@@ -1268,8 +1268,8 @@ func (p *Pvr) Put(uri string, force bool) error {
 }
 
 func (p *Pvr) SaveConfig() error {
-	configNew := path.Join(p.Pvrdir, "config.new")
-	configPath := path.Join(p.Pvrdir, "config")
+	configNew := filepath.Join(p.Pvrdir, "config.new")
+	configPath := filepath.Join(p.Pvrdir, "config")
 
 	byteJson, err := json.Marshal(p.Pvrconfig)
 	if err != nil {
@@ -1401,7 +1401,7 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 	rs := map[string]interface{}{}
 
 	// first copy new json, but only rename at the very end after all else succeed
-	jsonRepo := path.Join(repoPath, "json")
+	jsonRepo := filepath.Join(repoPath, "json")
 
 	jsonData, err := ioutil.ReadFile(jsonRepo)
 	if err != nil {
@@ -1420,9 +1420,9 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 		if strings.HasPrefix(k, "#spec") {
 			continue
 		}
-		getPath := path.Join(repoPath, "objects", v.(string))
-		objPathNew := path.Join(p.Objdir, v.(string)+".new")
-		objPath := path.Join(p.Objdir, v.(string))
+		getPath := filepath.Join(repoPath, "objects", v.(string))
+		objPathNew := filepath.Join(p.Objdir, v.(string)+".new")
+		objPath := filepath.Join(p.Objdir, v.(string))
 		fmt.Println("pulling objects file " + getPath + "-> " + objPathNew)
 		err := Copy(objPathNew, getPath)
 		if err != nil {
@@ -1446,14 +1446,14 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
+	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
 
 	if err != nil {
 		return err
 	}
 
 	// all succeeded, atomically commiting the json
-	err = os.Rename(path.Join(p.Pvrdir, "json.new"), path.Join(p.Pvrdir, "json"))
+	err = os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
 
 	return err
 }
@@ -1667,13 +1667,13 @@ func (p *Pvr) GetRepoRemote(repoPath string, merge bool) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(path.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
+	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
 
 	if err != nil {
 		return err
 	}
 
-	return os.Rename(path.Join(p.Pvrdir, "json.new"), path.Join(p.Pvrdir, "json"))
+	return os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
 }
 
 func (p *Pvr) GetRepo(uri string, merge bool) error {
@@ -1716,7 +1716,7 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 }
 
 func (p *Pvr) Reset() error {
-	data, err := ioutil.ReadFile(path.Join(p.Pvrdir, "json"))
+	data, err := ioutil.ReadFile(filepath.Join(p.Pvrdir, "json"))
 
 	if err != nil {
 		return err
@@ -1727,7 +1727,7 @@ func (p *Pvr) Reset() error {
 
 	if err != nil {
 		return errors.New("JSON Unmarshal (" +
-			strings.TrimPrefix(path.Join(p.Pvrdir, "json"), p.Dir) + "): " +
+			strings.TrimPrefix(filepath.Join(p.Pvrdir, "json"), p.Dir) + "): " +
 			err.Error())
 	}
 
@@ -1737,18 +1737,18 @@ func (p *Pvr) Reset() error {
 			if err != nil {
 				return err
 			}
-			err = ioutil.WriteFile(path.Join(p.Dir, k+".new"), data, 0644)
+			err = ioutil.WriteFile(filepath.Join(p.Dir, k+".new"), data, 0644)
 			if err != nil {
 				return err
 			}
-			err = os.Rename(path.Join(p.Dir, k+".new"),
+			err = os.Rename(filepath.Join(p.Dir, k+".new"),
 				path.Join(p.Dir, k))
 
 		} else if strings.HasPrefix(k, "#spec") {
 			continue
 		} else {
-			objectP := path.Join(p.Objdir, v.(string))
-			targetP := path.Join(p.Dir, k)
+			objectP := filepath.Join(p.Objdir, v.(string))
+			targetP := filepath.Join(p.Dir, k)
 			targetD := path.Dir(targetP)
 			targetDInfo, err := os.Stat(targetD)
 			if err != nil {
@@ -1770,7 +1770,7 @@ func (p *Pvr) Reset() error {
 			}
 		}
 	}
-	os.Remove(path.Join(p.Pvrdir, "new"))
+	os.Remove(filepath.Join(p.Pvrdir, "new"))
 	return nil
 }
 
@@ -1842,7 +1842,7 @@ func (p *Pvr) Export(dst string) error {
 
 	for _, v := range filesAndObjects {
 		apath := "objects/" + v
-		ipath := path.Join(p.Objdir, v)
+		ipath := filepath.Join(p.Objdir, v)
 		err := addToTar(tw, apath, ipath)
 
 		if err != nil {
@@ -1850,7 +1850,7 @@ func (p *Pvr) Export(dst string) error {
 		}
 	}
 
-	if err := addToTar(tw, "json", path.Join(p.Pvrdir, "json")); err != nil {
+	if err := addToTar(tw, "json", filepath.Join(p.Pvrdir, "json")); err != nil {
 		return err
 	}
 
@@ -1897,7 +1897,7 @@ func (p *Pvr) Import(src string) error {
 			continue
 		}
 
-		filePath := path.Join(p.Pvrdir, header.Name)
+		filePath := filepath.Join(p.Pvrdir, header.Name)
 		filePathNew := filePath + ".new"
 
 		file, err := os.OpenFile(filePathNew, os.O_CREATE|os.O_TRUNC|os.O_WRONLY,
