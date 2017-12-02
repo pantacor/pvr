@@ -43,6 +43,8 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"gopkg.in/cheggaaa/pb.v1"
+
+	pvrapi "gitlab.com/pantacor/pvr/api"
 )
 
 type PvrStatus struct {
