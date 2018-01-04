@@ -40,6 +40,8 @@ import (
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
 
+	pvrapi "gitlab.com/pantacor/pvr/api"
+
 	"golang.org/x/crypto/ssh/terminal"
 
 	"gopkg.in/cheggaaa/pb.v1"
