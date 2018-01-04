@@ -1,0 +1,15 @@
+package: gitlab.com/pantacor/pvr
+import:
+- package: github.com/asac/json-patch
+- package: github.com/cavaliercoder/grab
+- package: github.com/go-resty/resty
+- package: github.com/jessfraz/reg
+  subpackages:
+  - registry
+  - utils
+- package: github.com/opencontainers/go-digest
+- package: github.com/urfave/cli
+- package: golang.org/x/crypto
+  subpackages:
+  - ssh/terminal
+- package: gopkg.in/cheggaaa/pb.v1
