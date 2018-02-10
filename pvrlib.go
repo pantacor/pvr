@@ -213,7 +213,8 @@ func (p *Pvr) AddFile(globs []string) error {
 		}
 		for _, glob := range globs {
 			absglob := glob
-			if absglob[0] != '/' {
+
+			if !filepath.IsAbs(absglob) {
 				absglob = p.Dir + glob
 			}
 			matched, err := filepath.Match(absglob, walkPath)
@@ -263,21 +264,21 @@ func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 		if relPath == "" {
 			return nil
 		}
-		// ignore .pvr directory
+		if info.IsDir() {
+			return nil
+		}
+		// ignore .pvr and .pv directories
 		if _, ok := p.PristineJsonMap[relPath]; !ok {
 			if _, ok1 := p.NewFiles[relPath]; !ok1 {
-				if strings.HasPrefix(relPath, ".pvr") {
+				if strings.HasPrefix(relPath, ".pvr"+string(os.PathSeparator)) {
 					return nil
 				}
-				if strings.HasPrefix(relPath, ".pv") {
+				if strings.HasPrefix(relPath, ".pv"+string(os.PathSeparator)) {
 					return nil
 				}
 				untrackedFiles = append(untrackedFiles, relPath)
 				return nil
 			}
-		}
-		if info.IsDir() {
-			return nil
 		}
 		// inline json
 		if strings.HasSuffix(filepath.Base(filePath), ".json") {
