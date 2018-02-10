@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2017, 2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,10 +48,11 @@ import (
 )
 
 type PvrStatus struct {
-	NewFiles     []string
-	RemovedFiles []string
-	ChangedFiles []string
-	JsonDiff     *[]byte
+	NewFiles       []string
+	RemovedFiles   []string
+	ChangedFiles   []string
+	UntrackedFiles []string
+	JsonDiff       *[]byte
 }
 
 // stringify of file status for "pvr status" list...
@@ -65,6 +66,9 @@ func (p *PvrStatus) String() string {
 	}
 	for _, f := range p.ChangedFiles {
 		str += "C " + f + "\n"
+	}
+	for _, f := range p.UntrackedFiles {
+		str += "? " + f + "\n"
 	}
 	return str
 }
@@ -248,16 +252,27 @@ func (p *Pvr) AddFile(globs []string) error {
 }
 
 // create the canonical json for the working directory
-func (p *Pvr) GetWorkingJson() ([]byte, error) {
+func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 
+	untrackedFiles := []string{}
 	workingJson := map[string]interface{}{}
 	workingJson["#spec"] = "pantavisor-multi-platform@1"
 
 	err := filepath.Walk(p.Dir, func(filePath string, info os.FileInfo, err error) error {
 		relPath := strings.TrimPrefix(filePath, p.Dir)
+		if relPath == "" {
+			return nil
+		}
 		// ignore .pvr directory
 		if _, ok := p.PristineJsonMap[relPath]; !ok {
 			if _, ok1 := p.NewFiles[relPath]; !ok1 {
+				if strings.HasPrefix(relPath, ".pvr") {
+					return nil
+				}
+				if strings.HasPrefix(relPath, ".pv") {
+					return nil
+				}
+				untrackedFiles = append(untrackedFiles, relPath)
 				return nil
 			}
 		}
@@ -290,9 +305,16 @@ func (p *Pvr) GetWorkingJson() ([]byte, error) {
 	})
 
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, []string{}, err
 	}
-	return json.Marshal(workingJson)
+
+	b, err := json.Marshal(workingJson)
+
+	if err != nil {
+		return []byte{}, []string{}, err
+	}
+
+	return b, untrackedFiles, err
 }
 
 func (p *Pvr) Init(objectsDir string) error {
@@ -347,24 +369,34 @@ func (p *Pvr) InitCustom(customInitJson string, objectsDir string) error {
 }
 
 func (p *Pvr) Diff() (*[]byte, error) {
-	workingJson, err := p.GetWorkingJson()
+	workingJson, _, err := p.GetWorkingJson()
 	if err != nil {
 		return nil, err
 	}
 
 	diff, err := jsonpatch.CreateMergePatch(p.PristineJson, workingJson)
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &diff, nil
 }
 
 func (p *Pvr) Status() (*PvrStatus, error) {
 	rs := PvrStatus{}
 
-	// produce diff of working dir to prisitine
-	diff, err := p.Diff()
+	workingJson, untrackedFiles, err := p.GetWorkingJson()
 	if err != nil {
 		return nil, err
 	}
-	rs.JsonDiff = diff
+
+	diff, err := jsonpatch.CreateMergePatch(p.PristineJson, workingJson)
+	if err != nil {
+		return nil, err
+	}
+
+	rs.JsonDiff = &diff
 
 	// make json map out of diff
 	diffJson := map[string]interface{}{}
@@ -390,6 +422,8 @@ func (p *Pvr) Status() (*PvrStatus, error) {
 			rs.NewFiles = append(rs.NewFiles, file)
 		}
 	}
+
+	rs.UntrackedFiles = untrackedFiles
 
 	return &rs, nil
 }

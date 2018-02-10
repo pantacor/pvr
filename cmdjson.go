@@ -40,7 +40,7 @@ func CommandJson() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
-			result, err := pvr.GetWorkingJson()
+			result, _, err := pvr.GetWorkingJson()
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}

@@ -44,7 +44,7 @@ func CommandStatus() cli.Command {
 				return cli.NewExitError(err, 3)
 			}
 
-			fmt.Println(status)
+			fmt.Print(status)
 
 			return nil
 		},
