@@ -1114,7 +1114,11 @@ func (p *Pvr) putFiles(filePut ...FilePut) []FilePut {
 
 	fileOutPut := []FilePut{}
 
-	pool, _ := pb.StartPool()
+	pool, err := pb.StartPool()
+
+	if err != nil {
+		log.Fatalf("FATAL: starting progressbar pool failed: %s\n", err.Error())
+	}
 
 	for i := 0; i < PoolSize; i++ {
 		go worker(jobs, results)
