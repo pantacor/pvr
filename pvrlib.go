@@ -214,7 +214,7 @@ func (p *Pvr) AddFile(globs []string) error {
 		for _, glob := range globs {
 			absglob := glob
 
-			if !filepath.IsAbs(absglob) {
+			if !filepath.IsAbs(absglob) && absglob[0] != '/' {
 				absglob = p.Dir + glob
 			}
 			matched, err := filepath.Match(absglob, walkPath)
@@ -1162,8 +1162,8 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		remoteObject.ObjectName = k
 
 		uri := pvrRemote.ObjectsEndpointUrl
-		if !strings.HasSuffix(uri, string(filepath.Separator)) {
-			uri += string(filepath.Separator)
+		if !strings.HasSuffix(uri, "/") {
+			uri += "/"
 		}
 
 		response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
