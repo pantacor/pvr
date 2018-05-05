@@ -80,6 +80,7 @@ type Pvr struct {
 	Initialized     bool
 	Dir             string
 	Pvrdir          string
+	Pvdir           string
 	Objdir          string
 	Pvrconfig       PvrConfig
 	PristineJson    []byte
@@ -113,6 +114,7 @@ func NewPvrInit(app *cli.App, dir string) (*Pvr, error) {
 	pvr := Pvr{
 		Dir:         dir + string(filepath.Separator),
 		Pvrdir:      filepath.Join(dir, ".pvr"),
+		Pvdir:       filepath.Join(dir, ".pv"),
 		Objdir:      filepath.Join(dir, ".pvr", "objects"),
 		Initialized: false,
 		App:         app,
@@ -203,7 +205,7 @@ func (p *Pvr) AddFile(globs []string) error {
 			return err
 		}
 
-		if strings.HasPrefix(walkPath, p.Pvrdir) {
+		if strings.HasPrefix(walkPath, p.Pvrdir) || strings.HasPrefix(walkPath, p.Pvdir) {
 			return nil
 		}
 
