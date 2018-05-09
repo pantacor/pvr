@@ -29,7 +29,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "pvr"
 	app.Usage = "PantaVisor Repo"
-	app.Version = "0.0.1"
+	app.Version = VERSION
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
