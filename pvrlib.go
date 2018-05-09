@@ -1153,6 +1153,8 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	filePuts := []FilePut{}
 
+	shaSeen := map[string]interface{}{}
+
 	// push all objects
 	for k, v := range filesAndObjects {
 		info, err := os.Stat(filepath.Join(p.Objdir, v))
@@ -1183,6 +1185,13 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		if response == nil {
 			return errors.New("BAD STATE; no respo")
 		}
+
+		if shaSeen[remoteObject.Sha] != nil {
+			_str := remoteObject.ObjectName[0:Min(len(remoteObject.ObjectName)-1, 12)] + " "
+			fmt.Println(_str + "[OK - Dupe]")
+			continue
+		}
+		shaSeen[remoteObject.Sha] = "yes"
 
 		if response.StatusCode() != http.StatusOK &&
 			response.StatusCode() != http.StatusConflict {
@@ -1620,6 +1629,7 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 	}
 
 	grabs := make([]*grab.Request, 0)
+	shaMap := map[string]interface{}{}
 
 	for k := range jsonMap {
 		if strings.HasSuffix(k, ".json") {
@@ -1630,6 +1640,13 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 		}
 
 		v := jsonMap[k].(string)
+
+		// only add to downloads if we have not seen this sha already
+		if shaMap[v] != nil {
+			continue
+		} else {
+			shaMap[v] = "seen"
+		}
 
 		uri := pvrRemote.ObjectsEndpointUrl + "/" + v
 
