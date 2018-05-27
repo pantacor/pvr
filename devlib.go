@@ -88,10 +88,11 @@ func Scan() {
 				fmt.Printf("\tIPv4: %s\n", res.AddrIPv4)
 				fmt.Printf("\tIPv6: %s\n", res.AddrIPv6)
 				fmt.Printf("\tPort: %d\n", res.Port)
-				fmt.Printf("\tPVR Clone: %s\n", res.Pantahub+"/trails/"+res.DeviceId)
-				fmt.Printf("\tPantahub WWW: %s\n", "https://www.pantahub.com/u/_/devices/"+res.DeviceId)
 				if res.Challenge != "" {
 					fmt.Printf("\tClaim Cmd: %s\n", res.ClaimCmd())
+				} else {
+					fmt.Printf("\tPantahub WWW: %s\n", "https://www.pantahub.com/u/_/devices/"+res.DeviceId)
+					fmt.Printf("\tPVR Clone: %s\n", res.Pantahub+"/trails/"+res.DeviceId)
 				}
 			}
 		}
