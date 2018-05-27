@@ -108,5 +108,5 @@ func Scan() {
 
 	<-ctx.Done()
 
-	fmt.Println("Pantavisor devices detected in network: %d (see above for details)\n", len(devices))
+	fmt.Printf("Pantavisor devices detected in network: %d (see above for details)\n", len(devices))
 }
