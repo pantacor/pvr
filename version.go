@@ -1,3 +1,3 @@
 package main
 
-const VERSION = "NA"
+const VERSION = "003-3-g36f5f42"

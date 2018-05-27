@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"strings"
 	"time"
 
@@ -26,6 +27,11 @@ import (
 )
 
 type PVZeroConf struct {
+	Hostname string
+	AddrIPv4 []net.IP
+	AddrIPv6 []net.IP
+	Port     int
+
 	Pantahub  string
 	DeviceId  string
 	Challenge string
@@ -61,6 +67,11 @@ func Scan() {
 		for entry := range results {
 			res := PVZeroConf{}
 
+			res.Hostname = entry.HostName
+			res.AddrIPv4 = entry.AddrIPv4
+			res.AddrIPv6 = entry.AddrIPv6
+			res.Port = entry.Port
+
 			for _, v := range entry.Text {
 				if strings.HasPrefix(v, "pantahub=") {
 					res.Pantahub = v[9:]
@@ -72,6 +83,16 @@ func Scan() {
 			}
 			if res.DeviceId != "" {
 				devices = append(devices, res)
+				fmt.Printf("\tID: %s\n", res)
+				fmt.Printf("\tHost: %s\n", res.Hostname)
+				fmt.Printf("\tIPv4: %s\n", res.AddrIPv4)
+				fmt.Printf("\tIPv6: %s\n", res.AddrIPv6)
+				fmt.Printf("\tPort: %d\n", res.Port)
+				fmt.Printf("\tPVR Clone: %s\n", res.Pantahub+"/trails/"+res.DeviceId)
+				fmt.Printf("\tPantahub WWW: %s\n", "https://www.pantahub.com/u/_/devices/"+res.DeviceId)
+				if res.Challenge != "" {
+					fmt.Printf("\tClaim Cmd: %s\n", res.ClaimCmd())
+				}
 			}
 		}
 	}(entries)
@@ -86,17 +107,5 @@ func Scan() {
 
 	<-ctx.Done()
 
-	if len(devices) > 0 {
-		fmt.Println("Pantavisor Devices found:")
-		for i, v := range devices {
-			fmt.Printf("%d.\tID: %s\n", i+1, v)
-			fmt.Printf("\tClone: %s\n", v.Pantahub+"/trails/"+v.DeviceId)
-			fmt.Printf("\tWWW: %s\n", "https://www.pantahub.com/u/_/devices/"+v.DeviceId)
-			if v.Challenge != "" {
-				fmt.Printf("\tClaim Cmd: %s\n", v.ClaimCmd())
-			}
-		}
-	} else {
-		fmt.Println("No Devices found. Please try again elsewhere ...")
-	}
+	fmt.Println("Pantavisor devices detected in network: %d (see above for details)\n", len(devices))
 }
