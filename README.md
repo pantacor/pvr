@@ -254,13 +254,16 @@ Info about how to interface and claim devices that dont have an owner yet
 are printed on console.
 
 ```
-$ pvr scan
+> .\pvr.exe scan
 Scanning ...
-Pantavisor Devices found:
-1.      ID: 5b09d1aeb9aee40009a61480 (owned)
-        Clone: https://api.pantahub.com:443/trails/5b09d1aeb9aee40009a61480
-        WWW: https://www.pantahub.com/u/_/devices/5b09d1aeb9aee40009a61480
-```
+        ID: 5b0aa4363c6f7200095b2566 (owned)
+        Host: linux.local.
+        IPv4: [192.168.178.97]
+        IPv6: [2a02:2028:713:3001:602:a2ff:feb3:d4e8]
+        Port: 22
+        Pantahub WWW: https://www.pantahub.com/u/_/devices/5b0aa4363c6f7200095b2566
+        PVR Clone: https://api.pantahub.com:443/trails/5b0aa4363c6f7200095b2566
+		```
 
 # References
 
