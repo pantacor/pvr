@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"os"
 )
 
@@ -55,13 +54,21 @@ func FormatJson(data []byte) ([]byte, error) {
 }
 
 func FiletoSha(path string) (string, error) {
-	data, err := ioutil.ReadFile(path)
+	hasher := sha256.New()
+
+	file, err := os.Open(path)
 	// problems reading file here, just dont add, output warning
 	if err != nil {
 		return "", err
 	}
 
-	buf := sha256.Sum256(data)
+	_, err = io.Copy(hasher, file)
+
+	if err != nil {
+		return "", err
+	}
+
+	buf := hasher.Sum(nil)
 	shaBal := hex.EncodeToString(buf[:])
 	return shaBal, nil
 }
