@@ -263,7 +263,7 @@ Scanning ...
         Port: 22
         Pantahub WWW: https://www.pantahub.com/u/_/devices/5b0aa4363c6f7200095b2566
         PVR Clone: https://api.pantahub.com:443/trails/5b0aa4363c6f7200095b2566
-		```
+```
 
 # References
 
