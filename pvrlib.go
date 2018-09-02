@@ -1463,6 +1463,22 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 		return errors.New("JSON Unmarshal (json.new):" + err.Error())
 	}
 
+	// first copy new json, but only rename at the very end after all else succeed
+	configRepo := filepath.Join(repoPath, "config")
+
+	var config *PvrConfig
+
+	configData, err := ioutil.ReadFile(configRepo)
+	if err != nil {
+		return err
+	} else {
+		config = new(PvrConfig)
+		err = json.Unmarshal(configData, config)
+		if err != nil {
+			return errors.New("JSON Unmarshal (config.new):" + err.Error())
+		}
+	}
+
 	for k, v := range rs {
 		if strings.HasSuffix(k, ".json") {
 			continue
@@ -1471,6 +1487,16 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 			continue
 		}
 		getPath := filepath.Join(repoPath, "objects", v.(string))
+
+		// config can overload objectsdir for remote repo; not abs and abs
+		if config != nil && config.ObjectsDir != "" {
+			if !filepath.IsAbs(config.ObjectsDir) {
+				getPath = filepath.Join(repoPath, "..", config.ObjectsDir)
+			} else {
+				getPath = config.ObjectsDir
+			}
+		}
+
 		objPathNew := filepath.Join(p.Objdir, v.(string)+".new")
 		objPath := filepath.Join(p.Objdir, v.(string))
 		fmt.Println("pulling objects file " + getPath + "-> " + objPathNew)
