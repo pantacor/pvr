@@ -1463,6 +1463,22 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 		return errors.New("JSON Unmarshal (json.new):" + err.Error())
 	}
 
+	// first copy new json, but only rename at the very end after all else succeed
+	configRepo := filepath.Join(repoPath, "config")
+
+	var config *PvrConfig
+
+	configData, err := ioutil.ReadFile(configRepo)
+	if err != nil {
+		return err
+	} else {
+		config = new(PvrConfig)
+		err = json.Unmarshal(configData, config)
+		if err != nil {
+			return errors.New("JSON Unmarshal (config.new):" + err.Error())
+		}
+	}
+
 	for k, v := range rs {
 		if strings.HasSuffix(k, ".json") {
 			continue
@@ -1471,6 +1487,16 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 			continue
 		}
 		getPath := filepath.Join(repoPath, "objects", v.(string))
+
+		// config can overload objectsdir for remote repo; not abs and abs
+		if config != nil && config.ObjectsDir != "" {
+			if !filepath.IsAbs(config.ObjectsDir) {
+				getPath = filepath.Join(repoPath, "..", config.ObjectsDir, v.(string))
+			} else {
+				getPath = filepath.Join(config.ObjectsDir, v.(string))
+			}
+		}
+
 		objPathNew := filepath.Join(p.Objdir, v.(string)+".new")
 		objPath := filepath.Join(p.Objdir, v.(string))
 		fmt.Println("pulling objects file " + getPath + "-> " + objPathNew)
@@ -1746,29 +1772,26 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 		return err
 	}
 
+	p.Pvrconfig.DefaultGetUrl = uri
+
 	if url.Scheme == "" {
 		err = p.GetRepoLocal(uri, merge)
 	} else {
+		if p.Pvrconfig.DefaultPutUrl == "" {
+			p.Pvrconfig.DefaultPutUrl = uri
+		}
+
+		if p.Pvrconfig.DefaultPostUrl == "" {
+			p.Pvrconfig.DefaultPostUrl = uri
+		}
+
 		err = p.GetRepoRemote(uri, merge)
 	}
 	if err != nil {
 		return err
 	}
 
-	p.Pvrconfig.DefaultGetUrl = uri
-
-	if p.Pvrconfig.DefaultPutUrl == "" {
-		p.Pvrconfig.DefaultPutUrl = uri
-	}
-
-	if p.Pvrconfig.DefaultPostUrl == "" {
-		p.Pvrconfig.DefaultPostUrl = uri
-	}
-
-	if err == nil {
-		p.Pvrconfig.DefaultPutUrl = uri
-		err = p.SaveConfig()
-	}
+	err = p.SaveConfig()
 
 	return err
 }
