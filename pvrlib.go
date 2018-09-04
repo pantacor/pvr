@@ -1491,9 +1491,9 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 		// config can overload objectsdir for remote repo; not abs and abs
 		if config != nil && config.ObjectsDir != "" {
 			if !filepath.IsAbs(config.ObjectsDir) {
-				getPath = filepath.Join(repoPath, "..", config.ObjectsDir)
+				getPath = filepath.Join(repoPath, "..", config.ObjectsDir, v.(string))
 			} else {
-				getPath = config.ObjectsDir
+				getPath = filepath.Join(config.ObjectsDir, v.(string))
 			}
 		}
 
