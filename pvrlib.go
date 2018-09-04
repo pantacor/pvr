@@ -1772,29 +1772,26 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 		return err
 	}
 
+	p.Pvrconfig.DefaultGetUrl = uri
+
 	if url.Scheme == "" {
 		err = p.GetRepoLocal(uri, merge)
 	} else {
+		if p.Pvrconfig.DefaultPutUrl == "" {
+			p.Pvrconfig.DefaultPutUrl = uri
+		}
+
+		if p.Pvrconfig.DefaultPostUrl == "" {
+			p.Pvrconfig.DefaultPostUrl = uri
+		}
+
 		err = p.GetRepoRemote(uri, merge)
 	}
 	if err != nil {
 		return err
 	}
 
-	p.Pvrconfig.DefaultGetUrl = uri
-
-	if p.Pvrconfig.DefaultPutUrl == "" {
-		p.Pvrconfig.DefaultPutUrl = uri
-	}
-
-	if p.Pvrconfig.DefaultPostUrl == "" {
-		p.Pvrconfig.DefaultPostUrl = uri
-	}
-
-	if err == nil {
-		p.Pvrconfig.DefaultPutUrl = uri
-		err = p.SaveConfig()
-	}
+	err = p.SaveConfig()
 
 	return err
 }
