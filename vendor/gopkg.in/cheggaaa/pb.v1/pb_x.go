@@ -20,6 +20,7 @@ var (
 	echoLockMutex    sync.Mutex
 	origTermStatePtr *unix.Termios
 	tty              *os.File
+	istty            bool
 )
 
 func init() {
@@ -28,13 +29,18 @@ func init() {
 
 	var err error
 	tty, err = os.Open("/dev/tty")
+	istty = true
 	if err != nil {
 		tty = os.Stdin
+		istty = false
 	}
 }
 
 // terminalWidth returns width of the terminal.
 func terminalWidth() (int, error) {
+	if !istty {
+		return 0, errors.New("Not Supported")
+	}
 	echoLockMutex.Lock()
 	defer echoLockMutex.Unlock()
 
@@ -51,6 +57,7 @@ func terminalWidth() (int, error) {
 func lockEcho() (shutdownCh chan struct{}, err error) {
 	echoLockMutex.Lock()
 	defer echoLockMutex.Unlock()
+	if istty {
 	if origTermStatePtr != nil {
 		return shutdownCh, ErrPoolWasStarted
 	}
@@ -71,6 +78,7 @@ func lockEcho() (shutdownCh chan struct{}, err error) {
 		return nil, fmt.Errorf("Can't set terminal settings: %v", err)
 	}
 
+	}
 	shutdownCh = make(chan struct{})
 	go catchTerminate(shutdownCh)
 	return
@@ -79,6 +87,7 @@ func lockEcho() (shutdownCh chan struct{}, err error) {
 func unlockEcho() error {
 	echoLockMutex.Lock()
 	defer echoLockMutex.Unlock()
+	if istty {
 	if origTermStatePtr == nil {
 		return nil
 	}
@@ -89,6 +98,7 @@ func unlockEcho() error {
 		return fmt.Errorf("Can't set terminal settings: %v", err)
 	}
 
+	}
 	origTermStatePtr = nil
 
 	return nil
