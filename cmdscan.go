@@ -17,6 +17,7 @@ package main
 
 import (
 	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandScan() cli.Command {
@@ -26,7 +27,7 @@ func CommandScan() cli.Command {
 		Usage:     "Scan for pantavisor devices announcing themselves through MDNS on local network.",
 		Action: func(c *cli.Context) error {
 
-			Scan()
+			libpvr.Scan()
 
 			return nil
 		},
