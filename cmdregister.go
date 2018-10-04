@@ -17,9 +17,9 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandRegister() cli.Command {
@@ -48,17 +48,7 @@ func CommandRegister() cli.Command {
 				aEp = c.Args()[0]
 			}
 
-			wd, err := os.Getwd()
-			if err != nil {
-				return cli.NewExitError(err, 1)
-			}
-
-			pvr, err := NewPvr(c.App, wd)
-			if err != nil {
-				return cli.NewExitError(err, 2)
-			}
-
-			err = pvr.doRegister(aEp, e, u, p)
+			err := libpvr.DoRegister(aEp, e, u, p)
 
 			if err != nil {
 				return cli.NewExitError("Error Registering User: "+err.Error(), 3)
