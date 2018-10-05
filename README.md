@@ -308,3 +308,24 @@ Scanning ...
 	}
 }
 ```
+
+# PVR Pantahub Commands
+
+Since version 006 PVR also provides convenience commands for interacting with pantahub
+regardless beyond publishing pvr repositories to pantahub trails.
+
+## pvr ps
+
+```pvr ps``` gets a list of devices like below:
+
+```
+$ pvr ps
+     ID               NICK             REV   STATUS   STATE          SEEN            MESSAGE
+  5a21cefc   tops_urchin                20   NEW      xxxx    7 months ago         message....
+  5af32b42   verified_cicada             5   NEW      xxxx    5 months ago         message....
+  5af4ca2c   classic_crappie             0   DONE     xxxx    5 months ago         message....
+  5b07f476   resolved_mule               0   DONE     xxxx    4 months ago         message....
+  5b07ff81   right_vervet                0   DONE     xxxx    4 months ago         message....
+  5b08464f   helped_aphid                3   NEW      xxxx    about 23 hours ago   message....
+```
+
