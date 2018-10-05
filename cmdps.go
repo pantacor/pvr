@@ -57,9 +57,9 @@ func CommandPs() cli.Command {
 					v.Nick,
 					strconv.Itoa(v.ProgressRevision),
 					v.Status,
-					"xxxx",
+					v.StateSha,
 					timeago.FromTime(v.Timestamp),
-					"message...."})
+					v.StatusMsg})
 			}
 
 			table.Render()

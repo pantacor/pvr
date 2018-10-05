@@ -97,7 +97,9 @@ type PantahubDevice struct {
 	Revision         int       `json:"revision"`
 	ProgressRevision int       `json:"progress-revision"`
 	Timestamp        time.Time `json:"timestamp"`
+	StateSha         string    `json:"state-sha"`
 	Status           string    `json:"status"`
+	StatusMsg        string    `json:"status-msg"`
 }
 
 func (p *Session) DoPs(baseurl string) ([]PantahubDevice, error) {
