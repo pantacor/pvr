@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2017, 2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ func CommandRegister() cli.Command {
 			p := c.String("pass")
 			e := c.String("email")
 
-			aEp := "https://api.pantahub.com/auth"
+			aEp := "https://api.pantahub.com"
 
 			if c.NArg() > 1 {
 				return cli.NewExitError("Only one argument (pantahub url) allowed. See --help.", 2)
