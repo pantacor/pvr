@@ -25,6 +25,12 @@ import (
 	"gitlab.com/pantacor/pvr/libpvr"
 )
 
+func min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
+}
 func CommandPs() cli.Command {
 	return cli.Command{
 		Name:        "ps",
@@ -57,7 +63,7 @@ func CommandPs() cli.Command {
 					v.Nick,
 					strconv.Itoa(v.ProgressRevision),
 					v.Status,
-					v.StateSha,
+					v.StateSha[:min(len(v.StateSha), 8)],
 					timeago.FromTime(v.Timestamp),
 					v.StatusMsg})
 			}
