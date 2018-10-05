@@ -55,7 +55,7 @@ func (s *Session) DoAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error)
 	var response *resty.Response
 
 	// legacy flat -a from CLI will give a default token
-	bearer = s.GetApp().Metadata["PANTAHUB_AUTH"].(string)
+	bearer = s.GetApp().Metadata["PVR_AUTH"].(string)
 	response, err = fn(resty.R().SetAuthToken(bearer))
 
 	// if we see www-authenticate, we need to auth ...

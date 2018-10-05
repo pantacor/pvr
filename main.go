@@ -33,37 +33,38 @@ func main() {
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:  "auth, a",
-			Usage: "Use `ACCESS_TOKEN` for authorization with core services",
+			Name:   "access-token, a",
+			Usage:  "Use `ACCESS_TOKEN` for authorization with core services",
+			EnvVar: "PVR_ACCESSTOKEN",
 		},
 		cli.StringFlag{
-			Name:  "baseurl, b",
-			Usage: "Use `BASEURL` for resolving prn URIs to core service endpoints",
+			Name:   "baseurl, b",
+			Usage:  "Use `BASEURL` for resolving prn URIs to core service endpoints",
+			EnvVar: "PVR_BASEURL",
 		},
 		cli.BoolFlag{
-			Name:  "debug, d",
-			Usage: "enable debugging output for rest calls",
+			Name:   "debug, d",
+			Usage:  "enable debugging output for rest calls",
+			EnvVar: "PVR_DEBUG",
+		},
+		cli.BoolFlag{
+			Name:   "insecure, i",
+			Usage:  "skip tls verify",
+			EnvVar: "PVR_INSECURE",
 		},
 	}
 
 	app.Before = func(c *cli.Context) error {
-		c.App.Metadata["PANTAHUB_BASE"] = "https://pantahub.appspot.com/api"
-		if os.Getenv("PANTAHUB_BASE") != "" {
-			c.App.Metadata["PANTAHUB_BASE"] = os.Getenv("PANTAHUB_BASE")
-		}
-		if c.GlobalString("baseurl") != "" {
-			c.App.Metadata["PANTAHUB_BASE"] = c.GlobalString("baseurl")
-		}
-		c.App.Metadata["PANTAHUB_AUTH"] = ""
-		if os.Getenv("PANTAHUB_AUTH") != "" {
-			c.App.Metadata["PANTAHUB_AUTH"] = os.Getenv("PANTAHUB_AUTH")
-		}
-		if c.GlobalString("auth") != "" {
-			c.App.Metadata["PANTAHUB_AUTH"] = c.GlobalString("auth")
-		}
-		// XXX: make a --no-verify flag instead of thisr
-		resty.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+		resty.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: c.GlobalBool("insecure")})
 		resty.SetDebug(c.GlobalBool("debug"))
+
+		c.App.Metadata["PVR_AUTH"] = c.GlobalString("auth")
+
+		if c.GlobalString("baseurl") != "" {
+			c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
+		} else {
+			c.App.Metadata["PVR_BASEURL"] = "https://api.pantahub.com"
+		}
 
 		return nil
 	}
