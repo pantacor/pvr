@@ -187,7 +187,6 @@ func doAuthenticate(authEp, username, password string) (string, string, error) {
 	if !ok {
 		return "", "", errors.New("Illegal response: " + string(response.Body()))
 	}
-
 	return m1["token"].(string), m1["token"].(string), nil
 }
 
