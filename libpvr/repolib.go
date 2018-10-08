@@ -1040,15 +1040,39 @@ func (p *Pvr) Put(uri string, force bool) error {
 	}
 
 	if url.Scheme == "" {
-		err = p.PutLocal(uri)
-	} else {
-		err = p.PutRemote(url, force)
+		_, err := os.Stat(filepath.Join(uri, "json"))
+		// if we get pointed at a pvr repo on disk, go local
+		if err == nil {
+			err = p.PutLocal(uri)
+			goto save
+		} else if !os.IsNotExist(err) {
+			return errors.New("error testing existance of json file in provided path: " + err.Error())
+		}
+		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
+		if err != nil {
+			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
+		}
+
+		if !path.IsAbs(uri) {
+			uri = "/" + uri
+		}
+
+		refURL, err := url.Parse(uri)
+		if err != nil {
+			return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
+		}
+
+		url = repoBaseURL.ResolveReference(refURL)
+
 	}
+
+	err = p.PutRemote(url, force)
 
 	if err != nil {
 		return err
 	}
 
+save:
 	if p.Pvrconfig.DefaultGetUrl == "" {
 		p.Pvrconfig.DefaultGetUrl = uri
 	}
@@ -1112,7 +1136,29 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	}
 
 	if url.Scheme == "" {
-		return errors.New("Post must be a remote REST endpoint, not: " + url.String())
+		_, err := os.Stat(filepath.Join(uri, "json"))
+		// if we get pointed at a pvr repo on disk, go local
+		if err == nil {
+			return errors.New("Post must be a remote REST endpoint, not: " + uri)
+		} else if !os.IsNotExist(err) {
+			return errors.New("error testing existance of json file in provided path: " + err.Error())
+		}
+
+		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
+		if err != nil {
+			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
+		}
+
+		if !path.IsAbs(uri) {
+			uri = "/" + uri
+		}
+
+		refURL, err := url.Parse(uri)
+		if err != nil {
+			return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
+		}
+
+		url = repoBaseURL.ResolveReference(refURL)
 	}
 
 	remotePvr, err := p.initializeRemote(url)
@@ -1520,29 +1566,31 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 	//  3. if a first dir of path is resolvable host -> Prepend https://
 	if url.Scheme == "" {
 		_, err := os.Stat(filepath.Join(uri, "json"))
+
 		// if we get pointed at a pvr repo on disk, go local
 		if err == nil {
 			err = p.GetRepoLocal(uri, merge)
 			goto save
 		} else if !os.IsNotExist(err) {
 			return errors.New("error testing existance of json file in provided path: " + err.Error())
-		} else {
-			repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
-			if err != nil {
-				return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
-			}
-
-			if !path.IsAbs(uri) {
-				uri = "/" + uri
-			}
-
-			refURL, err := url.Parse(uri)
-			if err != nil {
-				return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
-			}
-
-			url = repoBaseURL.ResolveReference(refURL)
 		}
+
+		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
+		if err != nil {
+			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
+		}
+
+		if !path.IsAbs(uri) {
+			uri = "/" + uri
+		}
+
+		refURL, err := url.Parse(uri)
+		if err != nil {
+			return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
+		}
+
+		url = repoBaseURL.ResolveReference(refURL)
+
 	}
 
 	if p.Pvrconfig.DefaultPutUrl == "" {
