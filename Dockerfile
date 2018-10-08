@@ -12,7 +12,11 @@ RUN CGO_ENABLED=0 GOOS_ARCH=armv6 go install -v ./...
 
 FROM alpine
 
+RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
+
 WORKDIR /work
 COPY --from=build /go/bin/pvr /
+
+ENV USER root
 
 ENTRYPOINT [ "/pvr" ]
