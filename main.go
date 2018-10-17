@@ -16,9 +16,8 @@
 package main
 
 import (
-	"os"
-
 	"crypto/tls"
+	"os"
 
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
@@ -89,6 +88,7 @@ func main() {
 		CommandRegister(),
 		CommandScan(),
 		CommandPs(),
+		CommandLogs(),
 	}
 	app.Run(os.Args)
 }
