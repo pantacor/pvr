@@ -38,34 +38,15 @@ func CommandLogs() cli.Command {
 				return cli.NewExitError(err, 4)
 			}
 
-			now := time.Now()
-			logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, &now, true)
-
-			if err != nil {
-				return cli.NewExitError("Error getting device list: "+err.Error(), 4)
-			}
-
-			for _, v := range logEntries {
-				cutDeviceStart := strings.LastIndex(v.Device, "/")
-				if cutDeviceStart < 0 {
-					cutDeviceStart = 0
-				} else {
-					cutDeviceStart++
-				}
-
-				fmt.Printf("%s %s\t%s\n", v.TimeCreated.Format(time.RFC3339),
-					v.Device[cutDeviceStart:cutDeviceStart+8]+":"+v.LogSource+":"+v.LogLevel,
-					v.LogText)
-			}
+			from := time.Now().Add(time.Duration(-1 * time.Minute))
 
 			for {
-				logEntries, cursorID, err = session.DoLogsCursor(c.App.Metadata["PVR_BASEURL"].(string), cursorID)
+				logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, &from, true)
 
 				if err != nil {
 					return cli.NewExitError("Error getting device list: "+err.Error(), 4)
 				}
 
-				//log.Printf("logs entries len %d\n", len(logEntries))
 				for _, v := range logEntries {
 					cutDeviceStart := strings.LastIndex(v.Device, "/")
 					if cutDeviceStart < 0 {
@@ -74,9 +55,43 @@ func CommandLogs() cli.Command {
 						cutDeviceStart++
 					}
 
-					fmt.Printf("%s %s\t%s\n", v.TimeCreated.Format(time.RFC822Z),
+					fmt.Printf("%s %s\t%s\n", v.TimeCreated.Format(time.RFC3339),
 						v.Device[cutDeviceStart:cutDeviceStart+8]+":"+v.LogSource+":"+v.LogLevel,
 						v.LogText)
+
+					// advance "from" cursor
+					from = v.TimeCreated
+				}
+
+				for {
+					logEntries, cursorID, err = session.DoLogsCursor(c.App.Metadata["PVR_BASEURL"].(string), cursorID)
+
+					if err != nil {
+						return cli.NewExitError("Error getting device list: "+err.Error(), 4)
+					}
+
+					for _, v := range logEntries {
+						cutDeviceStart := strings.LastIndex(v.Device, "/")
+						if cutDeviceStart < 0 {
+							cutDeviceStart = 0
+						} else {
+							cutDeviceStart++
+						}
+
+						fmt.Printf("%s %s\t%s\n", v.TimeCreated.Format(time.RFC822Z),
+							v.Device[cutDeviceStart:cutDeviceStart+8]+":"+v.LogSource+":"+v.LogLevel,
+							v.LogText)
+
+						// advance "from" cursor
+						from = v.TimeCreated
+
+					}
+					// if we reach end of cursor we have exhausted it and will sleep
+					// before trying to get new logs starting from last timestamp
+					if len(logEntries) == 0 {
+						time.Sleep(time.Duration(1 * time.Second))
+						break
+					}
 				}
 			}
 
