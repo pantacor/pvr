@@ -52,7 +52,7 @@ func LoadConfig(filePath string) (*PvrAuthConfig, error) {
 	if os.IsNotExist(err) {
 		_, err := os.Stat(filepath.Dir(filePath))
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(filepath.Dir(filePath), 0600)
+			err = os.MkdirAll(filepath.Dir(filePath), 0700)
 		} else {
 			err = nil
 		}
@@ -121,7 +121,7 @@ func (p *PvrAuthConfig) Save() error {
 		dInfo, err := os.Stat(configPath)
 		if os.IsNotExist(err) {
 			// lets mkdir a personal dir if it does not exists.
-			err = os.MkdirAll(d, 0600)
+			err = os.MkdirAll(d, 0700)
 		} else if err != nil {
 			return err
 		} else {
