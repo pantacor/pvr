@@ -125,7 +125,7 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 	fileInfo, err := os.Stat(pvr.Dir)
 
 	if os.IsNotExist(err) {
-		err = os.MkdirAll(pvr.Dir, 0600)
+		err = os.MkdirAll(pvr.Dir, 0700)
 	}
 
 	if err != nil {
