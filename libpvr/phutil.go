@@ -217,7 +217,5 @@ func (p *Session) DoLogs(baseurl string, deviceIds []string, startTime *time.Tim
 		return nil, "", errors.New("ERROR: cannot decode result of authenticated call to " + baseurl + ": " + err.Error())
 	}
 
-	fmt.Println("NEXTCURSOR: " + resultPage.NextCursor)
-
 	return resultPage.Entries, resultPage.NextCursor, nil
 }
