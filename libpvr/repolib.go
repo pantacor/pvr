@@ -13,7 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
-package main
+package libpvr
 
 import (
 	"archive/tar"
@@ -38,7 +38,6 @@ import (
 	"github.com/asac/json-patch"
 	"github.com/cavaliercoder/grab"
 	"github.com/go-resty/resty"
-	"github.com/urfave/cli"
 
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -86,7 +85,7 @@ type Pvr struct {
 	PristineJson    []byte
 	PristineJsonMap PvrMap
 	NewFiles        PvrIndex
-	App             *cli.App
+	Session         *Session
 }
 
 type PvrConfig struct {
@@ -106,27 +105,33 @@ func (p *Pvr) String() string {
 	return "PVR: " + p.Dir
 }
 
-func NewPvr(app *cli.App, dir string) (*Pvr, error) {
-	return NewPvrInit(app, dir)
+func NewPvr(s *Session, dir string) (*Pvr, error) {
+	return NewPvrInit(s, dir)
 }
 
-func NewPvrInit(app *cli.App, dir string) (*Pvr, error) {
+func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 	pvr := Pvr{
 		Dir:         dir + string(filepath.Separator),
 		Pvrdir:      filepath.Join(dir, ".pvr"),
 		Pvdir:       filepath.Join(dir, ".pv"),
 		Objdir:      filepath.Join(dir, ".pvr", "objects"),
 		Initialized: false,
-		App:         app,
+		Session:     s,
 	}
 
 	pvr.Pvrconfig.AccessTokens = make(map[string]string)
 	pvr.Pvrconfig.RefreshTokens = make(map[string]string)
 
 	fileInfo, err := os.Stat(pvr.Dir)
+
+	if os.IsNotExist(err) {
+		err = os.MkdirAll(pvr.Dir, 0700)
+	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	if !fileInfo.IsDir() {
 		return nil, errors.New("pvr path is not a directory: " + dir)
 	}
@@ -593,18 +598,13 @@ type ObjectWithAccess struct {
 	ExpireTime   string `json:"expire-time"`
 }
 
-func (p *Pvr) initializeRemote(repoPath string) (pvrapi.PvrRemote, error) {
+func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 	res := pvrapi.PvrRemote{}
-	repoUrl, err := url.Parse(repoPath)
-
-	if err != nil {
-		return res, err
-	}
 
 	pvrRemoteUrl := repoUrl
 	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
 
-	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		return req.Get(pvrRemoteUrl.String())
 	})
 
@@ -737,47 +737,7 @@ func getWwwAuthenticateInfo(header string) (string, map[string]string) {
 	return authType, opts
 }
 
-func (p *Pvr) doAuthenticate(authEp, username, password string) (string, string, error) {
-
-	m := map[string]string{
-		"username": username,
-		"password": password,
-	}
-
-	if username == "" {
-		return "", "", errors.New("doAuthenticate: no username provided.")
-	}
-	if password == "" {
-		return "", "", errors.New("doAuthenticate: no password provided.")
-	}
-	if authEp == "" {
-		return "", "", errors.New("doAuthenticate: no authentication endpoint provided.")
-	}
-
-	response, err := resty.R().SetBody(m).
-		Post(authEp + "/login")
-
-	m1 := map[string]interface{}{}
-	err = json.Unmarshal(response.Body(), &m1)
-
-	if err != nil {
-		return "", "", err
-	}
-
-	if response.StatusCode() != 200 {
-		return "", "", errors.New("Failed to Login: " + string(response.Body()))
-	}
-
-	_, ok := m1["token"]
-
-	if !ok {
-		return "", "", errors.New("Illegal response: " + string(response.Body()))
-	}
-
-	return m1["token"].(string), m1["token"].(string), nil
-}
-
-func (p *Pvr) doClaim(deviceEp, challenge string) error {
+func (p *Pvr) DoClaim(deviceEp, challenge string) error {
 
 	u, err := url.Parse(deviceEp)
 
@@ -793,7 +753,7 @@ func (p *Pvr) doClaim(deviceEp, challenge string) error {
 	uV.Set("challenge", challenge)
 	u.RawQuery = uV.Encode()
 
-	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		return req.Put(u.String())
 	})
 
@@ -806,220 +766,6 @@ func (p *Pvr) doClaim(deviceEp, challenge string) error {
 	}
 
 	return nil
-}
-
-func (p *Pvr) doRefresh(authEp, token string) (string, string, error) {
-	m := map[string]string{
-		"token": token,
-	}
-
-	if token == "" {
-		return "", "", errors.New("doRefresh: no token provided.")
-	}
-	if authEp == "" {
-		return "", "", errors.New("doAuthenticate: no authentication endpoint provided.")
-	}
-
-	response, err := resty.R().SetBody(m).
-		SetAuthToken(token).
-		Get(authEp + "/login")
-
-	m1 := map[string]interface{}{}
-	err = json.Unmarshal(response.Body(), &m1)
-
-	if err != nil {
-		return "", "", err
-	}
-
-	if response.StatusCode() != 200 {
-		return "", "", nil
-	}
-
-	return m1["token"].(string), m1["token"].(string), nil
-}
-
-func (p *Pvr) doRegister(authEp, email, username, password string) error {
-
-	if authEp == "" {
-		return errors.New("doRegister: no authentication endpoint provided.")
-	}
-	if email == "" {
-		return errors.New("doRegister: no email provided.")
-	}
-	if username == "" {
-		return errors.New("doRegister: no username provided.")
-	}
-	if password == "" {
-		return errors.New("doRegister: no password provided.")
-	}
-
-	u1, err := url.Parse(authEp)
-	if err != nil {
-		return errors.New("doRegister: error parsing EP url.")
-	}
-
-	accountsEp := u1.String() + "/accounts"
-
-	m := map[string]string{
-		"email":    email,
-		"nick":     username,
-		"password": password,
-	}
-
-	response, err := resty.R().SetBody(m).
-		Post(accountsEp)
-
-	if err != nil {
-		log.Fatal("Error calling POST for registration: " + err.Error())
-		return err
-	}
-
-	m1 := map[string]interface{}{}
-	err = json.Unmarshal(response.Body(), &m1)
-
-	if err != nil {
-		log.Fatal("Error parsing Register body(" + err.Error() + ") for " + accountsEp + ": " + string(response.Body()))
-		return err
-	}
-
-	if response.StatusCode() != 200 {
-		return errors.New("Failed to register: " + string(response.Body()))
-	}
-
-	fmt.Println("Registration Response: " + string(response.Body()))
-
-	return nil
-}
-
-func (p *Pvr) getCachedAccessToken(authHeader string) (string, error) {
-
-	// no auth header; nothing we can do magic here...
-	if authHeader == "" {
-		return "", errors.New("Bad Parameter (authHeader empty)")
-	}
-
-	authType, opts := getWwwAuthenticateInfo(authHeader)
-	if authType != "JWT" && authType != "Bearer" {
-		return "", errors.New("Invalid www-authenticate header retrieved")
-	}
-
-	realm := opts["realm"]
-	authEpString := opts["ph-aeps"]
-	authEps := strings.Split(authEpString, ",")
-
-	if len(authEps) == 0 {
-		return "", errors.New("Bad Server Behaviour. Need ph-aeps token in Www-Authenticate header. Check your server version")
-	}
-
-	authEp := authEps[0]
-
-	if p.Pvrconfig.AccessTokens[authEp+" realm="+realm] != "" {
-		return p.Pvrconfig.AccessTokens[authEp+" realm="+realm], nil
-	}
-
-	return "", nil
-}
-
-func (p *Pvr) getNewAccessToken(authHeader string) (string, error) {
-
-	authType, opts := getWwwAuthenticateInfo(authHeader)
-	if authType != "JWT" && authType != "Bearer" {
-		return "", errors.New("Invalid www-authenticate header retrieved")
-	}
-
-	realm := opts["realm"]
-	authEpString := opts["ph-aeps"]
-	authEps := strings.Split(authEpString, ",")
-
-	if len(authEps) == 0 {
-		return "", errors.New("Bad Server Behaviour. Need ph-aeps token in Www-Authenticate header. Check your server version")
-	}
-
-	authEp := authEps[0]
-
-	p.Pvrconfig.AccessTokens[authEp+" realm="+realm] = ""
-
-	// if we have a refresh token
-	if p.Pvrconfig.RefreshTokens[authEp+" realm="+realm] != "" {
-		accessToken, refreshToken, err := p.doRefresh(authEp, p.Pvrconfig.RefreshTokens[authEp+" realm="+realm])
-
-		if err != nil {
-			return "", err
-		}
-
-		p.Pvrconfig.RefreshTokens[authEp+" realm="+realm] = refreshToken
-		p.Pvrconfig.AccessTokens[authEp+" realm="+realm] = accessToken
-		p.SaveConfig()
-
-		if accessToken != "" {
-			return accessToken, nil
-		}
-	}
-
-	var err error
-	// get fresh user/pass auth
-	for i := 0; i < 3; i++ {
-		var accessToken, refreshToken string
-		username, password := readCredentials(authEp + " (realm=" + realm + ")")
-		if username == "REGISTER" {
-			email, username, password := readRegistration(authEp + " (realm=" + realm + ")")
-			err = p.doRegister(authEp, email, username, password)
-
-			if err != nil {
-				log.Fatal("error registering with PH: " + err.Error())
-				os.Exit(122)
-			}
-		}
-		accessToken, refreshToken, err = p.doAuthenticate(authEp, username, password)
-
-		if err != nil {
-			continue
-		}
-
-		if accessToken != "" {
-			p.Pvrconfig.AccessTokens[authEp+" realm="+realm] = accessToken
-			p.Pvrconfig.RefreshTokens[authEp+" realm="+realm] = refreshToken
-			p.SaveConfig()
-
-			return accessToken, nil
-		}
-	}
-
-	return "", err
-}
-
-func (p *Pvr) doAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error) {
-
-	var bearer string
-	var err error
-	var response *resty.Response
-
-	// legacy flat -a from CLI will give a default token
-	bearer = p.App.Metadata["PANTAHUB_AUTH"].(string)
-	response, err = fn(resty.R().SetAuthToken(bearer))
-
-	// if we see www-authenticate, we need to auth ...
-	authHeader := response.Header().Get("www-authenticate")
-
-	// first try cached accesstoken
-	if authHeader != "" {
-		bearer, err = p.getCachedAccessToken(authHeader)
-		if bearer != "" {
-			response, err = fn(resty.R().SetAuthToken(bearer))
-			authHeader = response.Header().Get("Www-Authenticate")
-		}
-	}
-
-	// then get new accesstoken
-	if authHeader != "" {
-		bearer, err = p.getNewAccessToken(authHeader)
-		if bearer != "" {
-			response, err = fn(resty.R().SetAuthToken(bearer))
-			authHeader = response.Header().Get("Www-Authenticate")
-		}
-	}
-
-	return response, err
 }
 
 type FilePut struct {
@@ -1174,7 +920,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			uri += "/"
 		}
 
-		response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 			return req.SetBody(remoteObject).Post(uri)
 		})
 
@@ -1231,7 +977,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 	return nil
 }
 
-func (p *Pvr) PutRemote(repoPath string, force bool) error {
+func (p *Pvr) PutRemote(repoPath *url.URL, force bool) error {
 
 	pvrRemote, err := p.initializeRemote(repoPath)
 
@@ -1259,7 +1005,7 @@ func (p *Pvr) PutRemote(repoPath string, force bool) error {
 		return err
 	}
 
-	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		return req.SetBody(body).Put(uri)
 	})
 
@@ -1294,15 +1040,39 @@ func (p *Pvr) Put(uri string, force bool) error {
 	}
 
 	if url.Scheme == "" {
-		err = p.PutLocal(uri)
-	} else {
-		err = p.PutRemote(uri, force)
+		_, err := os.Stat(filepath.Join(uri, "json"))
+		// if we get pointed at a pvr repo on disk, go local
+		if err == nil {
+			err = p.PutLocal(uri)
+			goto save
+		} else if !os.IsNotExist(err) {
+			return errors.New("error testing existance of json file in provided path: " + err.Error())
+		}
+		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
+		if err != nil {
+			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
+		}
+
+		if !path.IsAbs(uri) {
+			uri = "/" + uri
+		}
+
+		refURL, err := url.Parse(uri)
+		if err != nil {
+			return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
+		}
+
+		url = repoBaseURL.ResolveReference(refURL)
+
 	}
+
+	err = p.PutRemote(url, force)
 
 	if err != nil {
 		return err
 	}
 
+save:
 	if p.Pvrconfig.DefaultGetUrl == "" {
 		p.Pvrconfig.DefaultGetUrl = uri
 	}
@@ -1366,10 +1136,32 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	}
 
 	if url.Scheme == "" {
-		return errors.New("Post must be a remote REST endpoint, not: " + url.String())
+		_, err := os.Stat(filepath.Join(uri, "json"))
+		// if we get pointed at a pvr repo on disk, go local
+		if err == nil {
+			return errors.New("Post must be a remote REST endpoint, not: " + uri)
+		} else if !os.IsNotExist(err) {
+			return errors.New("error testing existance of json file in provided path: " + err.Error())
+		}
+
+		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
+		if err != nil {
+			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
+		}
+
+		if !path.IsAbs(uri) {
+			uri = "/" + uri
+		}
+
+		refURL, err := url.Parse(uri)
+		if err != nil {
+			return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
+		}
+
+		url = repoBaseURL.ResolveReference(refURL)
 	}
 
-	remotePvr, err := p.initializeRemote(uri)
+	remotePvr, err := p.initializeRemote(url)
 
 	if err != nil {
 		return err
@@ -1412,7 +1204,7 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 		return err
 	}
 
-	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		return req.SetBody(data).SetContentLength(true).Post(remotePvr.PostUrl)
 	})
 
@@ -1536,7 +1328,7 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 
 func (p *Pvr) getJsonBuf(pvrRemote pvrapi.PvrRemote) ([]byte, error) {
 
-	response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		return req.Get(pvrRemote.JsonGetUrl)
 	})
 
@@ -1676,7 +1468,7 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 
 		uri := pvrRemote.ObjectsEndpointUrl + "/" + v
 
-		response, err := p.doAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 			return req.Get(uri)
 		})
 
@@ -1709,19 +1501,13 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 	return nil
 }
 
-func (p *Pvr) GetRepoRemote(repoPath string, merge bool) error {
-
-	url, err := url.Parse(repoPath)
-
-	if err != nil {
-		return err
-	}
+func (p *Pvr) GetRepoRemote(url *url.URL, merge bool) error {
 
 	if url.Scheme == "" {
 		return errors.New("Post must be a remote REST endpoint, not: " + url.String())
 	}
 
-	remotePvr, err := p.initializeRemote(repoPath)
+	remotePvr, err := p.initializeRemote(url)
 
 	if err != nil {
 		return err
@@ -1774,23 +1560,54 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 
 	p.Pvrconfig.DefaultGetUrl = uri
 
+	// if no url scheme try following in order;
+	//  1. is uri a local .pvr repo directory -> GetRepoLocal
+	//  2. if a path with one or two elements -> Prepend https://pvr.pantahub.com
+	//  3. if a first dir of path is resolvable host -> Prepend https://
 	if url.Scheme == "" {
-		err = p.GetRepoLocal(uri, merge)
-	} else {
-		if p.Pvrconfig.DefaultPutUrl == "" {
-			p.Pvrconfig.DefaultPutUrl = uri
+		_, err := os.Stat(filepath.Join(uri, "json"))
+
+		// if we get pointed at a pvr repo on disk, go local
+		if err == nil {
+			err = p.GetRepoLocal(uri, merge)
+			goto save
+		} else if !os.IsNotExist(err) {
+			return errors.New("error testing existance of json file in provided path: " + err.Error())
 		}
 
-		if p.Pvrconfig.DefaultPostUrl == "" {
-			p.Pvrconfig.DefaultPostUrl = uri
+		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
+		if err != nil {
+			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
 		}
 
-		err = p.GetRepoRemote(uri, merge)
+		if !path.IsAbs(uri) {
+			uri = "/" + uri
+		}
+
+		refURL, err := url.Parse(uri)
+		if err != nil {
+			return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
+		}
+
+		url = repoBaseURL.ResolveReference(refURL)
+
 	}
+
+	if p.Pvrconfig.DefaultPutUrl == "" {
+		p.Pvrconfig.DefaultPutUrl = uri
+	}
+
+	if p.Pvrconfig.DefaultPostUrl == "" {
+		p.Pvrconfig.DefaultPostUrl = uri
+	}
+
+	err = p.GetRepoRemote(url, merge)
+
 	if err != nil {
 		return err
 	}
 
+save:
 	err = p.SaveConfig()
 
 	return err
