@@ -18,22 +18,11 @@ package libpvr
 import (
 	"errors"
 	"net/http"
-	"os/user"
 	"path/filepath"
 
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
 )
-
-func GetConfigDir() (string, error) {
-
-	user, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(user.HomeDir, ".pvr"), nil
-}
 
 type Session struct {
 	app  *cli.App
@@ -41,15 +30,11 @@ type Session struct {
 }
 
 func NewSession(app *cli.App) (*Session, error) {
-	configDir, err := GetConfigDir()
 
-	if err != nil {
-		return nil, errors.New("Cannot get config dir: " + err.Error())
-	}
-
+	configDir := app.Metadata["PVR_CONFIG_DIR"].(string)
 	configPath := filepath.Join(configDir, "auth.json")
-	authConfig, err := LoadConfig(configPath)
 
+	authConfig, err := LoadConfig(configPath)
 	if err != nil {
 		return nil, errors.New("Cannot load config: " + err.Error())
 	}

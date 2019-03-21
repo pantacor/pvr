@@ -18,6 +18,8 @@ package main
 import (
 	"crypto/tls"
 	"os"
+	"os/user"
+	"path/filepath"
 
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
@@ -29,6 +31,11 @@ func main() {
 	app.Name = "pvr"
 	app.Usage = "PantaVisor Repo"
 	app.Version = VERSION
+
+	usr, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -44,9 +51,15 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:   "repo-baseurl, r",
-			Usage:  "Use `REPO_BASEURL` for resolving PVR repositories like docker through user/name syntax.",
+			Usage:  "Use `PVR_REPO_BASEURL` for resolving PVR repositories like docker through user/name syntax.",
 			EnvVar: "PVR_REPO_BASEURL",
 			Value:  "https://pvr.pantahub.com",
+		},
+		cli.StringFlag{
+			Name:   "config-dir, c",
+			Usage:  "Use `PVR_CONFIG_DIR` for using a custom global config directory (used to store auth.json etc.).",
+			EnvVar: "PVR_CONFIG_DIR",
+			Value:  filepath.Join(usr.HomeDir, ".pvr"),
 		},
 		cli.BoolFlag{
 			Name:   "debug, d",
@@ -76,6 +89,12 @@ func main() {
 			c.App.Metadata["PVR_REPO_BASEURL"] = c.GlobalString("repo-baseurl")
 		} else {
 			c.App.Metadata["PVR_REPO_BASEURL"] = "https://pvr.pantahub.com"
+		}
+
+		if c.GlobalString("config-dir") != "" {
+			c.App.Metadata["PVR_CONFIG_DIR"] = c.GlobalString("config-dir")
+		} else {
+			c.App.Metadata["PVR_CONFIG_DIR"] = filepath.Join(usr.HomeDir, ".pvr")
 		}
 
 		return nil
