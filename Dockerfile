@@ -42,6 +42,16 @@ RUN apk update; apk add git
 RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go get -d -v ./...
 RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /go/bin/windows_amd64/pvr.exe -v .
 
+# build darwin amd64 static
+FROM golang:alpine as darwin_amd64
+
+WORKDIR /go/src/gitlab.com/pantacor/pvr
+COPY --from=src /go/src/gitlab.com/pantacor/pvr .
+RUN apk update; apk add git
+RUN CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go get -d -v ./...
+RUN CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o /go/bin/darwin_amd64/pvr.exe -v .
+
+
 FROM alpine
 
 RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
