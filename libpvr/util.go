@@ -20,8 +20,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
+	"strings"
 )
 
 func Copy(dst, src string) error {
@@ -85,4 +87,26 @@ func Max(x, y int) int {
 		return x
 	}
 	return y
+}
+
+func GetPhAuthHeaderTokenKey(authHeader string) (string, error) {
+	// no auth header; nothing we can do magic here...
+	if authHeader == "" {
+		return "", errors.New("Bad Parameter (authHeader empty)")
+	}
+
+	authType, opts := getWwwAuthenticateInfo(authHeader)
+	if authType != "JWT" && authType != "Bearer" {
+		return "", errors.New("Invalid www-authenticate header retrieved")
+	}
+
+	realm := opts["realm"]
+	authEpString := opts["ph-aeps"]
+	authEps := strings.Split(authEpString, ",")
+
+	if len(authEps) == 0 || len(realm) == 0 {
+		return "", errors.New("Bad Server Behaviour. Need ph-aeps and realm token in Www-Authenticate header. Check your server version")
+	}
+
+	return authEps[0] + " realm=" + realm, nil
 }
