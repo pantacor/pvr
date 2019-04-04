@@ -17,6 +17,7 @@ package libpvr
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"path/filepath"
 
@@ -54,37 +55,53 @@ func (s *Session) DoAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error)
 	var bearer string
 	var err error
 	var response *resty.Response
+	var authHeader string
 
-	// legacy flat -a from CLI will give a default token
 	bearer = s.GetApp().Metadata["PVR_AUTH"].(string)
-	response, err = fn(resty.R().SetAuthToken(bearer))
-
-	if err == nil && response.StatusCode() == http.StatusOK {
-		return response, nil
-	}
-
-	// if we see www-authenticate, we need to auth ...
-	authHeader := response.Header().Get("www-authenticate")
-
-	// first try cached accesstoken
-	if authHeader != "" {
-		bearer, err = s.auth.getCachedAccessToken(authHeader)
-		if bearer != "" {
-			response, err = fn(resty.R().SetAuthToken(bearer))
-			authHeader = response.Header().Get("Www-Authenticate")
-			s.GetApp().Metadata["PVR_AUTH"] = bearer
+	for {
+		var newAuthHeader string
+		// legacy flat -a from CLI will give a default token
+		response, err = fn(resty.R().SetAuthToken(bearer))
+		// we continue looping for 401 and 403 error codes, everything
+		// else are error conditions that need to be handled upstream
+		if err == nil &&
+			response.StatusCode() != http.StatusUnauthorized &&
+			response.StatusCode() != http.StatusForbidden {
+			return response, nil
 		}
-	}
+		// if we see www-authenticate, we need to auth ...
+		newAuthHeader = response.Header().Get("www-authenticate")
+		// first try cached accesstoken or get a new one
+		if newAuthHeader != "" {
 
-	// then get new accesstoken
-	if authHeader != "" {
-		bearer, err = s.auth.getNewAccessToken(authHeader)
-		if bearer != "" {
-			response, err = fn(resty.R().SetAuthToken(bearer))
-			authHeader = response.Header().Get("Www-Authenticate")
-			s.GetApp().Metadata["PVR_AUTH"] = bearer
+			// if we already had one run with this auth header, evict from cache
+			if authHeader != "" {
+				s.auth.resetCachedAccessToken(authHeader)
+			}
+			authHeader = newAuthHeader
+			bearer, err = s.auth.getCachedAccessToken(authHeader)
+			if err != nil {
+				// server seems to not be compatible
+				return nil, err
+			}
+			if bearer == "" {
+				bearer, err = s.auth.getNewAccessToken(authHeader, true)
+			}
+			if err != nil {
+				// getting new bearer token didnt go very well
+				return nil, err
+			}
+		} else if response.StatusCode() == http.StatusForbidden {
+			fmt.Println("** ACCESS DENIED: user cannot access repository. **")
+			bearer, err = s.auth.getNewAccessToken(authHeader, false)
+			if err != nil {
+				// getting new bearer token didnt go very well
+				return nil, err
+			}
 		}
-	}
 
+		// now that we would have a refreshed bearer, lets go again
+		s.GetApp().Metadata["PVR_AUTH"] = bearer
+	}
 	return response, err
 }
