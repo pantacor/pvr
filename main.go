@@ -77,7 +77,7 @@ func main() {
 		resty.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: c.GlobalBool("insecure")})
 		resty.SetDebug(c.GlobalBool("debug"))
 
-		c.App.Metadata["PVR_AUTH"] = c.GlobalString("auth")
+		c.App.Metadata["PVR_AUTH"] = c.GlobalString("access-token")
 
 		if c.GlobalString("baseurl") != "" {
 			c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
