@@ -35,7 +35,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/asac/json-patch"
+	jsonpatch "github.com/asac/json-patch"
 	"github.com/cavaliercoder/grab"
 	"github.com/go-resty/resty"
 	pvrapi "gitlab.com/pantacor/pvr/api"
@@ -1632,35 +1632,37 @@ func (p *Pvr) Reset() error {
 	}
 
 	for k, v := range jsonMap {
+		if strings.HasPrefix(k, "#spec") {
+			continue
+		}
+
+		fromSlashK := filepath.FromSlash(k)
+		targetP := filepath.Join(p.Dir, fromSlashK)
+		targetD := path.Dir(targetP)
+		targetDInfo, err := os.Stat(targetD)
+		if err != nil {
+			err = os.MkdirAll(targetD, 0755)
+		} else if !targetDInfo.IsDir() {
+			return errors.New("Not a directory " + targetD)
+		}
+		if err != nil {
+			return err
+		}
+
 		if strings.HasSuffix(k, ".json") {
 			data, err := json.Marshal(v)
 			if err != nil {
 				return err
 			}
-			err = ioutil.WriteFile(filepath.Join(p.Dir, k+".new"), data, 0644)
+			err = ioutil.WriteFile(targetP+".new", data, 0644)
 			if err != nil {
 				return err
 			}
-			err = os.Rename(filepath.Join(p.Dir, k+".new"),
-				path.Join(p.Dir, k))
-
-		} else if strings.HasPrefix(k, "#spec") {
-			continue
+			err = os.Rename(targetP+".new",
+				targetP)
 		} else {
-			fromSlashK := filepath.FromSlash(k)
-			objectP := filepath.Join(p.Objdir, v.(string))
-			targetP := filepath.Join(p.Dir, fromSlashK)
-			targetD := path.Dir(targetP)
-			targetDInfo, err := os.Stat(targetD)
-			if err != nil {
-				err = os.MkdirAll(targetD, 0755)
-			} else if !targetDInfo.IsDir() {
-				return errors.New("Not a directory " + targetD)
-			}
-			if err != nil {
-				return err
-			}
 
+			objectP := filepath.Join(p.Objdir, v.(string))
 			err = Copy(targetP+".new", objectP)
 			if err != nil {
 				return err
