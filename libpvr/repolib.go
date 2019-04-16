@@ -196,9 +196,6 @@ func (p *Pvr) addPvrFile(path string) error {
 	}
 	relPath := strings.TrimPrefix(path, p.Dir)
 	relPathSlash := filepath.ToSlash(relPath)
-	if p.NewFiles == nil {
-		p.NewFiles = map[string]string{}
-	}
 	p.NewFiles[relPathSlash] = shaBal
 	return nil
 }
