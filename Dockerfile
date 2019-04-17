@@ -61,6 +61,7 @@ COPY --from=linux_amd64 /go/bin /pkg/bin
 COPY --from=linux_armv6 /go/bin /pkg/bin
 COPY --from=windows_386 /go/bin /pkg/bin
 COPY --from=windows_amd64 /go/bin /pkg/bin
+COPY --from=darwin_amd64 /go/bin /pkg/bin
 
 ENV USER root
 
