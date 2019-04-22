@@ -265,7 +265,13 @@ func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 
 	untrackedFiles := []string{}
 	workingJson := map[string]interface{}{}
-	workingJson["#spec"] = "pantavisor-multi-platform@1"
+	currentSpec, ok := p.PristineJsonMap["#spec"]
+	if ok {
+		currentSpecString := currentSpec.(string)
+		workingJson["#spec"] = currentSpecString
+	} else {
+		workingJson["#spec"] = "pantavisor-service-system@1"
+	}
 
 	err := filepath.Walk(p.Dir, func(filePath string, info os.FileInfo, err error) error {
 		relPath := strings.TrimPrefix(filePath, p.Dir)
