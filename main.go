@@ -121,6 +121,7 @@ func main() {
 		CommandScan(),
 		CommandPs(),
 		CommandLogs(),
+		CommandAppInstall(),
 	}
 	app.Run(os.Args)
 }
