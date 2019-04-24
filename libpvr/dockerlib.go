@@ -18,6 +18,7 @@ package libpvr
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -66,33 +67,46 @@ func (p *Pvr) GetDockerRegistry(image registry.Image, username, password string)
 	})
 }
 
-func (p *Pvr) GetDockerManifest(dockerURL, username, password string) (*schema2.DeserializedManifest, error) {
+func (p *Pvr) GetDockerConfig(dockerURL, username, password string) (*schema2.Manifest, map[string]interface{}, error) {
 	image, err := registry.ParseImage(dockerURL)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	r, err := p.GetDockerRegistry(image, username, password)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	manifest, err := r.Manifest(context.Background(), image.Path, image.Reference())
+	manifestV2, err := r.ManifestV2(context.Background(), image.Path, image.Reference())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	manifestv2 := manifest.(*schema2.DeserializedManifest)
-	return manifestv2, err
+	manifestV1, err := r.ManifestV1(context.Background(), image.Path, image.Reference())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	config := make(map[string]interface{})
+	for _, history := range manifestV1.History {
+		var c map[string]interface{}
+		json.Unmarshal([]byte(history.V1Compatibility), &c)
+		for k, v := range c["container_config"].(map[string]interface{}) {
+			config[k] = v
+		}
+	}
+
+	return &manifestV2, config, nil
 }
 
-func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, dockermanifest *schema2.DeserializedManifest, appmanifest map[string]interface{}, destinationPath string) error {
+func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, dockerManifest *schema2.Manifest, dockerConfig map[string]interface{}, appmanifest map[string]interface{}, destinationPath string) error {
 	digestFile := filepath.Join(destinationPath, DOCKER_DIGEST_FILE)
 	currentDigest, err := os.Open(digestFile)
 	if err == nil {
 		currentDigestContent, err := ioutil.ReadAll(currentDigest)
 		if err == nil {
-			if string(currentDigestContent) == string(dockermanifest.Config.Digest) {
+			if string(currentDigestContent) == string(dockerManifest.Config.Digest) {
 				return nil
 			}
 		}
@@ -119,7 +133,7 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 
 	files := []string{}
 	fmt.Println("Downloading layers...")
-	for i, layer := range dockermanifest.Layers {
+	for i, layer := range dockerManifest.Layers {
 		layerReader, err := r.DownloadLayer(context.Background(), image.Path, layer.Digest)
 		buf := bufio.NewReader(layerReader)
 
@@ -196,6 +210,18 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 		return err
 	}
 
-	digestContent := []byte(dockermanifest.Config.Digest)
-	return ioutil.WriteFile(digestFile, digestContent, 0644)
+	return ioutil.WriteFile(digestFile, []byte(dockerManifest.Config.Digest), 0644)
+}
+
+func (p *Pvr) GetSquashFSDigest(appName string) (string, error) {
+	content, err := ioutil.ReadFile(filepath.Join(p.Dir, appName, DOCKER_DIGEST_FILE))
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(content), nil
 }
