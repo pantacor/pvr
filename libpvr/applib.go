@@ -21,65 +21,47 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"github.com/docker/distribution/manifest/schema2"
-	"github.com/opencontainers/go-digest"
 	"gitlab.com/pantacor/pvr/templates"
 )
 
 const (
-	SRC_FILE_PATH = "/src.json"
+	SRC_FILE = "src.json"
 )
 
 func (p *Pvr) GetApplicationManifest(appname string) (map[string]interface{}, error) {
-	var result map[string]interface{}
-	js, _, err := p.GetWorkingJson()
+	appManifestFile := filepath.Join(p.Dir, appname, SRC_FILE)
+	js, err := ioutil.ReadFile(appManifestFile)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 
+	var result map[string]interface{}
 	err = json.Unmarshal(js, &result)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 
-	return result[appname+SRC_FILE_PATH].(map[string]interface{}), nil
+	return result, nil
 }
 
-func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockermanifest *schema2.DeserializedManifest, appmanifest map[string]interface{}) error {
-	dockerConfig := dockermanifest.Config
-	appConfig := appmanifest["config"]
-	if appConfig != nil {
-		config := appConfig.(map[string]interface{})
-		if config["mediaType"] != nil {
-			dockerConfig.MediaType = config["mediaType"].(string)
-		}
-
-		if config["size"] != nil {
-			dockerConfig.Size = config["size"].(int64)
-		}
-
-		if config["digest"] != nil {
-			dockerConfig.Digest = config["digest"].(digest.Digest)
-		}
-
-		if config["urls"] != nil {
-			dockerConfig.URLs = config["urls"].([]string)
-		}
-
-		if config["annotations"] != nil {
-			dockerConfig.Annotations = config["annotations"].(map[string]string)
+func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[string]interface{}, appManifest map[string]interface{}) error {
+	appConfig := appManifest["config"].(map[string]interface{})
+	for k, _ := range dockerConfig {
+		value := appConfig[k]
+		if value != nil {
+			dockerConfig[k] = value
 		}
 	}
 
 	configValues := map[string]interface{}{}
-	configValues["Source"] = appmanifest
+	configValues["Source"] = appManifest
 	configValues["Docker"] = dockerConfig
 
-	if appmanifest["template"] == nil {
+	if appManifest["template"] == nil {
 		return fmt.Errorf("empty template")
 	}
 
-	appTemplate := appmanifest["template"].(string)
+	appTemplate := appManifest["template"].(string)
 	templateHandler := templates.Handlers[appTemplate]
 	if templateHandler == nil {
 		return fmt.Errorf("invalid template, no handler for %s", appTemplate)
@@ -101,30 +83,87 @@ func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockermanifest *s
 }
 
 func (p *Pvr) InstallApplication(appname, username, password string) error {
-	appmanifest, err := p.GetApplicationManifest(appname)
+	appManifest, err := p.GetApplicationManifest(appname)
 	if err != nil {
 		return err
 	}
 
-	if appmanifest["docker_name"] == nil {
+	if appManifest["docker_name"] == nil {
 		return err
 	}
 
-	trackURL := appmanifest["docker_name"].(string)
-	if appmanifest["docker_tag"] != nil {
-		trackURL += fmt.Sprintf(":%s", appmanifest["docker_tag"])
+	trackURL := appManifest["docker_name"].(string)
+	if appManifest["docker_tag"] != nil {
+		trackURL += fmt.Sprintf(":%s", appManifest["docker_tag"])
 	}
 
-	dockermanifest, err := p.GetDockerManifest(trackURL, username, password)
+	dockerManifest, dockerConfig, err := p.GetDockerConfig(trackURL, username, password)
 	if err != nil {
 		return err
 	}
 
-	err = p.GenerateApplicationTemplateFiles(appname, dockermanifest, appmanifest)
+	err = p.GenerateApplicationTemplateFiles(appname, dockerConfig, appManifest)
 	if err != nil {
 		return err
 	}
 
 	destinationPath := filepath.Join(p.Dir, appname)
-	return p.GenerateApplicationSquashFS(trackURL, username, password, dockermanifest, appmanifest, destinationPath)
+	return p.GenerateApplicationSquashFS(trackURL, username, password, dockerManifest, dockerConfig, appManifest, destinationPath)
+}
+
+func (p *Pvr) UpdateApplication(appname, username, password string) error {
+	appManifest, err := p.GetApplicationManifest(appname)
+	if err != nil {
+		return err
+	}
+
+	trackURL := appManifest["docker_name"].(string)
+	if appManifest["docker_tag"] != nil {
+		trackURL += fmt.Sprintf(":%s", appManifest["docker_tag"])
+	}
+
+	dockerManifest, _, err := p.GetDockerConfig(trackURL, username, password)
+	if err != nil {
+		return err
+	}
+
+	squashFSDigest, err := p.GetSquashFSDigest(appname)
+	if err != nil {
+		return err
+	}
+
+	dockerDigest := string(dockerManifest.Config.Digest)
+	if dockerDigest == squashFSDigest {
+		return nil
+	}
+
+	srcFilePath := filepath.Join(p.Dir, appname, SRC_FILE)
+	content, err := ioutil.ReadFile(srcFilePath)
+	if err != nil {
+		return err
+	}
+
+	srcMap := make(map[string]interface{})
+	err = json.Unmarshal(content, &srcMap)
+	if err != nil {
+		return err
+	}
+
+	srcMap["docker_digest"] = dockerDigest
+	content, err = json.Marshal(srcMap)
+	if err != nil {
+		return err
+	}
+
+	srcContent, err := json.Marshal(srcMap)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
+	if err != nil {
+		return err
+	}
+
+	return p.InstallApplication(appname, username, password)
 }

@@ -24,13 +24,13 @@ import (
 	"github.com/urfave/cli"
 )
 
-func CommandAppInstall() cli.Command {
+func CommandAppUpdate() cli.Command {
 	cmd := cli.Command{
-		Name:        "app-install",
-		Aliases:     []string{"ai"},
+		Name:        "app-update",
+		Aliases:     []string{"au"},
 		ArgsUsage:   "[appname]",
-		Usage:       "install new applications.",
-		Description: "generates application files",
+		Usage:       "update an existing application.",
+		Description: "update application files",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -38,7 +38,7 @@ func CommandAppInstall() cli.Command {
 			}
 
 			if c.NArg() < 1 {
-				return cli.NewExitError("app-install needs application argument. See --help", 2)
+				return cli.NewExitError("app-update needs application argument. See --help", 2)
 			}
 
 			session, err := libpvr.NewSession(c.App)
@@ -56,12 +56,12 @@ func CommandAppInstall() cli.Command {
 			username := c.String("username")
 			password := c.String("password")
 
-			err = pvr.InstallApplication(appname, username, password)
+			err = pvr.UpdateApplication(appname, username, password)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
 
-			fmt.Println("Application installed")
+			fmt.Println("Application updated")
 
 			return nil
 		},

@@ -122,6 +122,7 @@ func main() {
 		CommandPs(),
 		CommandLogs(),
 		CommandAppInstall(),
+		CommandAppUpdate(),
 	}
 	app.Run(os.Args)
 }
