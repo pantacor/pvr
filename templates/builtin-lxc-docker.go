@@ -42,6 +42,7 @@ lxc.environment = force_noncontainer=1
 		}
 	},
 	"type":"lxc",
+	"root-volume: "root.squashfs",
 	"volumes":[]
 }`
 )
