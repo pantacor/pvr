@@ -821,8 +821,10 @@ func worker(jobs chan FilePut, done chan FilePut) {
 		j.bar.Units = pb.U_BYTES
 		j.bar.UnitsWidth = 25
 		j.bar.ShowSpeed = true
-		j.bar.Prefix(filepath.Base(j.objName)[:Min(len(j.objName)-1, 12)] + " ")
 		j.bar.ShowCounters = false
+
+		objBaseName := filepath.Base(j.objName)
+		j.bar.Prefix(objBaseName[:Min(len(objBaseName)-1, 12)] + " ")
 
 		defer reader.Close()
 		r := &AsyncBody{
