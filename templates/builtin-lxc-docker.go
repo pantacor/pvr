@@ -8,8 +8,10 @@ lxc.cgroup.devices.allow = a
 lxc.utsname = major
 lxc.rootfs = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd = {{ .Docker.Entrypoint }}
+lxc.namespace.keep = user net ipc
+lxc.console.path = none
 lxc.mount.auto = proc sys:rw cgroup-full
-lxc.mount.entry = /dev dev none bind,rw,create=dir 0 0
+lxc.mount.entry = /dev/ dev none bind,rw,create=dir 0 0
 lxc.mount.entry = /storage pvstorage none bind,rw,create=dir 0 0
 lxc.mount.entry = /etc/resolv.conf etc/resolv.conf none bind,rw,create=file 0 0
 lxc.mount.entry = tmpfs run tmpfs rw,nodev,relatime,mode=755 0 0
@@ -20,7 +22,6 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | replace "/" "-" }} {
 {{- end -}}
 {{- end -}}
 {{- end }}
-lxc.environment = force_noncontainer=1
 `
 
 	RUN_JSON = `
