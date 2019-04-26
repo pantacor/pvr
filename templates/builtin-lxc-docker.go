@@ -29,7 +29,6 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | replace "/" "-" }} {
 	"#spec":"service-manifest-run@1",
 	"config":"lxc.container.conf",
 	"name":"{{- .Source.name -}}",
-	"root-volume":"root.squashfs",
 	"storage":{
 		{{- range $key, $value := .Source.persistence -}}
 		{{- if ne $key "lxc-overlay" }}
@@ -43,7 +42,7 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | replace "/" "-" }} {
 		}
 	},
 	"type":"lxc",
-	"root-volume: "root.squashfs",
+	"root-volume": "root.squashfs",
 	"volumes":[]
 }`
 )
