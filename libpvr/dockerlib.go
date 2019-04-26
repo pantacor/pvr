@@ -63,7 +63,7 @@ func (p *Pvr) GetDockerRegistry(image registry.Image, username, password string)
 		Debug:    false,
 		SkipPing: true,
 		NonSSL:   false,
-		Timeout:  10 * time.Second,
+		Timeout:  1800 * time.Second,
 	})
 }
 
