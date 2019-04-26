@@ -36,8 +36,8 @@ import (
 const (
 	TAR_CMD            = "tar"
 	MAKE_SQUASHFS_CMD  = "mksquashfs"
-	SQUASH_FILE        = "rootfs.squashfs"
-	DOCKER_DIGEST_FILE = "rootfs.squashfs.docker-digest"
+	SQUASH_FILE        = "root.squashfs"
+	DOCKER_DIGEST_FILE = "root.squashfs.docker-digest"
 )
 
 var (
