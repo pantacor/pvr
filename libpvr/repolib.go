@@ -473,6 +473,7 @@ func (p *Pvr) Commit(msg string) error {
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
+		v = filepath.Join(p.Dir, v)
 		sha, err := FiletoSha(v)
 		if err != nil {
 			return err
