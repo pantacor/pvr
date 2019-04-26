@@ -2,11 +2,10 @@ package templates
 
 const (
 	LXC_CONTAINER_CONF = `
-lxc.tty = 4
-lxc.pts = 1024
+lxc.tty.max = 4
+lxc.pty.max = 1024
 lxc.cgroup.devices.allow = a
-lxc.utsname = major
-lxc.rootfs = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
+lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd = {{ .Docker.Entrypoint }}
 lxc.namespace.keep = user net ipc
 lxc.console.path = none
