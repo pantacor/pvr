@@ -17,16 +17,39 @@ package libpvr
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
+	"github.com/genuinetools/reg/registry"
 	"gitlab.com/pantacor/pvr/templates"
 )
 
 const (
-	SRC_FILE = "src.json"
+	SRC_FILE                    = "src.json"
+	SRC_SPEC                    = "service-manifest-src@1"
+	TEMPLATE_BUILTIN_LXC_DOCKER = "builtin-lxc-docker"
 )
+
+var (
+	ErrInvalidVolumeFormat = errors.New("invalid volume format")
+	ErrEmptyAppName        = errors.New("empty app name")
+	ErrEmptyFrom           = errors.New("empty from")
+)
+
+type Source struct {
+	Spec         string                 `json:"#spec"`
+	Template     string                 `json:"template"`
+	Config       map[string]interface{} `json:"config"`
+	DockerName   string                 `json:"docker_name"`
+	DockerTag    string                 `json:"docker_tag"`
+	DockerDigest string                 `json:"docker_digest"`
+	Persistence  map[string]string      `json:"persistence"`
+}
 
 func (p *Pvr) GetApplicationManifest(appname string) (map[string]interface{}, error) {
 	appManifestFile := filepath.Join(p.Dir, appname, SRC_FILE)
@@ -160,6 +183,87 @@ func (p *Pvr) UpdateApplication(appname, username, password string) error {
 		return err
 	}
 
+	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
+	if err != nil {
+		return err
+	}
+
+	return p.InstallApplication(appname, username, password)
+}
+
+func (p *Pvr) AddApplication(appname, username, password, from, configFile string, volumes []string) error {
+	if appname == "" {
+		return ErrEmptyAppName
+	}
+
+	appPath := filepath.Join(p.Dir, appname)
+	if _, err := os.Stat(appPath); !os.IsNotExist(err) {
+		return nil
+	}
+
+	if from == "" {
+		return ErrEmptyFrom
+	}
+
+	image, err := registry.ParseImage(from)
+	if err != nil {
+		return err
+	}
+
+	_, dockerConfig, err := p.GetDockerConfig(from, username, password)
+	if err != nil {
+		return err
+	}
+
+	if configFile != "" {
+		var config map[string]interface{}
+		content, err := ioutil.ReadFile(configFile)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(content, &config)
+		if err != nil {
+			return err
+		}
+
+		for k, v := range config {
+			dockerConfig[k] = v
+		}
+
+	}
+
+	persistence := map[string]string{}
+	for _, volume := range volumes {
+		split := strings.Split(volume, ":")
+		if len(split) < 2 {
+			return ErrInvalidVolumeFormat
+		}
+
+		persistence[split[0]] = split[1]
+	}
+
+	src := Source{
+		Spec:         SRC_SPEC,
+		Template:     TEMPLATE_BUILTIN_LXC_DOCKER,
+		Config:       dockerConfig,
+		DockerName:   path.Join(image.Domain, image.Path),
+		DockerTag:    image.Tag,
+		DockerDigest: string(image.Digest),
+		Persistence:  persistence,
+	}
+
+	srcContent, err := json.MarshalIndent(src, " ", " ")
+	if err != nil {
+		return err
+	}
+
+	err = os.Mkdir(appPath, 0777)
+	if err != nil {
+		return err
+	}
+
+	srcFilePath := filepath.Join(appPath, SRC_FILE)
 	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
 	if err != nil {
 		return err
