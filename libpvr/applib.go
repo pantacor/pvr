@@ -166,19 +166,15 @@ func (p *Pvr) UpdateApplication(appname, username, password string) error {
 		return err
 	}
 
-	srcMap := make(map[string]interface{})
-	err = json.Unmarshal(content, &srcMap)
+	var src Source
+	err = json.Unmarshal(content, &src)
 	if err != nil {
 		return err
 	}
 
-	srcMap["docker_digest"] = dockerDigest
-	content, err = json.Marshal(srcMap)
-	if err != nil {
-		return err
-	}
+	src.DockerDigest = dockerDigest
 
-	srcContent, err := json.Marshal(srcMap)
+	srcContent, err := json.Marshal(src)
 	if err != nil {
 		return err
 	}
