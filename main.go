@@ -123,6 +123,7 @@ func main() {
 		CommandLogs(),
 		CommandAppInstall(),
 		CommandAppUpdate(),
+		CommandAppAdd(),
 	}
 	app.Run(os.Args)
 }
