@@ -18,17 +18,21 @@ package libpvr
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/docker/distribution/manifest/schema2"
+	"github.com/docker/docker/api/types"
 	"github.com/genuinetools/reg/registry"
 	"github.com/genuinetools/reg/repoutils"
 )
@@ -50,13 +54,7 @@ var (
 
 type DockerManifest map[string]interface{}
 
-func (p *Pvr) GetDockerRegistry(image registry.Image, username, password string) (*registry.Registry, error) {
-
-	auth, err := repoutils.GetAuthConfig(username, password, image.Domain)
-	if err != nil {
-		return nil, err
-	}
-
+func (p *Pvr) GetDockerRegistry(image registry.Image, auth types.AuthConfig) (*registry.Registry, error) {
 	return registry.New(context.Background(), auth, registry.Opt{
 		Domain:   image.Domain,
 		Insecure: false,
@@ -73,7 +71,12 @@ func (p *Pvr) GetDockerConfig(dockerURL, username, password string) (*schema2.Ma
 		return nil, nil, err
 	}
 
-	r, err := p.GetDockerRegistry(image, username, password)
+	auth, err := repoutils.GetAuthConfig(username, password, image.Domain)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	r, err := p.GetDockerRegistry(image, auth)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -83,19 +86,80 @@ func (p *Pvr) GetDockerConfig(dockerURL, username, password string) (*schema2.Ma
 		return nil, nil, err
 	}
 
-	manifestV1, err := r.ManifestV1(context.Background(), image.Path, image.Reference())
+	blobsURL := fmt.Sprintf("%s/v2/%s/blobs/%s", r.URL, image.Path, manifestV2.Config.Digest)
+
+	resp, err := http.Get(blobsURL)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	config := make(map[string]interface{})
-	for _, history := range manifestV1.History {
-		var c map[string]interface{}
-		json.Unmarshal([]byte(history.V1Compatibility), &c)
-		for k, v := range c["container_config"].(map[string]interface{}) {
-			config[k] = v
+	if resp.StatusCode == http.StatusUnauthorized {
+		wwwHeaders := resp.Header["Www-Authenticate"][0]
+
+		// Expected format: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull"
+
+		baseReg := `%s="(([a-z]|[A-Z]|:|\/|-|_|\.)+)"`
+
+		realmReg := regexp.MustCompile(fmt.Sprintf(baseReg, "realm"))
+		realm := realmReg.FindStringSubmatch(wwwHeaders)[1]
+
+		serviceReg := regexp.MustCompile(fmt.Sprintf(baseReg, "service"))
+		service := serviceReg.FindStringSubmatch(wwwHeaders)[1]
+
+		scopeReg := regexp.MustCompile(fmt.Sprintf(baseReg, "scope"))
+		scope := scopeReg.FindStringSubmatch(wwwHeaders)[1]
+
+		tokenURL := fmt.Sprintf("%s?service=%s&scope=%s", realm, service, scope)
+		req, err := http.NewRequest(http.MethodGet, tokenURL, nil)
+		if err != nil {
+			return nil, nil, err
 		}
+
+		if username != "" && password != "" {
+			auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+			req.Header.Set("Authorization", "Basic "+auth)
+		}
+
+		resp, err = http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		content, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		var tokenResponse map[string]interface{}
+		err = json.Unmarshal(content, &tokenResponse)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		token := tokenResponse["token"].(string)
+		req, err = http.NewRequest(http.MethodGet, blobsURL, nil)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+		req.Header.Add("Authorization", "Bearer "+token)
+		resp, err = http.DefaultClient.Do(req)
 	}
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	blobContent, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var blob map[string]interface{}
+	err = json.Unmarshal(blobContent, &blob)
+
+	config := blob["config"].(map[string]interface{})
 
 	return &manifestV2, config, nil
 }
@@ -119,7 +183,12 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 		return err
 	}
 
-	r, err := p.GetDockerRegistry(image, username, password)
+	auth, err := repoutils.GetAuthConfig(username, password, image.Domain)
+	if err != nil {
+		return err
+	}
+
+	r, err := p.GetDockerRegistry(image, auth)
 	if err != nil {
 		return err
 	}
