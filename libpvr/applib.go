@@ -76,6 +76,9 @@ func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[
 		}
 	}
 
+	// add application name to proccess template
+	appManifest["name"] = appname
+
 	configValues := map[string]interface{}{}
 	configValues["Source"] = appManifest
 	configValues["Docker"] = dockerConfig
