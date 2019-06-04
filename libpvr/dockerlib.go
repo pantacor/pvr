@@ -98,7 +98,7 @@ func (p *Pvr) GetDockerConfig(dockerURL, username, password string) (*schema2.Ma
 
 		// Expected format: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull"
 
-		baseReg := `%s="(([a-z]|[A-Z]|:|\/|-|_|\.)+)"`
+		baseReg := `%s="(([a-z]|[A-Z]|[0-9]|\:|\/|\-|\_|\.)+)"`
 
 		realmReg := regexp.MustCompile(fmt.Sprintf(baseReg, "realm"))
 		realm := realmReg.FindStringSubmatch(wwwHeaders)[1]
