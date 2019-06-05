@@ -209,10 +209,12 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 		return err
 	}
 
-	_, dockerConfig, err := p.GetDockerConfig(from, username, password)
+	dockerManifest, dockerConfig, err := p.GetDockerConfig(from, username, password)
 	if err != nil {
 		return err
 	}
+
+	dockerDigest := string(dockerManifest.Config.Digest)
 
 	if configFile != "" {
 		var config map[string]interface{}
@@ -245,10 +247,10 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 	src := Source{
 		Spec:         SRC_SPEC,
 		Template:     TEMPLATE_BUILTIN_LXC_DOCKER,
-		Config:       dockerConfig,
+		Config:       map[string]interface{}{},
 		DockerName:   path.Join(image.Domain, image.Path),
 		DockerTag:    image.Tag,
-		DockerDigest: string(image.Digest),
+		DockerDigest: string(dockerDigest),
 		Persistence:  persistence,
 	}
 
