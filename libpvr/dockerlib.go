@@ -65,6 +65,30 @@ func (p *Pvr) GetDockerRegistry(image registry.Image, auth types.AuthConfig) (*r
 	})
 }
 
+func (p *Pvr) GetDockerManifest(dockerURL, username, password string) (*schema2.Manifest, error) {
+	image, err := registry.ParseImage(dockerURL)
+	if err != nil {
+		return nil, err
+	}
+
+	auth, err := repoutils.GetAuthConfig(username, password, image.Domain)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := p.GetDockerRegistry(image, auth)
+	if err != nil {
+		return nil, err
+	}
+
+	manifestV2, err := r.ManifestV2(context.Background(), image.Path, image.Reference())
+	if err != nil {
+		return nil, err
+	}
+
+	return &manifestV2, nil
+}
+
 func (p *Pvr) GetDockerConfig(dockerURL, username, password string) (*schema2.Manifest, map[string]interface{}, error) {
 	image, err := registry.ParseImage(dockerURL)
 	if err != nil {

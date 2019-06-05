@@ -25,25 +25,43 @@ import (
 	"github.com/urfave/cli"
 )
 
+const (
+	ConfigurationFile = "config.json"
+)
+
 type Session struct {
-	app  *cli.App
-	auth *PvrAuthConfig
+	app           *cli.App
+	auth          *PvrAuthConfig
+	Configuration *PvrGlobalConfig
+	configDir     string
 }
 
 func NewSession(app *cli.App) (*Session, error) {
 
 	configDir := app.Metadata["PVR_CONFIG_DIR"].(string)
-	configPath := filepath.Join(configDir, "auth.json")
+	authConfigPath := filepath.Join(configDir, "auth.json")
+	generalConfigPath := filepath.Join(configDir, ConfigurationFile)
 
-	authConfig, err := LoadConfig(configPath)
+	authConfig, err := LoadConfig(authConfigPath)
 	if err != nil {
 		return nil, errors.New("Cannot load config: " + err.Error())
 	}
 
+	configuration, err := LoadConfiguration(generalConfigPath)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Session{
-		app:  app,
-		auth: authConfig,
+		app:           app,
+		auth:          authConfig,
+		configDir:     configDir,
+		Configuration: configuration,
 	}, nil
+}
+
+func (s *Session) GetConfigDir() string {
+	return s.configDir
 }
 
 func (s *Session) GetApp() *cli.App {
