@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func main() {
@@ -97,6 +98,8 @@ func main() {
 			c.App.Metadata["PVR_CONFIG_DIR"] = filepath.Join(usr.HomeDir, ".pvr")
 		}
 
+		libpvr.UpdateIfNecessary(c)
+
 		return nil
 	}
 
@@ -124,6 +127,8 @@ func main() {
 		CommandAppInstall(),
 		CommandAppUpdate(),
 		CommandAppAdd(),
+		CommandSelfUpdate(),
+		CommandGlobalConfig(),
 	}
 	app.Run(os.Args)
 }

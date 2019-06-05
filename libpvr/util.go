@@ -21,8 +21,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -63,6 +69,8 @@ func FiletoSha(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	defer file.Close()
 
 	_, err = io.Copy(hasher, file)
 
@@ -109,4 +117,122 @@ func GetPhAuthHeaderTokenKey(authHeader string) (string, error) {
 	}
 
 	return authEps[0] + " realm=" + realm, nil
+}
+
+// ReadOrCreateFile read a file from file system if is not avaible creates the file
+func ReadOrCreateFile(filePath string) (*[]byte, error) {
+	_, err := os.Stat(filePath)
+
+	if os.IsNotExist(err) {
+		_, err := os.Stat(filepath.Dir(filePath))
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(filePath, 0700)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, errors.New("OS error getting stats for: " + err.Error())
+	}
+
+	content, err := ioutil.ReadFile(filePath)
+
+	if err != nil {
+		return nil, errors.New("OS error reading file: " + err.Error())
+	}
+
+	return &content, nil
+}
+
+func WriteTxtFile(filePath string, content string) error {
+
+	data := []byte(content)
+
+	return ioutil.WriteFile(filePath, data, 0644)
+}
+
+// GetPlatform get string with the full platform name
+func GetPlatform() string {
+	values := []string{string(runtime.GOOS), string(runtime.GOARCH)}
+
+	return strings.Join(values, "_")
+}
+
+// AskForConfirmation ask the user for confirmation action
+func AskForConfirmation(question string) bool {
+	var response string
+	fmt.Println(question)
+
+	_, err := fmt.Scanln(&response)
+	if err != nil {
+		return false
+	}
+	okayResponses := `(y|yes|Yes|Y|YES)`
+	matched, err := regexp.MatchString(okayResponses, response)
+	if err != nil {
+		return false
+	}
+	return matched
+}
+
+func FileHasSameSha(path, sha string) (bool, error) {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	fileSha, err := FiletoSha(path)
+	if err != nil {
+		return false, err
+	}
+
+	fileSha = fmt.Sprintf("sha256:%s", fileSha)
+
+	return fileSha == sha, nil
+}
+
+func CreateFolder(path string) error {
+	_, err := os.Stat(path)
+
+	if os.IsNotExist(err) {
+		_, err := os.Stat(filepath.Dir(path))
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(filepath.Dir(path), 0700)
+			if err != nil {
+				return err
+			}
+		}
+		err = os.MkdirAll(path, 0700)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ExtractFiles(files []string, extractPath string) error {
+	tarPath, err := exec.LookPath(TAR_CMD)
+	if err != nil {
+		return err
+	}
+
+	if tarPath == "" {
+		return ErrTarNotFound
+	}
+
+	for _, file := range files {
+		args := []string{tarPath, "xzvf", file, "-C", extractPath}
+		untar := exec.Command(args[0], args[1:]...)
+		untarError := untar.Run()
+		if untarError != nil {
+			return untarError
+		}
+	}
+
+	return nil
 }
