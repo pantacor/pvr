@@ -25,10 +25,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/genuinetools/reg/registry"
 	"github.com/genuinetools/reg/repoutils"
+	"github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )
 
@@ -49,12 +49,12 @@ type downloadData struct {
 }
 
 type layerData struct {
-	Registry  *registry.Registry
-	Image     *registry.Image
-	Layer     *distribution.Descriptor
-	OutputDir *string
-	Number    int
-	Downloads chan<- *downloadData
+	Registry    *registry.Registry
+	ImagePath   string
+	LayerDigest digest.Digest
+	OutputDir   *string
+	Number      int
+	Downloads   chan<- *downloadData
 }
 
 // UpdateIfNecessary update pvr if is necesary but only check on time at the day
@@ -196,7 +196,7 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 	}
 
 	totalLayers := len(dockerManifest.Layers)
-	downloads := make(chan *downloadData, totalLayers)
+	downloads := make(chan *downloadData)
 	var waitGroup sync.WaitGroup
 
 	fmt.Printf("\n\rDownloading layers %d ... \r\n", totalLayers)
@@ -204,17 +204,17 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 	waitGroup.Add(totalLayers)
 	for i, layer := range dockerManifest.Layers {
 		layerdata := layerData{
-			Registry:  r,
-			Image:     &image,
-			Layer:     &layer,
-			OutputDir: outputDir,
-			Number:    i + 1,
-			Downloads: downloads,
+			Registry:    r,
+			ImagePath:   image.Path,
+			LayerDigest: layer.Digest,
+			OutputDir:   outputDir,
+			Number:      i + 1,
+			Downloads:   downloads,
 		}
-		go func(layerdata *layerData) {
+		go func(layerdata layerData) {
+			defer waitGroup.Done()
 			downloadlayers(layerdata)
-			waitGroup.Done()
-		}(&layerdata)
+		}(layerdata)
 	}
 
 	go func() {
@@ -266,6 +266,7 @@ func processDownloads(downloads chan *downloadData, totalLayers int) ([]string, 
 	files := []string{}
 
 	for download := range downloads {
+
 		if download.err != nil {
 			return nil, download.err
 		}
@@ -275,11 +276,11 @@ func processDownloads(downloads chan *downloadData, totalLayers int) ([]string, 
 	return files, nil
 }
 
-func downloadlayers(layerdata *layerData) {
+func downloadlayers(layerdata layerData) {
 	i := layerdata.Number
 	filename := filepath.Join(*layerdata.OutputDir, strconv.Itoa(i)) + ".tar.gz"
 
-	sameFile, err := FileHasSameSha(filename, string(layerdata.Layer.Digest))
+	sameFile, err := FileHasSameSha(filename, string(layerdata.LayerDigest))
 	if err != nil {
 		layerdata.Downloads <- &downloadData{
 			filename: filename,
@@ -309,10 +310,19 @@ func downloadlayers(layerdata *layerData) {
 		return
 	}
 
-	layerReader, err := layerdata.Registry.DownloadLayer(context.Background(), layerdata.Image.Path, layerdata.Layer.Digest)
-	buf := bufio.NewReader(layerReader)
+	layerReader, err := layerdata.Registry.DownloadLayer(context.Background(), layerdata.ImagePath, layerdata.LayerDigest)
+	if err != nil {
+		layerdata.Downloads <- &downloadData{
+			filename: filename,
+			number:   i,
+			err:      err,
+		}
+		return
+	}
 
+	buf := bufio.NewReader(layerReader)
 	file, err := os.Create(filename)
+
 	if err != nil {
 		layerdata.Downloads <- &downloadData{
 			filename: filename,
