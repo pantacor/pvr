@@ -62,7 +62,7 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | replace "/" "-" }} {
 		{{- end -}}
 		{{- end }}
 		"lxc-overlay" : {
-			"persistence": "{{ index .Source.persistence "lxc-overlay" }}"
+			"persistence": "{{ if index .Source.persistence "lxc-overlay" }}{{ index .Source.persistence "lxc-overlay" }}{{ else }}boot{{ end }}"
 		}
 	},
 	"type":"lxc",
