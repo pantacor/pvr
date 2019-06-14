@@ -27,7 +27,7 @@ var pvrFuncMap = map[string]interface{}{
 			return false
 		}
 		val := reflect.ValueOf(content)
-		if val.Kind() == reflect.Array {
+		if val.Kind() == reflect.Array || val.Kind() == reflect.Slice {
 			return true
 		}
 		return false
