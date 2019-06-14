@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -39,6 +40,8 @@ const (
 	cacheFolder         = "cache/"
 	lastCheckedFileName = "last_checked"
 	updateEveryDays     = 1.0
+	cacheFilePrefix     = "pvr_layer_"
+	cacheFileExt        = ".tar.gz"
 )
 
 type downloadData struct {
@@ -224,8 +227,10 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 
 	files, err := processDownloads(downloads, totalLayers)
 
-	extractPath := filepath.Join(*outputDir, "bin")
-	os.MkdirAll(extractPath, 0777)
+	extractPath, err := ioutil.TempDir(os.TempDir(), "bin-")
+	if err != nil {
+		return nil, nil, err
+	}
 
 	fmt.Printf("\n\rExtracting layers %d ... \r\n", len(files))
 
@@ -278,7 +283,7 @@ func processDownloads(downloads chan *downloadData, totalLayers int) ([]string, 
 
 func downloadlayers(layerdata layerData) {
 	i := layerdata.Number
-	filename := filepath.Join(*layerdata.OutputDir, strconv.Itoa(i)) + ".tar.gz"
+	filename := filepath.Join(*layerdata.OutputDir, cacheFilePrefix+strconv.Itoa(i)+cacheFileExt)
 
 	sameFile, err := FileHasSameSha(filename, string(layerdata.LayerDigest))
 	if err != nil {
