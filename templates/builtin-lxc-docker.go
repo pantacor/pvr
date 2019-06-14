@@ -1,12 +1,37 @@
 package templates
 
 const (
-	LXC_CONTAINER_CONF = `
+	LXC_CONTAINER_CONF = `{{ "" -}}
 lxc.tty.max = 4
 lxc.pty.max = 1024
 lxc.cgroup.devices.allow = a
 lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
-lxc.init.cmd = {{ .Docker.Entrypoint }}
+lxc.init.cmd =
+{{- if .Docker.Entrypoint }}
+	{{- if pvrIsSlice .Docker.Entrypoint }}
+		{{- if pvrSliceIndex .Docker.Entrypoint 0 }}
+			{{- "" }} {{ pvrSliceIndex .Docker.Entrypoint 0}}{{ range pvrSliceFrom .Docker.Entrypoint 1 }} "{{ . }}"{{ end }}
+		{{- end }}
+	{{- else }}
+		{{- "" }} {{ .Docker.Entrypoint }}
+	{{- end }}
+{{- else }}
+	{{- if .Docker.Cmd }}
+		{{- if pvrIsSlice .Docker.Cmd }}
+			{{- if pvrSliceIndex .Docker.Cmd 0 }}
+				{{- "" }} {{ pvrSliceIndex .Docker.Cmd 0}}{{ range pvrSliceFrom .Docker.Cmd 1 }} "{{ . }}"{{ end }}
+			{{- end }}
+		{{- else }}
+			{{- "" }} {{ .Docker.Cmd }}
+		{{- end }}
+	{{- end }}
+{{- end }}
+{{- if and (not .Docker.Cmd) (not .Docker.Entrypoint) }} /sbin/init{{- end }}
+{{- if .Docker.Env }}
+	{{- range .Docker.Env }}
+lxc.environment = {{ . }}
+	{{- end }}
+{{- end }}
 lxc.namespace.keep = user net ipc
 lxc.console.path = none
 lxc.mount.auto = proc sys:rw cgroup-full
@@ -23,7 +48,7 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | replace "/" "-" }} {
 {{- end }}
 `
 
-	RUN_JSON = `
+	RUN_JSON = `{{ "" -}}
 {
 	"#spec":"service-manifest-run@1",
 	"config":"lxc.container.conf",
@@ -37,7 +62,7 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | replace "/" "-" }} {
 		{{- end -}}
 		{{- end }}
 		"lxc-overlay" : {
-			"persistence": "{{ index .Source.persistence "lxc-overlay" }}"
+			"persistence": "{{ if index .Source.persistence "lxc-overlay" }}{{ index .Source.persistence "lxc-overlay" }}{{ else }}boot{{ end }}"
 		}
 	},
 	"type":"lxc",
