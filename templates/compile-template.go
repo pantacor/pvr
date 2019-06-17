@@ -20,12 +20,14 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig"
+	"github.com/leekchan/gtf"
 )
 
 func compileTemplate(content string, values map[string]interface{}) (result []byte) {
 	buffer := bytes.NewBuffer(result)
 	templ := template.Must(template.New("compiled-template").
 		Funcs(sprig.TxtFuncMap()).
+		Funcs(gtf.GtfTextFuncMap).
 		Funcs(PvrFuncMap()).
 		Parse(content))
 	templ.Execute(buffer, values)
