@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/genuinetools/reg/registry"
 	"gitlab.com/pantacor/pvr/templates"
 )
 
@@ -122,8 +121,28 @@ func (p *Pvr) InstallApplication(appname, username, password string) error {
 	if appManifest["docker_tag"] != nil {
 		trackURL += fmt.Sprintf(":%s", appManifest["docker_tag"])
 	}
+	if appManifest["docker_digest"] != nil {
+		trackURL += fmt.Sprintf("@%s", appManifest["docker_digest"])
+	}
 
-	dockerManifest, dockerConfig, err := p.GetDockerConfig(trackURL, username, password)
+	image, err := p.ParseDockerImage(trackURL)
+	if err != nil {
+		return err
+	}
+
+	if username == "" && password == "" {
+		username, password, err = p.CredentialsFromCache(image.Domain)
+		if err != nil {
+			return err
+		}
+	}
+
+	dockerManifest, err := p.GetDockerManifest(image, username, password)
+	if err != nil {
+		return err
+	}
+
+	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, username, password)
 	if err != nil {
 		return err
 	}
@@ -134,7 +153,15 @@ func (p *Pvr) InstallApplication(appname, username, password string) error {
 	}
 
 	destinationPath := filepath.Join(p.Dir, appname)
-	return p.GenerateApplicationSquashFS(trackURL, username, password, dockerManifest, dockerConfig, appManifest, destinationPath)
+	return p.GenerateApplicationSquashFS(
+		trackURL,
+		username,
+		password,
+		dockerManifest,
+		dockerConfig,
+		appManifest,
+		destinationPath,
+	)
 }
 
 func (p *Pvr) UpdateApplication(appname, username, password string) error {
@@ -148,7 +175,19 @@ func (p *Pvr) UpdateApplication(appname, username, password string) error {
 		trackURL += fmt.Sprintf(":%s", appManifest["docker_tag"])
 	}
 
-	dockerManifest, _, err := p.GetDockerConfig(trackURL, username, password)
+	image, err := p.ParseDockerImage(trackURL)
+	if err != nil {
+		return err
+	}
+
+	if username == "" && password == "" {
+		username, password, err = p.CredentialsFromCache(image.Domain)
+		if err != nil {
+			return err
+		}
+	}
+
+	dockerManifest, err := p.GetDockerManifest(image, username, password)
 	if err != nil {
 		return err
 	}
@@ -158,7 +197,7 @@ func (p *Pvr) UpdateApplication(appname, username, password string) error {
 		return err
 	}
 
-	dockerDigest := string(dockerManifest.Config.Digest)
+	dockerDigest := dockerManifest.DockerContentDigest
 	if dockerDigest == squashFSDigest {
 		return nil
 	}
@@ -204,17 +243,29 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 		return ErrEmptyFrom
 	}
 
-	image, err := registry.ParseImage(from)
+	image, err := p.ParseDockerImage(from)
 	if err != nil {
 		return err
 	}
 
-	dockerManifest, dockerConfig, err := p.GetDockerConfig(from, username, password)
+	if username == "" && password == "" {
+		username, password, err = p.CredentialsFromCache(image.Domain)
+		if err != nil {
+			return err
+		}
+	}
+
+	dockerManifest, err := p.GetDockerManifest(image, username, password)
 	if err != nil {
 		return err
 	}
 
-	dockerDigest := string(dockerManifest.Config.Digest)
+	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, username, password)
+	if err != nil {
+		return err
+	}
+
+	dockerDigest := dockerManifest.DockerContentDigest
 
 	if configFile != "" {
 		var config map[string]interface{}
@@ -250,7 +301,7 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 		Config:       map[string]interface{}{},
 		DockerName:   path.Join(image.Domain, image.Path),
 		DockerTag:    image.Tag,
-		DockerDigest: string(dockerDigest),
+		DockerDigest: dockerDigest,
 		Persistence:  persistence,
 	}
 
@@ -270,5 +321,28 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 		return err
 	}
 
-	return p.InstallApplication(appname, username, password)
+	appManifest, err := p.GetApplicationManifest(appname)
+	if err != nil {
+		return err
+	}
+
+	if appManifest["docker_name"] == nil {
+		return err
+	}
+
+	err = p.GenerateApplicationTemplateFiles(appname, dockerConfig, appManifest)
+	if err != nil {
+		return err
+	}
+
+	destinationPath := filepath.Join(p.Dir, appname)
+	return p.GenerateApplicationSquashFS(
+		from,
+		username,
+		password,
+		dockerManifest,
+		dockerConfig,
+		appManifest,
+		destinationPath,
+	)
 }

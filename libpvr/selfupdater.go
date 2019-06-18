@@ -16,7 +16,6 @@ package libpvr
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -26,9 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/distribution/manifest/schema2"
-	"github.com/genuinetools/reg/registry"
-	"github.com/genuinetools/reg/repoutils"
 	"github.com/opencontainers/go-digest"
 	"github.com/urfave/cli"
 )
@@ -52,7 +48,6 @@ type downloadData struct {
 }
 
 type layerData struct {
-	Registry    *registry.Registry
 	ImagePath   string
 	LayerDigest digest.Digest
 	OutputDir   *string
@@ -102,7 +97,7 @@ func UpdateIfNecessary(c *cli.Context) error {
 
 // UpdatePvr Take the username, password and configuration File (aka: ~/.pvr) and update the pvr binary
 func (pvr *Pvr) UpdatePvr(username, password *string, silent bool) error {
-	currentDigest, previousDigest, manifestV2, err := pvr.getDigetsDifference(username, password)
+	currentDigest, previousDigest, manifest, err := pvr.getDigetsDifference(username, password)
 	if err != nil {
 		return err
 	}
@@ -116,7 +111,7 @@ func (pvr *Pvr) UpdatePvr(username, password *string, silent bool) error {
 
 	fmt.Printf("Starting update PVR using Docker latest tag (%v) \r\n ", *currentDigest)
 
-	cacheFolder, err := pvr.downloadAdUpdateBinary(username, password, currentDigest, manifestV2)
+	cacheFolder, err := pvr.downloadAdUpdateBinary(username, password, currentDigest, manifest)
 	if err != nil {
 		return err
 	}
@@ -127,17 +122,23 @@ func (pvr *Pvr) UpdatePvr(username, password *string, silent bool) error {
 	return nil
 }
 
-func (pvr *Pvr) getDigetsDifference(username, password *string) (*string, *string, *schema2.Manifest, error) {
+func (pvr *Pvr) getDigetsDifference(username, password *string) (*string, *string, *DockerManifest, error) {
 	configDir := pvr.Session.configDir
 	tag := pvr.Session.Configuration.DistributionTag
 	registry := pvrRegistry
 	dockerURL := fmt.Sprintf("%s:%s", registry, tag)
-	manifestV2, err := pvr.GetDockerManifest(dockerURL, *username, *password)
+
+	image, err := pvr.ParseDockerImage(dockerURL)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	currentDigest := string(manifestV2.Config.Digest)
+	manifest, err := pvr.GetDockerManifest(image, *username, *password)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	currentDigest := string(manifest.Config.Digest)
 
 	fileContent, err := ReadOrCreateFile(filepath.Join(configDir, lastUpdateFile))
 	if err != nil {
@@ -149,10 +150,10 @@ func (pvr *Pvr) getDigetsDifference(username, password *string) (*string, *strin
 	} else {
 		previousDigest = string(*fileContent)
 	}
-	return &currentDigest, &previousDigest, manifestV2, nil
+	return &currentDigest, &previousDigest, manifest, nil
 }
 
-func (pvr *Pvr) downloadAdUpdateBinary(username, password, currentDigest *string, manifestV2 *schema2.Manifest) (*string, error) {
+func (pvr *Pvr) downloadAdUpdateBinary(username, password, currentDigest *string, manifest *DockerManifest) (*string, error) {
 	configDir := pvr.Session.configDir
 	cachePath := filepath.Join(configDir, cacheFolder)
 	dockerURL := fmt.Sprintf("%s:%s", pvrRegistry, pvr.Session.Configuration.DistributionTag)
@@ -162,7 +163,7 @@ func (pvr *Pvr) downloadAdUpdateBinary(username, password, currentDigest *string
 		return nil, err
 	}
 
-	temp, extractPath, err := pvr.getDockerContent(dockerURL, &cachePath, username, password, manifestV2)
+	temp, extractPath, err := pvr.getDockerContent(dockerURL, &cachePath, username, password, manifest)
 	if err != nil {
 		return nil, err
 	}
@@ -182,18 +183,8 @@ func (pvr *Pvr) downloadAdUpdateBinary(username, password, currentDigest *string
 	return temp, nil
 }
 
-func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password *string, dockerManifest *schema2.Manifest) (*string, *string, error) {
-	image, err := registry.ParseImage(dockerURL)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	auth, err := repoutils.GetAuthConfig(*username, *password, image.Domain)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	r, err := pvr.GetDockerRegistry(image, auth)
+func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password *string, dockerManifest *DockerManifest) (*string, *string, error) {
+	image, err := pvr.ParseDockerImage(dockerURL)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -207,17 +198,16 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 	waitGroup.Add(totalLayers)
 	for i, layer := range dockerManifest.Layers {
 		layerdata := layerData{
-			Registry:    r,
 			ImagePath:   image.Path,
 			LayerDigest: layer.Digest,
 			OutputDir:   outputDir,
 			Number:      i + 1,
 			Downloads:   downloads,
 		}
-		go func(layerdata layerData) {
+		go func(image DockerImage, layerdata layerData) {
 			defer waitGroup.Done()
-			downloadlayers(layerdata)
-		}(layerdata)
+			downloadlayers(image, layerdata)
+		}(image, layerdata)
 	}
 
 	go func() {
@@ -281,7 +271,7 @@ func processDownloads(downloads chan *downloadData, totalLayers int) ([]string, 
 	return files, nil
 }
 
-func downloadlayers(layerdata layerData) {
+func downloadlayers(image DockerImage, layerdata layerData) {
 	i := layerdata.Number
 	filename := filepath.Join(*layerdata.OutputDir, cacheFilePrefix+strconv.Itoa(i)+cacheFileExt)
 
@@ -315,7 +305,7 @@ func downloadlayers(layerdata layerData) {
 		return
 	}
 
-	layerReader, err := layerdata.Registry.DownloadLayer(context.Background(), layerdata.ImagePath, layerdata.LayerDigest)
+	layerReader, err := DownloadLayer(&image, layerdata.LayerDigest)
 	if err != nil {
 		layerdata.Downloads <- &downloadData{
 			filename: filename,
