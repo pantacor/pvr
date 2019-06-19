@@ -1397,7 +1397,8 @@ func (p *Pvr) grabObjects(requests ...*grab.Request) error {
 				if resp != nil && resp.IsComplete() {
 					req := resp.Request
 					// print final result
-					if resp.Err() != nil {
+					if resp.Err() != nil && grab.ErrFileExists != resp.Err() {
+						log.Println("ERROR: Downloading " + resp.Err().Error())
 						progressBars[req].Finish()
 						progressBars[req].ShowBar = false
 						progressBars[req].ShowPercent = false
@@ -1499,10 +1500,27 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 			return err
 		}
 
-		req, err := grab.NewRequest(path.Join(p.Objdir, v), remoteObject.SignedGetUrl)
+		fullPathV := path.Join(p.Objdir, v)
+
+		fSha, err := FiletoSha(fullPathV)
+		if err != nil && !os.IsNotExist(err) {
+			log.Println("ERROR: error calculating sha for existing file " + fullPathV + ": " + err.Error())
+			return err
+		}
+
+		if err == nil && fSha != v {
+			err = os.Remove(fullPathV)
+			if err != nil {
+				log.Println("WARNING: error removing not sha-matching local object: " + fullPathV + " - " + err.Error())
+			}
+		}
+
+		// we grab them to .new file ... and rename them when completed
+		req, err := grab.NewRequest(fullPathV, remoteObject.SignedGetUrl)
 		if err != nil {
 			return err
 		}
+		req.SkipExisting = true
 
 		grabs = append(grabs, req)
 	}
