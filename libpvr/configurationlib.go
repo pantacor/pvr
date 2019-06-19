@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	defaultDistributionTag = "latest"
+	defaultDistributionTag = "develop"
 	defaultSpec            = "1"
 )
 

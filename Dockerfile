@@ -3,8 +3,10 @@ FROM golang:alpine as src
 WORKDIR /go/src/gitlab.com/pantacor/pvr
 COPY . .
 
+ARG DOCKERTAG=latest
 RUN apk update; apk add git
 RUN version=`git describe --tags` && sed -i "s/NA/$version/" version.go
+RUN sed -i "s/defaultDistributionTag = \"develop\"/defaultDistributionTag = \"${DOCKERTAG}\"/" ./libpvr/configurationlib.go
 
 # build amd64 linux static
 FROM golang:alpine as linux_amd64
