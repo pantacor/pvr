@@ -57,7 +57,7 @@ var (
 	ErrMakeSquashFSNotFound = errors.New("mksquashfs not found in your PATH, please install before continue")
 	ErrTarNotFound          = errors.New("tar executable not found in your PATH, please install before continue")
 	ErrImageNotFound        = errors.New("image not found")
-	ErrNoAccess             = errors.New("you do not have access or the image does not exist, please check the docker url and your user credentials")
+	ErrNoAccess             = errors.New("invalid username or password")
 	ErrRepositoryError      = errors.New("something bad happen")
 
 	stripFilesList = []string{
@@ -190,7 +190,7 @@ func registryRequest(url, username, password string) (*resty.Response, error) {
 		}
 		req.SetAuthToken(token)
 
-		resp, err = req.Get(url)
+		return req.Get(url)
 	}
 
 	if resp.StatusCode() == http.StatusNotFound {
