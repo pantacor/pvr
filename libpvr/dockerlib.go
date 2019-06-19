@@ -38,15 +38,19 @@ import (
 )
 
 const (
-	TAR_CMD            = "tar"
-	MAKE_SQUASHFS_CMD  = "mksquashfs"
-	SQUASH_FILE        = "root.squashfs"
-	DOCKER_DIGEST_FILE = "root.squashfs.docker-digest"
+	TAR_CMD                        = "tar"
+	MAKE_SQUASHFS_CMD              = "mksquashfs"
+	SQUASH_FILE                    = "root.squashfs"
+	DOCKER_DIGEST_FILE             = "root.squashfs.docker-digest"
+	DOCKER_DOMAIN                  = "docker.io"
+	DOCKER_REGISTRY                = "https://index.docker.io/v1/"
+	DOCKER_REGISTRY_SERVER_ADDRESS = "https://registry-1.docker.io"
 )
 
 var (
 	ErrMakeSquashFSNotFound = errors.New("mksquashfs not found in your PATH, please install before continue")
 	ErrTarNotFound          = errors.New("tar not found in your PATH, please install before continue")
+	ErrImageNotFound        = errors.New("image not found or you do not have access")
 	stripFilesList          = []string{
 		"usr/bin/qemu-arm-static",
 	}
@@ -65,17 +69,7 @@ func (p *Pvr) GetDockerRegistry(image registry.Image, auth types.AuthConfig) (*r
 	})
 }
 
-func (p *Pvr) GetDockerManifest(dockerURL, username, password string) (*schema2.Manifest, error) {
-	image, err := registry.ParseImage(dockerURL)
-	if err != nil {
-		return nil, err
-	}
-
-	auth, err := repoutils.GetAuthConfig(username, password, image.Domain)
-	if err != nil {
-		return nil, err
-	}
-
+func (p *Pvr) GetDockerManifest(image registry.Image, auth types.AuthConfig) (*schema2.Manifest, error) {
 	r, err := p.GetDockerRegistry(image, auth)
 	if err != nil {
 		return nil, err
@@ -83,38 +77,23 @@ func (p *Pvr) GetDockerManifest(dockerURL, username, password string) (*schema2.
 
 	manifestV2, err := r.ManifestV2(context.Background(), image.Path, image.Reference())
 	if err != nil {
-		return nil, err
+		return nil, ErrImageNotFound
 	}
 
 	return &manifestV2, nil
 }
 
-func (p *Pvr) GetDockerConfig(dockerURL, username, password string) (*schema2.Manifest, map[string]interface{}, error) {
-	image, err := registry.ParseImage(dockerURL)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	auth, err := repoutils.GetAuthConfig(username, password, image.Domain)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image, auth types.AuthConfig) (map[string]interface{}, error) {
 	r, err := p.GetDockerRegistry(image, auth)
 	if err != nil {
-		return nil, nil, err
-	}
-
-	manifestV2, err := r.ManifestV2(context.Background(), image.Path, image.Reference())
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	blobsURL := fmt.Sprintf("%s/v2/%s/blobs/%s", r.URL, image.Path, manifestV2.Config.Digest)
 
 	resp, err := http.Get(blobsURL)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized {
@@ -136,34 +115,34 @@ func (p *Pvr) GetDockerConfig(dockerURL, username, password string) (*schema2.Ma
 		tokenURL := fmt.Sprintf("%s?service=%s&scope=%s", realm, service, scope)
 		req, err := http.NewRequest(http.MethodGet, tokenURL, nil)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
-		if username != "" && password != "" {
-			auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+		if auth.Username != "" && auth.Password != "" {
+			auth := base64.StdEncoding.EncodeToString([]byte(auth.Username + ":" + auth.Password))
 			req.Header.Set("Authorization", "Basic "+auth)
 		}
 
 		resp, err = http.DefaultClient.Do(req)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		content, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		var tokenResponse map[string]interface{}
 		err = json.Unmarshal(content, &tokenResponse)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		token := tokenResponse["token"].(string)
 		req, err = http.NewRequest(http.MethodGet, blobsURL, nil)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v2+json")
@@ -171,13 +150,17 @@ func (p *Pvr) GetDockerConfig(dockerURL, username, password string) (*schema2.Ma
 		resp, err = http.DefaultClient.Do(req)
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, ErrImageNotFound
+	}
+
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	blobContent, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var blob map[string]interface{}
@@ -185,7 +168,7 @@ func (p *Pvr) GetDockerConfig(dockerURL, username, password string) (*schema2.Ma
 
 	config := blob["config"].(map[string]interface{})
 
-	return &manifestV2, config, nil
+	return config, nil
 }
 
 func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, dockerManifest *schema2.Manifest, dockerConfig map[string]interface{}, appmanifest map[string]interface{}, destinationPath string) error {
@@ -228,6 +211,10 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 	fmt.Println("Downloading layers...")
 	for i, layer := range dockerManifest.Layers {
 		layerReader, err := r.DownloadLayer(context.Background(), image.Path, layer.Digest)
+		if err != nil {
+			return err
+		}
+
 		buf := bufio.NewReader(layerReader)
 
 		filename := filepath.Join(tempdir, strconv.Itoa(i)) + ".tar.gz"
@@ -317,4 +304,14 @@ func (p *Pvr) GetSquashFSDigest(appName string) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+func (p *Pvr) AuthConfig(username, password, registry string) (types.AuthConfig, error) {
+	if registry == DOCKER_DOMAIN {
+		auth, err := repoutils.GetAuthConfig(username, password, DOCKER_REGISTRY)
+		auth.ServerAddress = DOCKER_REGISTRY_SERVER_ADDRESS
+		return auth, err
+	}
+
+	return repoutils.GetAuthConfig(username, password, registry)
 }

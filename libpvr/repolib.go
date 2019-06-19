@@ -585,11 +585,6 @@ func (p *Pvr) PutLocal(repoPath string) error {
 		path.Join(repoPath, "json"))
 }
 
-type PvrInfo struct {
-	jsonUrl string `json:json-url`
-	objUrl  string `json:object-url`
-}
-
 type Object struct {
 	Id         string `json:"id" bson:"id"`
 	StorageId  string `json:"storage-id" bson:"_id"`
@@ -809,12 +804,12 @@ func worker(jobs chan FilePut, done chan FilePut) {
 	for j := range jobs {
 		fstat, err := os.Stat(j.sourceFile)
 		if err != nil {
-			fmt.Errorf("ERROR: " + err.Error())
+			log.Println("ERROR: " + err.Error())
 			continue
 		}
 		reader, err := os.Open(j.sourceFile)
 		if err != nil {
-			fmt.Errorf("ERROR: " + err.Error())
+			log.Println("ERROR: " + err.Error())
 			continue
 		}
 

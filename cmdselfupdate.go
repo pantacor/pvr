@@ -48,7 +48,7 @@ func CommandSelfUpdate() cli.Command {
 			username := c.String("username")
 			password := c.String("password")
 
-			err = pvr.UpdatePvr(&username, &password, false)
+			err = pvr.UpdatePvr(username, password, false)
 			if err != nil {
 				fmt.Println(err.Error())
 				cli.NewExitError(err.Error(), 2)
