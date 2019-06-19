@@ -121,5 +121,6 @@ func (s *Session) DoAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error)
 		// now that we would have a refreshed bearer, lets go again
 		s.GetApp().Metadata["PVR_AUTH"] = bearer
 	}
+
 	return response, err
 }

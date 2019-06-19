@@ -34,7 +34,8 @@ import (
 )
 
 const (
-	pvrRegistry         = "registry.gitlab.com/pantacor/pvr"
+	pvrRegistry         = "registry.gitlab.com"
+	pvrProject          = "pantacor/pvr"
 	lastUpdateFile      = "installed_version"
 	pvrCmd              = "pvr"
 	cacheFolder         = "cache/"
@@ -55,7 +56,7 @@ type layerData struct {
 	Registry    *registry.Registry
 	ImagePath   string
 	LayerDigest digest.Digest
-	OutputDir   *string
+	OutputDir   string
 	Number      int
 	Downloads   chan<- *downloadData
 }
@@ -94,54 +95,64 @@ func UpdateIfNecessary(c *cli.Context) error {
 
 	username := c.String("username")
 	password := c.String("password")
-	pvr.UpdatePvr(&username, &password, true)
+	pvr.UpdatePvr(username, password, true)
 	WriteTxtFile(lastCheckedPath, time.Now().Format(time.RFC3339))
 
 	return nil
 }
 
 // UpdatePvr Take the username, password and configuration File (aka: ~/.pvr) and update the pvr binary
-func (pvr *Pvr) UpdatePvr(username, password *string, silent bool) error {
+func (pvr *Pvr) UpdatePvr(username, password string, silent bool) error {
 	currentDigest, previousDigest, manifestV2, err := pvr.getDigetsDifference(username, password)
 	if err != nil {
 		return err
 	}
 
-	if *currentDigest == *previousDigest {
+	if currentDigest == previousDigest {
 		if silent != true {
 			fmt.Println("You already have the latest version of PVR :) \n\r")
 		}
 		return nil
 	}
 
-	fmt.Printf("Starting update PVR using Docker latest tag (%v) \r\n ", *currentDigest)
+	fmt.Printf("Starting update PVR using Docker latest tag (%v) \r\n ", currentDigest)
 
 	cacheFolder, err := pvr.downloadAdUpdateBinary(username, password, currentDigest, manifestV2)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("\r\nDocker layers are going to be cache on: %v \r\n\r\n", *cacheFolder)
+	fmt.Printf("\r\nDocker layers are going to be cache on: %v \r\n\r\n", cacheFolder)
 
 	fmt.Printf("PVR has been updated! \r\n\r\n ")
 	return nil
 }
 
-func (pvr *Pvr) getDigetsDifference(username, password *string) (*string, *string, *schema2.Manifest, error) {
+func (pvr *Pvr) getDigetsDifference(username, password string) (string, string, *schema2.Manifest, error) {
 	configDir := pvr.Session.configDir
 	tag := pvr.Session.Configuration.DistributionTag
-	registry := pvrRegistry
-	dockerURL := fmt.Sprintf("%s:%s", registry, tag)
-	manifestV2, err := pvr.GetDockerManifest(dockerURL, *username, *password)
+	dockerURL := fmt.Sprintf("%s:%s", pvrRegistry+"/"+pvrProject, tag)
+
+	image, err := registry.ParseImage(dockerURL)
 	if err != nil {
-		return nil, nil, nil, err
+		return "", "", nil, err
+	}
+
+	auth, err := pvr.AuthConfig(username, password, pvrRegistry)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	manifestV2, err := pvr.GetDockerManifest(image, auth)
+	if err != nil {
+		return "", "", nil, err
 	}
 
 	currentDigest := string(manifestV2.Config.Digest)
 
 	fileContent, err := ReadOrCreateFile(filepath.Join(configDir, lastUpdateFile))
 	if err != nil {
-		return nil, nil, nil, err
+		return "", "", nil, err
 	}
 	var previousDigest string
 	if fileContent == nil {
@@ -149,53 +160,53 @@ func (pvr *Pvr) getDigetsDifference(username, password *string) (*string, *strin
 	} else {
 		previousDigest = string(*fileContent)
 	}
-	return &currentDigest, &previousDigest, manifestV2, nil
+	return currentDigest, previousDigest, manifestV2, nil
 }
 
-func (pvr *Pvr) downloadAdUpdateBinary(username, password, currentDigest *string, manifestV2 *schema2.Manifest) (*string, error) {
+func (pvr *Pvr) downloadAdUpdateBinary(username, password, currentDigest string, manifestV2 *schema2.Manifest) (string, error) {
 	configDir := pvr.Session.configDir
 	cachePath := filepath.Join(configDir, cacheFolder)
 	dockerURL := fmt.Sprintf("%s:%s", pvrRegistry, pvr.Session.Configuration.DistributionTag)
 
 	err := CreateFolder(cachePath)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	temp, extractPath, err := pvr.getDockerContent(dockerURL, &cachePath, username, password, manifestV2)
+	temp, extractPath, err := pvr.getDockerContent(dockerURL, cachePath, username, password, manifestV2)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	err = updatePvrBinary(extractPath)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	err = WriteTxtFile(filepath.Join(configDir, lastUpdateFile), *currentDigest)
+	err = WriteTxtFile(filepath.Join(configDir, lastUpdateFile), currentDigest)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	defer os.RemoveAll(*extractPath)
+	defer os.RemoveAll(extractPath)
 
 	return temp, nil
 }
 
-func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password *string, dockerManifest *schema2.Manifest) (*string, *string, error) {
+func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password string, dockerManifest *schema2.Manifest) (string, string, error) {
 	image, err := registry.ParseImage(dockerURL)
 	if err != nil {
-		return nil, nil, err
+		return "", "", err
 	}
 
-	auth, err := repoutils.GetAuthConfig(*username, *password, image.Domain)
+	auth, err := repoutils.GetAuthConfig(username, password, image.Domain)
 	if err != nil {
-		return nil, nil, err
+		return "", "", err
 	}
 
 	r, err := pvr.GetDockerRegistry(image, auth)
 	if err != nil {
-		return nil, nil, err
+		return "", "", err
 	}
 
 	totalLayers := len(dockerManifest.Layers)
@@ -229,22 +240,22 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 
 	extractPath, err := ioutil.TempDir(os.TempDir(), "bin-")
 	if err != nil {
-		return nil, nil, err
+		return "", "", err
 	}
 
 	fmt.Printf("\n\rExtracting layers %d ... \r\n", len(files))
 
 	err = ExtractFiles(files, extractPath)
 	if err != nil {
-		return nil, nil, err
+		return "", "", err
 	}
 
-	return outputDir, &extractPath, nil
+	return outputDir, extractPath, nil
 }
 
-func updatePvrBinary(extractPath *string) error {
+func updatePvrBinary(extractPath string) error {
 	platform := GetPlatform()
-	binLocation := filepath.Join(*extractPath, "/pkg/bin/", platform, pvrCmd)
+	binLocation := filepath.Join(extractPath, "/pkg/bin/", platform, pvrCmd)
 
 	pvrPath, err := getExecutableFilePath()
 	if err != nil {
@@ -283,7 +294,7 @@ func processDownloads(downloads chan *downloadData, totalLayers int) ([]string, 
 
 func downloadlayers(layerdata layerData) {
 	i := layerdata.Number
-	filename := filepath.Join(*layerdata.OutputDir, cacheFilePrefix+strconv.Itoa(i)+cacheFileExt)
+	filename := filepath.Join(layerdata.OutputDir, cacheFilePrefix+strconv.Itoa(i)+cacheFileExt)
 
 	sameFile, err := FileHasSameSha(filename, string(layerdata.LayerDigest))
 	if err != nil {

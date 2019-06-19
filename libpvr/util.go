@@ -236,3 +236,18 @@ func ExtractFiles(files []string, extractPath string) error {
 
 	return nil
 }
+
+func ReportError(err error, knowSolutions ...string) error {
+	msg := "ERROR: "
+	msg += err.Error()
+
+	if len(knowSolutions) > 0 {
+		msg += "\n  POSSIBLE SOLUTIONS:\n"
+	}
+
+	for i, solution := range knowSolutions {
+		msg += fmt.Sprintf("   %d. %s\n", i+1, solution)
+	}
+
+	return errors.New(msg)
+}
