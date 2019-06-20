@@ -128,10 +128,14 @@ func (pvr *Pvr) UpdatePvr(username, password string, silent bool) error {
 	return nil
 }
 
+// getDockerURL
+func (pvr *Pvr) getDockerURL() string {
+	return fmt.Sprintf("%s:%s", pvrRegistry+"/"+pvrProject, pvr.Session.Configuration.DistributionTag)
+}
+
 func (pvr *Pvr) getDigetsDifference(username, password string) (string, string, *schema2.Manifest, error) {
 	configDir := pvr.Session.configDir
-	tag := pvr.Session.Configuration.DistributionTag
-	dockerURL := fmt.Sprintf("%s:%s", pvrRegistry+"/"+pvrProject, tag)
+	dockerURL := pvr.getDockerURL()
 
 	image, err := registry.ParseImage(dockerURL)
 	if err != nil {
@@ -166,7 +170,7 @@ func (pvr *Pvr) getDigetsDifference(username, password string) (string, string, 
 func (pvr *Pvr) downloadAdUpdateBinary(username, password, currentDigest string, manifestV2 *schema2.Manifest) (string, error) {
 	configDir := pvr.Session.configDir
 	cachePath := filepath.Join(configDir, cacheFolder)
-	dockerURL := fmt.Sprintf("%s:%s", pvrRegistry, pvr.Session.Configuration.DistributionTag)
+	dockerURL := pvr.getDockerURL()
 
 	err := CreateFolder(cachePath)
 	if err != nil {
@@ -217,7 +221,7 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 
 	waitGroup.Add(totalLayers)
 	for i, layer := range dockerManifest.Layers {
-		layerdata := layerData{
+		layerdata := &layerData{
 			Registry:    r,
 			ImagePath:   image.Path,
 			LayerDigest: layer.Digest,
@@ -225,7 +229,7 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 			Number:      i + 1,
 			Downloads:   downloads,
 		}
-		go func(layerdata layerData) {
+		go func(layerdata *layerData) {
 			defer waitGroup.Done()
 			downloadlayers(layerdata)
 		}(layerdata)
@@ -237,6 +241,9 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 	}()
 
 	files, err := processDownloads(downloads, totalLayers)
+	if err != nil {
+		return "", "", err
+	}
 
 	extractPath, err := ioutil.TempDir(os.TempDir(), "bin-")
 	if err != nil {
@@ -292,7 +299,7 @@ func processDownloads(downloads chan *downloadData, totalLayers int) ([]string, 
 	return files, nil
 }
 
-func downloadlayers(layerdata layerData) {
+func downloadlayers(layerdata *layerData) {
 	i := layerdata.Number
 	filename := filepath.Join(layerdata.OutputDir, cacheFilePrefix+strconv.Itoa(i)+cacheFileExt)
 
