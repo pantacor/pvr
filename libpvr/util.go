@@ -51,6 +51,18 @@ func Copy(dst, src string) error {
 	return cerr
 }
 
+func RenameFile(src string, dst string) (err error) {
+	err = Copy(dst, src)
+	if err != nil {
+		return fmt.Errorf("failed to copy source file %s to %s: %s", src, dst, err)
+	}
+	err = os.RemoveAll(src)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup source file %s: %s", src, err)
+	}
+	return nil
+}
+
 func FormatJson(data []byte) ([]byte, error) {
 	var prettyJSON bytes.Buffer
 	error := json.Indent(&prettyJSON, data, "", "\t")
