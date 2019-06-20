@@ -269,12 +269,24 @@ func updatePvrBinary(extractPath string) error {
 		return err
 	}
 
-	err = os.Remove(*pvrPath)
+	si, err := os.Stat(binLocation)
 	if err != nil {
 		return err
 	}
 
-	err = os.Rename(binLocation, *pvrPath)
+	tempFile := *pvrPath + ".bak"
+
+	err = RenameFile(binLocation, tempFile)
+	if err != nil {
+		return err
+	}
+
+	err = os.Chmod(tempFile, si.Mode())
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(tempFile, *pvrPath)
 	if err != nil {
 		return err
 	}
