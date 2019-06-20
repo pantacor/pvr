@@ -279,12 +279,12 @@ func updatePvrBinary(extractPath string) error {
 		return err
 	}
 
-	err = os.Rename(*pvrPath+".bak", *pvrPath)
+	err = os.Chmod(*pvrPath, si.Mode())
 	if err != nil {
 		return err
 	}
 
-	err = os.Chmod(*pvrPath, si.Mode())
+	err = os.Rename(*pvrPath+".bak", *pvrPath)
 	if err != nil {
 		return err
 	}
