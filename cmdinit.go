@@ -17,6 +17,7 @@ package main
 
 import (
 	"os"
+	"path"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -47,7 +48,12 @@ func CommandInit() cli.Command {
 			}
 
 			// empty template as starting point; XXX; add Flag to pass custom json
-			err = pvr.Init(c.String("objects"))
+			objectsDir := c.String("objects")
+			if objectsDir == "" {
+				objectsDir = path.Join(c.GlobalString("config-dir"), "objects")
+			}
+
+			err = pvr.Init(objectsDir)
 
 			if err != nil {
 				cli.NewExitError(err, 3)

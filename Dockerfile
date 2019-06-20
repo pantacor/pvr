@@ -3,8 +3,10 @@ FROM golang:alpine as src
 WORKDIR /go/src/gitlab.com/pantacor/pvr
 COPY . .
 
+ARG DOCKERTAG=latest
 RUN apk update; apk add git
 RUN version=`git describe --tags` && sed -i "s/NA/$version/" version.go
+RUN sed -i "s/defaultDistributionTag = \"develop\"/defaultDistributionTag = \"${DOCKERTAG}\"/" ./libpvr/configurationlib.go
 
 # build amd64 linux static
 FROM golang:alpine as linux_amd64
@@ -42,6 +44,16 @@ RUN apk update; apk add git
 RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go get -d -v ./...
 RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /go/bin/windows_amd64/pvr.exe -v .
 
+# build darwin amd64 static
+FROM golang:alpine as darwin_amd64
+
+WORKDIR /go/src/gitlab.com/pantacor/pvr
+COPY --from=src /go/src/gitlab.com/pantacor/pvr .
+RUN apk update; apk add git
+RUN CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go get -d -v ./...
+RUN CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o /go/bin/darwin_amd64/pvr -v .
+
+
 FROM alpine
 
 RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
@@ -51,6 +63,7 @@ COPY --from=linux_amd64 /go/bin /pkg/bin
 COPY --from=linux_armv6 /go/bin /pkg/bin
 COPY --from=windows_386 /go/bin /pkg/bin
 COPY --from=windows_amd64 /go/bin /pkg/bin
+COPY --from=darwin_amd64 /go/bin /pkg/bin
 
 ENV USER root
 

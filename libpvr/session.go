@@ -17,47 +17,51 @@ package libpvr
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
-	"os/user"
 	"path/filepath"
 
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
 )
 
-func GetConfigDir() (string, error) {
-
-	user, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(user.HomeDir, ".pvr"), nil
-}
+const (
+	ConfigurationFile = "config.json"
+)
 
 type Session struct {
-	app  *cli.App
-	auth *PvrAuthConfig
+	app           *cli.App
+	auth          *PvrAuthConfig
+	Configuration *PvrGlobalConfig
+	configDir     string
 }
 
 func NewSession(app *cli.App) (*Session, error) {
-	configDir, err := GetConfigDir()
 
-	if err != nil {
-		return nil, errors.New("Cannot get config dir: " + err.Error())
-	}
+	configDir := app.Metadata["PVR_CONFIG_DIR"].(string)
+	authConfigPath := filepath.Join(configDir, "auth.json")
+	generalConfigPath := filepath.Join(configDir, ConfigurationFile)
 
-	configPath := filepath.Join(configDir, "auth.json")
-	authConfig, err := LoadConfig(configPath)
-
+	authConfig, err := LoadConfig(authConfigPath)
 	if err != nil {
 		return nil, errors.New("Cannot load config: " + err.Error())
 	}
 
+	configuration, err := LoadConfiguration(generalConfigPath)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Session{
-		app:  app,
-		auth: authConfig,
+		app:           app,
+		auth:          authConfig,
+		configDir:     configDir,
+		Configuration: configuration,
 	}, nil
+}
+
+func (s *Session) GetConfigDir() string {
+	return s.configDir
 }
 
 func (s *Session) GetApp() *cli.App {
@@ -69,36 +73,53 @@ func (s *Session) DoAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error)
 	var bearer string
 	var err error
 	var response *resty.Response
+	var authHeader string
 
-	// legacy flat -a from CLI will give a default token
 	bearer = s.GetApp().Metadata["PVR_AUTH"].(string)
-	response, err = fn(resty.R().SetAuthToken(bearer))
-
-	if err == nil && response.StatusCode() == http.StatusOK {
-		return response, nil
-	}
-
-	// if we see www-authenticate, we need to auth ...
-	authHeader := response.Header().Get("www-authenticate")
-
-	// first try cached accesstoken
-	if authHeader != "" {
-		bearer, err = s.auth.getCachedAccessToken(authHeader)
-		if bearer != "" {
-			response, err = fn(resty.R().SetAuthToken(bearer))
-			authHeader = response.Header().Get("Www-Authenticate")
-			s.GetApp().Metadata["PVR_AUTH"] = bearer
+	for {
+		var newAuthHeader string
+		// legacy flat -a from CLI will give a default token
+		response, err = fn(resty.R().SetAuthToken(bearer))
+		// we continue looping for 401 and 403 error codes, everything
+		// else are error conditions that need to be handled upstream
+		if err == nil &&
+			response.StatusCode() != http.StatusUnauthorized &&
+			response.StatusCode() != http.StatusForbidden {
+			return response, nil
 		}
-	}
+		// if we see www-authenticate, we need to auth ...
+		newAuthHeader = response.Header().Get("www-authenticate")
+		// first try cached accesstoken or get a new one
+		if newAuthHeader != "" {
 
-	// then get new accesstoken
-	if authHeader != "" {
-		bearer, err = s.auth.getNewAccessToken(authHeader)
-		if bearer != "" {
-			response, err = fn(resty.R().SetAuthToken(bearer))
-			authHeader = response.Header().Get("Www-Authenticate")
-			s.GetApp().Metadata["PVR_AUTH"] = bearer
+			// if we already had one run with this auth header, evict from cache
+			if authHeader != "" {
+				s.auth.resetCachedAccessToken(authHeader)
+			}
+			authHeader = newAuthHeader
+			bearer, err = s.auth.getCachedAccessToken(authHeader)
+			if err != nil {
+				// server seems to not be compatible
+				return nil, err
+			}
+			if bearer == "" {
+				bearer, err = s.auth.getNewAccessToken(authHeader, true)
+			}
+			if err != nil {
+				// getting new bearer token didnt go very well
+				return nil, err
+			}
+		} else if response.StatusCode() == http.StatusForbidden {
+			fmt.Println("** ACCESS DENIED: user cannot access repository. **")
+			bearer, err = s.auth.getNewAccessToken(authHeader, false)
+			if err != nil {
+				// getting new bearer token didnt go very well
+				return nil, err
+			}
 		}
+
+		// now that we would have a refreshed bearer, lets go again
+		s.GetApp().Metadata["PVR_AUTH"] = bearer
 	}
 
 	return response, err

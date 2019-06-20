@@ -68,7 +68,12 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
-			err = pvr.Init(c.String("objects"))
+			objectsDir := c.String("objects")
+			if objectsDir == "" {
+				objectsDir = path.Join(c.GlobalString("config-dir"), "objects")
+			}
+
+			err = pvr.Init(objectsDir)
 			if err != nil {
 				return cli.NewExitError(err, 6)
 			}

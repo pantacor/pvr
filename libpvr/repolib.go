@@ -35,7 +35,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/asac/json-patch"
+	jsonpatch "github.com/asac/json-patch"
 	"github.com/cavaliercoder/grab"
 	"github.com/go-resty/resty"
 	pvrapi "gitlab.com/pantacor/pvr/api"
@@ -196,6 +196,9 @@ func (p *Pvr) addPvrFile(path string) error {
 	}
 	relPath := strings.TrimPrefix(path, p.Dir)
 	relPathSlash := filepath.ToSlash(relPath)
+	if p.NewFiles == nil {
+		p.NewFiles = map[string]string{}
+	}
 	p.NewFiles[relPathSlash] = shaBal
 	return nil
 }
@@ -262,7 +265,13 @@ func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 
 	untrackedFiles := []string{}
 	workingJson := map[string]interface{}{}
-	workingJson["#spec"] = "pantavisor-multi-platform@1"
+	currentSpec, ok := p.PristineJsonMap["#spec"]
+	if ok {
+		currentSpecString := currentSpec.(string)
+		workingJson["#spec"] = currentSpecString
+	} else {
+		workingJson["#spec"] = "pantavisor-service-system@1"
+	}
 
 	err := filepath.Walk(p.Dir, func(filePath string, info os.FileInfo, err error) error {
 		relPath := strings.TrimPrefix(filePath, p.Dir)
@@ -464,6 +473,7 @@ func (p *Pvr) Commit(msg string) error {
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
+		v = filepath.Join(p.Dir, v)
 		sha, err := FiletoSha(v)
 		if err != nil {
 			return err
@@ -573,11 +583,6 @@ func (p *Pvr) PutLocal(repoPath string) error {
 
 	return os.Rename(filepath.Join(repoPath, "json.new"),
 		path.Join(repoPath, "json"))
-}
-
-type PvrInfo struct {
-	jsonUrl string `json:json-url`
-	objUrl  string `json:object-url`
 }
 
 type Object struct {
@@ -799,12 +804,12 @@ func worker(jobs chan FilePut, done chan FilePut) {
 	for j := range jobs {
 		fstat, err := os.Stat(j.sourceFile)
 		if err != nil {
-			fmt.Errorf("ERROR: " + err.Error())
+			log.Println("ERROR: " + err.Error())
 			continue
 		}
 		reader, err := os.Open(j.sourceFile)
 		if err != nil {
-			fmt.Errorf("ERROR: " + err.Error())
+			log.Println("ERROR: " + err.Error())
 			continue
 		}
 
@@ -812,8 +817,10 @@ func worker(jobs chan FilePut, done chan FilePut) {
 		j.bar.Units = pb.U_BYTES
 		j.bar.UnitsWidth = 25
 		j.bar.ShowSpeed = true
-		j.bar.Prefix(filepath.Base(j.objName)[:Min(len(j.objName)-1, 12)] + " ")
 		j.bar.ShowCounters = false
+
+		objBaseName := filepath.Base(j.objName)
+		j.bar.Prefix(objBaseName[:Min(len(objBaseName)-1, 12)] + " ")
 
 		defer reader.Close()
 		r := &AsyncBody{
@@ -1385,7 +1392,8 @@ func (p *Pvr) grabObjects(requests ...*grab.Request) error {
 				if resp != nil && resp.IsComplete() {
 					req := resp.Request
 					// print final result
-					if resp.Err() != nil {
+					if resp.Err() != nil && grab.ErrFileExists != resp.Err() {
+						log.Println("ERROR: Downloading " + resp.Err().Error())
 						progressBars[req].Finish()
 						progressBars[req].ShowBar = false
 						progressBars[req].ShowPercent = false
@@ -1487,10 +1495,27 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 			return err
 		}
 
-		req, err := grab.NewRequest(path.Join(p.Objdir, v), remoteObject.SignedGetUrl)
+		fullPathV := path.Join(p.Objdir, v)
+
+		fSha, err := FiletoSha(fullPathV)
+		if err != nil && !os.IsNotExist(err) {
+			log.Println("ERROR: error calculating sha for existing file " + fullPathV + ": " + err.Error())
+			return err
+		}
+
+		if err == nil && fSha != v {
+			err = os.Remove(fullPathV)
+			if err != nil {
+				log.Println("WARNING: error removing not sha-matching local object: " + fullPathV + " - " + err.Error())
+			}
+		}
+
+		// we grab them to .new file ... and rename them when completed
+		req, err := grab.NewRequest(fullPathV, remoteObject.SignedGetUrl)
 		if err != nil {
 			return err
 		}
+		req.SkipExisting = true
 
 		grabs = append(grabs, req)
 	}
@@ -1629,35 +1654,37 @@ func (p *Pvr) Reset() error {
 	}
 
 	for k, v := range jsonMap {
+		if strings.HasPrefix(k, "#spec") {
+			continue
+		}
+
+		fromSlashK := filepath.FromSlash(k)
+		targetP := filepath.Join(p.Dir, fromSlashK)
+		targetD := path.Dir(targetP)
+		targetDInfo, err := os.Stat(targetD)
+		if err != nil {
+			err = os.MkdirAll(targetD, 0755)
+		} else if !targetDInfo.IsDir() {
+			return errors.New("Not a directory " + targetD)
+		}
+		if err != nil {
+			return err
+		}
+
 		if strings.HasSuffix(k, ".json") {
 			data, err := json.Marshal(v)
 			if err != nil {
 				return err
 			}
-			err = ioutil.WriteFile(filepath.Join(p.Dir, k+".new"), data, 0644)
+			err = ioutil.WriteFile(targetP+".new", data, 0644)
 			if err != nil {
 				return err
 			}
-			err = os.Rename(filepath.Join(p.Dir, k+".new"),
-				path.Join(p.Dir, k))
-
-		} else if strings.HasPrefix(k, "#spec") {
-			continue
+			err = os.Rename(targetP+".new",
+				targetP)
 		} else {
-			fromSlashK := filepath.FromSlash(k)
-			objectP := filepath.Join(p.Objdir, v.(string))
-			targetP := filepath.Join(p.Dir, fromSlashK)
-			targetD := path.Dir(targetP)
-			targetDInfo, err := os.Stat(targetD)
-			if err != nil {
-				err = os.MkdirAll(targetD, 0755)
-			} else if !targetDInfo.IsDir() {
-				return errors.New("Not a directory " + targetD)
-			}
-			if err != nil {
-				return err
-			}
 
+			objectP := filepath.Join(p.Objdir, v.(string))
 			err = Copy(targetP+".new", objectP)
 			if err != nil {
 				return err

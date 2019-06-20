@@ -112,6 +112,11 @@ func (p *PvrAuthConfig) DoRefresh(authEp, token string) (string, string, error) 
 }
 
 func (p *PvrAuthConfig) Save() error {
+
+	if p.path == "" {
+		return errors.New("not persistent authconfig")
+	}
+
 	configNew := p.path + ".tmp"
 	configPath := p.path
 
@@ -190,37 +195,31 @@ func doAuthenticate(authEp, username, password string) (string, string, error) {
 	return m1["token"].(string), m1["token"].(string), nil
 }
 
+func (p *PvrAuthConfig) resetCachedAccessToken(authHeader string) error {
+	tokenKey, err := GetPhAuthHeaderTokenKey(authHeader)
+	if err != nil {
+		return err
+	}
+	delete(p.Tokens, tokenKey)
+	return nil
+}
+
 func (p *PvrAuthConfig) getCachedAccessToken(authHeader string) (string, error) {
 
-	// no auth header; nothing we can do magic here...
-	if authHeader == "" {
-		return "", errors.New("Bad Parameter (authHeader empty)")
+	tokenKey, err := GetPhAuthHeaderTokenKey(authHeader)
+	if err != nil {
+		return "", err
 	}
 
-	authType, opts := getWwwAuthenticateInfo(authHeader)
-	if authType != "JWT" && authType != "Bearer" {
-		return "", errors.New("Invalid www-authenticate header retrieved")
-	}
-
-	realm := opts["realm"]
-	authEpString := opts["ph-aeps"]
-	authEps := strings.Split(authEpString, ",")
-
-	if len(authEps) == 0 {
-		return "", errors.New("Bad Server Behaviour. Need ph-aeps token in Www-Authenticate header. Check your server version")
-	}
-
-	authEp := authEps[0]
-
-	_, ok := p.Tokens[authEp+" realm="+realm]
-	if ok && p.Tokens[authEp+" realm="+realm].AccessToken != "" {
-		return p.Tokens[authEp+" realm="+realm].AccessToken, nil
+	_, ok := p.Tokens[tokenKey]
+	if ok && p.Tokens[tokenKey].AccessToken != "" {
+		return p.Tokens[tokenKey].AccessToken, nil
 	}
 
 	return "", nil
 }
 
-func (p *PvrAuthConfig) getNewAccessToken(authHeader string) (string, error) {
+func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh bool) (string, error) {
 
 	authType, opts := getWwwAuthenticateInfo(authHeader)
 	if authType != "JWT" && authType != "Bearer" {
@@ -245,7 +244,7 @@ func (p *PvrAuthConfig) getNewAccessToken(authHeader string) (string, error) {
 	s.AccessToken = ""
 
 	// if we have a refresh token
-	if s.RefreshToken != "" {
+	if s.RefreshToken != "" && tryRefresh {
 		accessToken, refreshToken, err := p.DoRefresh(authEp, s.RefreshToken)
 
 		if err != nil {
