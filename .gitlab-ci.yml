@@ -10,6 +10,18 @@ variables:
 before_script:
   - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
 
+build-tags:
+  stage: build
+  script:
+    - docker pull $CONTAINER_IMAGE:stable || true
+    - docker build --build-arg DOCKERTAG=stable --cache-from $CONTAINER_IMAGE:stable --tag $CONTAINER_IMAGE:$CI_BUILD_REF --tag $CONTAINER_IMAGE:stable .
+    - test -n "$CI_BUILD_TAG" && docker tag $CONTAINER_IMAGE:$CI_BUILD_REF $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+    - docker push $CONTAINER_IMAGE:$CI_BUILD_REF
+    - docker push $CONTAINER_IMAGE:stable
+    - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+  only:
+    - tags
+
 build-master:
   stage: build
   script:
@@ -31,6 +43,8 @@ build:
     - docker push $CONTAINER_IMAGE:$CI_BUILD_REF
     - docker push $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG
     - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+  only:
+    - branches
   except:
     - master
 
