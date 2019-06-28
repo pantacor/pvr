@@ -23,18 +23,18 @@ lxc.cgroup.devices.allow = a
 lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
 {{- if .Docker.Entrypoint }}
-	{{- if pvrIsSlice .Docker.Entrypoint }}
-		{{- if pvrSliceIndex .Docker.Entrypoint 0 }}
-			{{- "" }} {{ pvrSliceIndex .Docker.Entrypoint 0}}{{ range pvrSliceFrom .Docker.Entrypoint 1 }} "{{ . }}"{{ end }}
+	{{- if pvr_isSlice .Docker.Entrypoint }}
+		{{- if pvr_sliceIndex .Docker.Entrypoint 0 }}
+			{{- "" }} {{ pvr_sliceIndex .Docker.Entrypoint 0}}{{ range pvr_sliceFrom .Docker.Entrypoint 1 }} "{{ . }}"{{ end }}
 		{{- end }}
 	{{- else }}
 		{{- "" }} {{ .Docker.Entrypoint }}
 	{{- end }}
 {{- else }}
 	{{- if .Docker.Cmd }}
-		{{- if pvrIsSlice .Docker.Cmd }}
-			{{- if pvrSliceIndex .Docker.Cmd 0 }}
-				{{- "" }} {{ pvrSliceIndex .Docker.Cmd 0}}{{ range pvrSliceFrom .Docker.Cmd 1 }} "{{ . }}"{{ end }}
+		{{- if pvr_isSlice .Docker.Cmd }}
+			{{- if pvr_sliceIndex .Docker.Cmd 0 }}
+				{{- "" }} {{ pvr_sliceIndex .Docker.Cmd 0}}{{ range pvr_sliceFrom .Docker.Cmd 1 }} "{{ . }}"{{ end }}
 			{{- end }}
 		{{- else }}
 			{{- "" }} {{ .Docker.Cmd }}
@@ -60,7 +60,7 @@ lxc.mount.entry = tmpfs run tmpfs rw,nodev,relatime,mode=755 0 0
 {{- with $src := .Source -}}
 {{- range $key, $value := $src.persistence -}}
 {{- if ne $key "lxc-overlay" }}
-lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | replace "/" "-" }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
+lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | replace "/" "-" }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
 {{- end -}}
 {{- end -}}
 {{- end }}
@@ -74,7 +74,7 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | replace "/" "-" }} {
 	"storage":{
 		{{- range $key, $value := .Source.persistence -}}
 		{{- if ne $key "lxc-overlay" }}
-		"docker-{{ $key | replace "/" "-" -}}": {
+		"docker-{{ $key | trimSuffix "/" | replace "/" "-" -}}": {
 			"persistence": "{{ $value }}"
 		},
 		{{- end -}}
