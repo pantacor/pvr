@@ -17,19 +17,34 @@ package templates
 
 import (
 	"bytes"
+	"fmt"
 	"text/template"
 
 	"github.com/Masterminds/sprig"
 	"github.com/leekchan/gtf"
 )
 
+func prefixFuncMap(funcMap map[string]interface{}, prefix string, keep bool) map[string]interface{} {
+	newMap := map[string]interface{}{}
+	for k, v := range funcMap {
+		if keep {
+			newMap[k] = v
+		}
+		newMap[fmt.Sprintf("%s_%s", prefix, k)] = v
+	}
+	return newMap
+}
+
 func compileTemplate(content string, values map[string]interface{}) (result []byte) {
 	buffer := bytes.NewBuffer(result)
 	templ := template.Must(template.New("compiled-template").
-		Funcs(sprig.TxtFuncMap()).
-		Funcs(gtf.GtfTextFuncMap).
-		Funcs(PvrFuncMap()).
+		Funcs(prefixFuncMap(sprig.TxtFuncMap(), "sprig", true)).
+		Funcs(prefixFuncMap(gtf.GtfTextFuncMap, "gtf", false)).
+		Funcs(prefixFuncMap(PvrFuncMap(), "pvr", false)).
 		Parse(content))
-	templ.Execute(buffer, values)
+	err := templ.Execute(buffer, values)
+	if err != nil {
+		panic(err)
+	}
 	return buffer.Bytes()
 }
