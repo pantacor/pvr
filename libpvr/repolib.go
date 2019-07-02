@@ -1225,7 +1225,14 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 			"\n\t" + string(response.Body()))
 	}
 
-	fmt.Println("Posted JSON: " + string(response.Body()))
+	responseMap := map[string]interface{}{}
+	err = json.Unmarshal(response.Body(), &responseMap)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Successfully posted Revision %d (%s) to device id %s\n", int(responseMap["rev"].(float64)),
+		responseMap["state-sha"].(string)[:8], responseMap["trail-id"])
 
 	p.Pvrconfig.DefaultPostUrl = uri
 	if p.Pvrconfig.DefaultGetUrl == "" {
