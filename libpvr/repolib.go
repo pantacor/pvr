@@ -453,7 +453,7 @@ func (p *Pvr) Commit(msg string) error {
 	}
 
 	for _, v := range status.ChangedFiles {
-		fmt.Println("Committing " + filepath.Join(p.Objdir+v))
+		fmt.Println("Committing " + filepath.Join(p.Objdir, v))
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
