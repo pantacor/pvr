@@ -973,11 +973,12 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 	filePutResults := p.putFiles(filePuts...)
 
 	for _, v := range filePutResults {
-
+		if v.err != nil {
+			return fmt.Errorf("Error putting file %s: %s", v.objName, err.Error())
+		}
 		if 200 != v.res.StatusCode {
 			return errors.New("REST call failed. " +
 				strconv.Itoa(v.res.StatusCode) + "  " + v.res.Status)
-
 		}
 	}
 
