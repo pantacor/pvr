@@ -26,7 +26,7 @@ import (
 
 func CommandAppAdd() cli.Command {
 	cmd := cli.Command{
-		Name:        "app-add",
+		Name:        "add",
 		Aliases:     []string{"aa"},
 		ArgsUsage:   "[appname]",
 		Usage:       "add new applications.",

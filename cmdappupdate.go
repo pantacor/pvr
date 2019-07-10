@@ -26,7 +26,7 @@ import (
 
 func CommandAppUpdate() cli.Command {
 	cmd := cli.Command{
-		Name:        "app-update",
+		Name:        "update",
 		Aliases:     []string{"au"},
 		ArgsUsage:   "[appname]",
 		Usage:       "update an existing application.",

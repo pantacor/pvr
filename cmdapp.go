@@ -25,12 +25,15 @@ func CommandApp() cli.Command {
 		Name:    "app",
 		Aliases: []string{"ap"},
 		Subcommands: []cli.Command{
-			CommandAppInfo(),
+			CommandAppAdd(),
 			CommandAppList(),
+			CommandAppInfo(),
 			CommandAppRemove(),
+			CommandAppInstall(),
+			CommandAppUpdate(),
 		},
 		Usage:       "pvr app ls :list applications in pvr checkout,pvr app info <appname> output info and state of appname ,pvr app rm <appname> : remove app from pvr checkout",
-		Description: "1.List applications in pvr checkout ,2.Output info and state of appname , 3.Remove app from pvr checkout",
+		Description: "\n1.Add new application\n2.List applications in pvr checkout\n3.Output info and state of appname\n4.Remove app from pvr checkout\n5.Install Application\n6.Update Application",
 	}
 	return cmd
 }
