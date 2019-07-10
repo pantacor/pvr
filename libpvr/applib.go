@@ -308,6 +308,55 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 	return p.InstallApplication(appname, username, password)
 }
 
+// ListApplications : List Applications
+func (p *Pvr) ListApplications() error {
+	files, err := ioutil.ReadDir(p.Dir)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		containerConfPath := filepath.Join(p.Dir, f.Name(), "lxc.container.conf")
+		if _, err := os.Stat(containerConfPath); err == nil {
+			fmt.Println(f.Name())
+		}
+	}
+	return nil
+}
+
+// GetApplicationInfo : Get Application Info
+func (p *Pvr) GetApplicationInfo(appname string) error {
+	srcFilePath := filepath.Join(p.Dir, appname, "src.json")
+	if _, err := os.Stat(srcFilePath); err != nil {
+		return errors.New("App '" + appname + "' doesn't exist")
+	}
+	src, _ := ioutil.ReadFile(srcFilePath)
+	var fileData interface{}
+	err := json.Unmarshal(src, &fileData)
+	if err != nil {
+		return err
+	}
+	jsonData, err := json.MarshalIndent(fileData, "", "    ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(jsonData))
+	return nil
+}
+
+// RemoveApplication : Remove Application
+func (p *Pvr) RemoveApplication(appname string) error {
+	appPath := filepath.Join(p.Dir, appname)
+	if _, err := os.Stat(appPath); err != nil {
+		return errors.New("App '" + appname + "' doesn't exist")
+	}
+	err := os.RemoveAll(appPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func ReportDockerManifestError(err error) error {
 	return ReportError(
 		err,

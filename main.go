@@ -127,6 +127,7 @@ func main() {
 		CommandAppInstall(),
 		CommandAppUpdate(),
 		CommandAppAdd(),
+		CommandApp(),
 		CommandSelfUpdate(),
 		CommandGlobalConfig(),
 	}
