@@ -26,7 +26,7 @@ import (
 
 func CommandAppInstall() cli.Command {
 	cmd := cli.Command{
-		Name:        "app-install",
+		Name:        "install",
 		Aliases:     []string{"ai"},
 		ArgsUsage:   "[appname]",
 		Usage:       "install new applications.",
