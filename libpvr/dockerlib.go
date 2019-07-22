@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -29,10 +30,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"github.com/genuinetools/reg/registry"
 	"github.com/genuinetools/reg/repoutils"
 )
@@ -171,6 +174,64 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 	return config, nil
 }
 
+// DownloadLayersFromLocalDocker : Download Layers From Local Docker
+func DownloadLayersFromLocalDocker(imageID string) (io.ReadCloser, error) {
+	cli, err := client.NewEnvClient()
+	httpClient := cli.HTTPClient()
+	url := "http://v" + cli.ClientVersion() + "/images/" + imageID + "/get"
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return res.Body, nil
+}
+
+// ImageExistsInLocalDocker : To check whether Image Exist In Local Docker Or Not
+func ImageExistsInLocalDocker(dockerURL string) (bool, string, error) {
+	components := strings.Split(dockerURL, "/")
+	domain := components[0]
+	imageName := strings.Replace(dockerURL, domain+"/", "", -1)
+
+	ctx := context.Background()
+	client, err := client.NewEnvClient()
+	defer client.Close()
+	if err != nil {
+		return false, "", err
+	}
+	listOptions := types.ImageListOptions{
+		All: true,
+	}
+	imageList, err := client.ImageList(ctx, listOptions)
+	if err != nil {
+		return false, "", err
+	}
+	for _, image := range imageList {
+		for _, tag := range image.RepoTags {
+			if imageName == tag {
+				fmt.Printf("Image " + imageName + " exists in local docker\n")
+				return true, image.ID, nil
+			}
+		}
+	}
+	return false, "", nil
+}
+
+//UnTarFile : UnTar File
+func UnTarFile(file string, extractPath string) error {
+	tarPath, err := exec.LookPath(TAR_CMD)
+	if err != nil {
+		return err
+	}
+	args := []string{tarPath, "xzvf", file, "-C", extractPath}
+	untar := exec.Command(args[0], args[1:]...)
+	untar.Run()
+	return nil
+}
+
 func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, dockerManifest *schema2.Manifest, dockerConfig map[string]interface{}, appmanifest map[string]interface{}, destinationPath string) error {
 	digestFile := filepath.Join(destinationPath, DOCKER_DIGEST_FILE)
 	currentDigest, err := os.Open(digestFile)
@@ -209,23 +270,86 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 
 	files := []string{}
 	fmt.Println("Downloading layers...")
-	for i, layer := range dockerManifest.Layers {
-		layerReader, err := r.DownloadLayer(context.Background(), image.Path, layer.Digest)
+	//Check if there is local docker image exists or not
+	localImageExist, ImageID, err := ImageExistsInLocalDocker(dockerURL)
+	if err != nil {
+		return err
+	}
+	if localImageExist {
+		fmt.Println("Downloading layers from local docker")
+		imageReader, err := DownloadLayersFromLocalDocker(ImageID)
 		if err != nil {
 			return err
 		}
-
-		buf := bufio.NewReader(layerReader)
-
-		filename := filepath.Join(tempdir, strconv.Itoa(i)) + ".tar.gz"
+		buf := bufio.NewReader(imageReader)
+		filename := filepath.Join(tempdir, "layers") + ".tar.gz"
 		file, err := os.Create(filename)
 		if err != nil {
 			return err
 		}
-
 		_, err = buf.WriteTo(file)
-		files = append(files, filename)
-		fmt.Printf("Layer %d downloaded\n", i)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Layers downloaded from local\n")
+
+		fmt.Printf("Extracting layers folder\n")
+
+		os.MkdirAll(tempdir+"/layers", 0777)
+		err = UnTarFile(filename, tempdir+"/layers")
+		if err != nil {
+			return err
+		}
+		// Read layer.tar file locations from manifest.json
+		manifestFile, err := ioutil.ReadFile(tempdir + "/layers/manifest.json")
+		if err != nil {
+			return err
+		}
+		manifestData := []map[string]interface{}{}
+		json.Unmarshal([]byte(manifestFile), &manifestData)
+
+		//Populate layer.tar file locations in files array
+		for i, layer := range manifestData[0]["Layers"].([]interface{}) {
+			layerFilename1 := filepath.Join(tempdir, "layers") + "/" + layer.(string)
+			layerFile1, err := os.Open(layerFilename1)
+			if err != nil {
+				return err
+			}
+			layerFilename2 := filepath.Join(tempdir, strconv.Itoa(i)) + ".tar.gz"
+			layerFile2, err := os.Create(layerFilename2)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(layerFile1, layerFile2)
+			layerFile1.Close()
+			if err != nil {
+				return err
+			}
+			files = append(files, layerFilename2)
+		}
+
+	} else {
+		for i, layer := range dockerManifest.Layers {
+			layerReader, err := r.DownloadLayer(context.Background(), image.Path, layer.Digest)
+			if err != nil {
+				return err
+			}
+
+			buf := bufio.NewReader(layerReader)
+
+			filename := filepath.Join(tempdir, strconv.Itoa(i)) + ".tar.gz"
+			file, err := os.Create(filename)
+			if err != nil {
+				return err
+			}
+
+			_, err = buf.WriteTo(file)
+			if err != nil {
+				return err
+			}
+			files = append(files, filename)
+			fmt.Printf("Layer %d downloaded\n", i)
+		}
 	}
 
 	extractPath := filepath.Join(tempdir, "rootfs")
@@ -242,10 +366,11 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 
 	fmt.Println("Extracting layers...")
 	for layerNumber, file := range files {
-		args := []string{tarPath, "xzvf", file, "-C", extractPath}
-		untar := exec.Command(args[0], args[1:]...)
+		err := UnTarFile(file, extractPath)
+		if err != nil {
+			return err
+		}
 		fmt.Printf("Extracting layer %d\n", layerNumber)
-		untar.Run()
 	}
 
 	fmt.Println("Stripping qemu files...")
