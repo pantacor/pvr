@@ -17,9 +17,9 @@ package templates
 
 const (
 	LXC_CONTAINER_CONF = `{{ "" -}}
-lxc.tty.max = 4
-lxc.pty.max = 1024
-lxc.cgroup.devices.allow = a
+lxc.tty.max = {{ .Source.vars.LXC_TTY_MAX | pvr_ifNull "8" }}
+lxc.pty.max = {{ .Source.vars.LXC_PTY_MAX | pvr_ifNull "1024" }}
+lxc.cgroup.devices.allow = {{ .Source.vars.LXC_CGROUP_DEVICES_ALLOW | pvr_ifNull "a" }}
 lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
 {{- if .Docker.Entrypoint }}
@@ -53,8 +53,12 @@ lxc.environment = {{ . }}
 lxc.namespace.keep = user net ipc
 lxc.console.path = none
 lxc.mount.auto = proc sys:rw cgroup-full
+{{- if .Source.vars.PV_SECURITY_FULLDEV }}
 lxc.mount.entry = /dev/ dev none bind,rw,create=dir 0 0
-lxc.mount.entry = /storage pvstorage none bind,rw,create=dir 0 0
+{{- end }}
+{{- if .Source.vars.PV_SECURITY_WITH_STORAGE }}
+lxc.mount.entry = /storage storage none bind,rw,create=dir 0 0
+{{- end }}
 lxc.mount.entry = /etc/resolv.conf etc/resolv.conf none bind,rw,create=file 0 0
 lxc.mount.entry = tmpfs run tmpfs rw,nodev,relatime,mode=755 0 0
 {{- with $src := .Source -}}
