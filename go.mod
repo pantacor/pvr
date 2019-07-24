@@ -34,7 +34,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/urfave/cli v1.20.0
 	github.com/vbatts/tar-split v0.11.1 // indirect
-	gitlab.com/pantacor/pantahub-base v0.0.0-20190724153127-671fc6cb9387
+	gitlab.com/pantacor/pantahub-base v0.0.0-20190724204618-9041e257b8c8
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect

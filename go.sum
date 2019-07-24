@@ -325,6 +325,8 @@ gitlab.com/pantacor/pantahub-base v0.0.0-20190627154105-7b7165f08bbb h1:GtFWpzAI
 gitlab.com/pantacor/pantahub-base v0.0.0-20190627154105-7b7165f08bbb/go.mod h1:USp2RLQGd3Tbfd8rhGpusfyOF56s1DQCiL4I/7MaC+U=
 gitlab.com/pantacor/pantahub-base v0.0.0-20190724153127-671fc6cb9387 h1:KAqB0rNTgVxkcMr8kjQqbU/szGbXkY/Peu9leXxTSRE=
 gitlab.com/pantacor/pantahub-base v0.0.0-20190724153127-671fc6cb9387/go.mod h1:ccwehzrhL7TA4CYdYVbgm8jU3rHaBPjZztbvz4XlgT8=
+gitlab.com/pantacor/pantahub-base v0.0.0-20190724204618-9041e257b8c8 h1:C0jgpAIdqY/+ni3SOqqcgdQQkz8fIL3Cw0vSCWSb/EY=
+gitlab.com/pantacor/pantahub-base v0.0.0-20190724204618-9041e257b8c8/go.mod h1:ccwehzrhL7TA4CYdYVbgm8jU3rHaBPjZztbvz4XlgT8=
 gitlab.com/pantacor/pantahub-gc v0.0.0-20190719115544-466a41727898/go.mod h1:tA1eG67+BYqHqHhvEA3XojHj0TI2dVnJ6h3WwrIvLVY=
 gitlab.com/pantacor/pantahub-testharness v0.0.0-20190311155708-e39aa76a7650/go.mod h1:OKLYMZpZLzWr1qX7V5dLWogkaGXrlhVHPz7VfAIYlf4=
 gitlab.com/pantacor/pvr v0.0.0-20190722130419-325b73c63259/go.mod h1:kCVbGq5pj0K30bVXC9MHWJ/ThmLs0qIuRhfL1qbpC1M=
