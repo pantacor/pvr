@@ -56,7 +56,21 @@ func CommandAppInstall() cli.Command {
 			username := c.String("username")
 			password := c.String("password")
 
-			err = pvr.InstallApplication(appname, username, password)
+			trackURL, err := pvr.GetTrackURL(appname)
+			if err != nil {
+				return cli.NewExitError(err, 2)
+			}
+			//Check if there is local docker image exists or not
+			localImage, err := libpvr.ImageExistsInLocalDocker(trackURL)
+			if err != nil {
+				return cli.NewExitError(err, 2)
+			}
+			err = pvr.InstallApplication(
+				appname,
+				username,
+				password,
+				localImage,
+			)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}

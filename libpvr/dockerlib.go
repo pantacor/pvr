@@ -16,7 +16,9 @@
 package libpvr
 
 import (
+	"archive/tar"
 	"bufio"
+	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -24,13 +26,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/docker/distribution/manifest/schema2"
@@ -190,49 +192,170 @@ func DownloadLayersFromLocalDocker(imageID string) (io.ReadCloser, error) {
 	return res.Body, nil
 }
 
-// ImageExistsInLocalDocker : To check whether Image Exist In Local Docker Or Not
-func ImageExistsInLocalDocker(dockerURL string) (bool, string, error) {
-	components := strings.Split(dockerURL, "/")
-	domain := components[0]
-	imageName := strings.Replace(dockerURL, domain+"/", "", -1)
+// LocalDockerImage : return type of ImageExistsInLocalDocker()
+type LocalDockerImage struct {
+	Exists   bool
+	ImageID  string
+	RepoTags []string
+}
 
+// GetSourceRepo : Get Source Repo from a list of local repositories
+func (p *Pvr) GetSourceRepo(
+	repos []string,
+	username string,
+	password string,
+) (string, error) {
+	sourceRepo := ""
+	for _, repo := range repos {
+		image, err := registry.ParseImage(repo)
+		if err != nil {
+			return "", err
+		}
+		auth, err := p.AuthConfig(username, password, image.Domain)
+		if err != nil {
+			return "", err
+		}
+		_, err = p.GetDockerManifest(image, auth)
+		if err != nil {
+			continue
+		}
+		sourceRepo = repo
+		break
+	}
+	return sourceRepo, nil
+}
+
+// ImageExistsInLocalDocker : To check whether Image Exist In Local Docker Or Not
+func ImageExistsInLocalDocker(dockerURL string) (LocalDockerImage, error) {
+	image := LocalDockerImage{
+		Exists:   false,
+		ImageID:  "",
+		RepoTags: []string{},
+	}
 	ctx := context.Background()
 	client, err := client.NewEnvClient()
 	defer client.Close()
 	if err != nil {
-		return false, "", err
+		return image, err
 	}
-	listOptions := types.ImageListOptions{
-		All: true,
-	}
-	imageList, err := client.ImageList(ctx, listOptions)
+	inspect, _, err := client.ImageInspectWithRaw(ctx, dockerURL)
 	if err != nil {
-		return false, "", err
+		fmt.Printf("Repo not exists in local docker\n")
+		return image, nil
 	}
-	for _, image := range imageList {
-		for _, tag := range image.RepoTags {
-			if imageName == tag {
-				fmt.Printf("Image " + imageName + " exists in local docker\n")
-				return true, image.ID, nil
-			}
-		}
-	}
-	return false, "", nil
+	fmt.Printf("Repo exists in local docker\n")
+	image.Exists = true
+	image.ImageID = inspect.ID
+	image.RepoTags = inspect.RepoTags
+	return image, nil
 }
 
-//UnTarFile : UnTar File
-func UnTarFile(file string, extractPath string) error {
-	tarPath, err := exec.LookPath(TAR_CMD)
+// GetFileContentType : Get File Content Type of a file
+func GetFileContentType(src string) (string, error) {
+	file, err := os.Open(src)
+	defer file.Close()
+	if err != nil {
+		return "", err
+	}
+	buffer := make([]byte, 512)
+	_, err = file.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+	contentType := http.DetectContentType(buffer)
+	return contentType, nil
+}
+
+// Untar : Untar a file or folder
+func Untar(dst string, src string) error {
+	contentType, err := GetFileContentType(src)
 	if err != nil {
 		return err
 	}
-	args := []string{tarPath, "xzvf", file, "-C", extractPath}
-	untar := exec.Command(args[0], args[1:]...)
-	untar.Run()
-	return nil
+
+	file, err := os.Open(src)
+	defer file.Close()
+	if err != nil {
+		return err
+	}
+	tr := tar.NewReader(file)
+
+	if contentType == "application/x-gzip" {
+		// For zip content types, eg: application/x-gzip
+		gzr, err := gzip.NewReader(file)
+		if err != nil {
+			return err
+		}
+		defer gzr.Close()
+		tr = tar.NewReader(gzr)
+	}
+
+	for {
+		header, err := tr.Next()
+
+		switch {
+
+		// if no more files are found return
+		case err == io.EOF:
+			return nil
+
+		// return any other error
+		case err != nil:
+			return err
+
+		// if the header is nil, just skip it (not sure how this happens)
+		case header == nil:
+			continue
+		}
+
+		// the target location where the dir/file should be created
+		target := filepath.Join(dst, header.Name)
+
+		// the following switch could also be done using fi.Mode(), not sure if there
+		// a benefit of using one vs. the other.
+		// fi := header.FileInfo()
+
+		// check the file type
+		switch header.Typeflag {
+
+		// if its a dir and it doesn't exist create it
+		case tar.TypeDir:
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(target, 0777); err != nil {
+					return err
+				}
+			}
+
+		// if it's a file create it
+		case tar.TypeReg:
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				log.Print("Open Error")
+				return err
+			}
+
+			// copy over contents
+			if _, err := io.Copy(f, tr); err != nil {
+				return err
+			}
+
+			// manually close here after each file operation; defering would cause each file close
+			// to wait until all operations have completed.
+			f.Close()
+		}
+	}
 }
 
-func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, dockerManifest *schema2.Manifest, dockerConfig map[string]interface{}, appmanifest map[string]interface{}, destinationPath string) error {
+func (p *Pvr) GenerateApplicationSquashFS(
+	dockerURL string,
+	username string,
+	password string,
+	dockerManifest *schema2.Manifest,
+	dockerConfig map[string]interface{},
+	appmanifest map[string]interface{},
+	destinationPath string,
+	localImage LocalDockerImage,
+) error {
 	digestFile := filepath.Join(destinationPath, DOCKER_DIGEST_FILE)
 	currentDigest, err := os.Open(digestFile)
 	if err == nil {
@@ -250,7 +373,7 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 	if err != nil {
 		return err
 	}
-
+	image.Domain = DOCKER_REGISTRY_SERVER_ADDRESS
 	auth, err := repoutils.GetAuthConfig(username, password, image.Domain)
 	if err != nil {
 		return err
@@ -270,14 +393,10 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 
 	files := []string{}
 	fmt.Println("Downloading layers...")
-	//Check if there is local docker image exists or not
-	localImageExist, ImageID, err := ImageExistsInLocalDocker(dockerURL)
-	if err != nil {
-		return err
-	}
-	if localImageExist {
+
+	if localImage.Exists {
 		fmt.Println("Downloading layers from local docker")
-		imageReader, err := DownloadLayersFromLocalDocker(ImageID)
+		imageReader, err := DownloadLayersFromLocalDocker(localImage.ImageID)
 		if err != nil {
 			return err
 		}
@@ -296,7 +415,7 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 		fmt.Printf("Extracting layers folder\n")
 
 		os.MkdirAll(tempdir+"/layers", 0777)
-		err = UnTarFile(filename, tempdir+"/layers")
+		err = Untar(tempdir+"/layers", filename)
 		if err != nil {
 			return err
 		}
@@ -309,23 +428,9 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 		json.Unmarshal([]byte(manifestFile), &manifestData)
 
 		//Populate layer.tar file locations in files array
-		for i, layer := range manifestData[0]["Layers"].([]interface{}) {
-			layerFilename1 := filepath.Join(tempdir, "layers") + "/" + layer.(string)
-			layerFile1, err := os.Open(layerFilename1)
-			if err != nil {
-				return err
-			}
-			layerFilename2 := filepath.Join(tempdir, strconv.Itoa(i)) + ".tar.gz"
-			layerFile2, err := os.Create(layerFilename2)
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(layerFile1, layerFile2)
-			layerFile1.Close()
-			if err != nil {
-				return err
-			}
-			files = append(files, layerFilename2)
+		for _, layer := range manifestData[0]["Layers"].([]interface{}) {
+			filename := filepath.Join(tempdir, "layers") + "/" + layer.(string)
+			files = append(files, filename)
 		}
 
 	} else {
@@ -366,7 +471,7 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 
 	fmt.Println("Extracting layers...")
 	for layerNumber, file := range files {
-		err := UnTarFile(file, extractPath)
+		err := Untar(extractPath, file)
 		if err != nil {
 			return err
 		}

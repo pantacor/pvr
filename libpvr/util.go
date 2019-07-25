@@ -238,11 +238,9 @@ func ExtractFiles(files []string, extractPath string) error {
 	}
 
 	for _, file := range files {
-		args := []string{tarPath, "xzvf", file, "-C", extractPath}
-		untar := exec.Command(args[0], args[1:]...)
-		untarError := untar.Run()
-		if untarError != nil {
-			return untarError
+		err := Untar(extractPath, file)
+		if err != nil {
+			return err
 		}
 	}
 
