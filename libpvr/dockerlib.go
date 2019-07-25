@@ -48,15 +48,17 @@ const (
 	SQUASH_FILE                    = "root.squashfs"
 	DOCKER_DIGEST_FILE             = "root.squashfs.docker-digest"
 	DOCKER_DOMAIN                  = "docker.io"
+	DOCKER_DOMAIN_URL              = "https://" + DOCKER_DOMAIN
 	DOCKER_REGISTRY                = "https://index.docker.io/v1/"
 	DOCKER_REGISTRY_SERVER_ADDRESS = "https://registry-1.docker.io"
 )
 
 var (
-	ErrMakeSquashFSNotFound = errors.New("mksquashfs not found in your PATH, please install before continue")
-	ErrTarNotFound          = errors.New("tar not found in your PATH, please install before continue")
-	ErrImageNotFound        = errors.New("image not found or you do not have access")
-	stripFilesList          = []string{
+	ErrMakeSquashFSNotFound    = errors.New("mksquashfs not found in your PATH, please install before continue")
+	ErrTarNotFound             = errors.New("tar not found in your PATH, please install before continue")
+	ErrImageNotFound           = errors.New("image not found or you do not have access")
+	ErrDownloadedLayerDiffSize = errors.New("size of downloaded layer is different from expected")
+	stripFilesList             = []string{
 		"usr/bin/qemu-arm-static",
 	}
 )
@@ -384,6 +386,10 @@ func (p *Pvr) GenerateApplicationSquashFS(
 		return err
 	}
 
+	if r.URL == DOCKER_DOMAIN_URL {
+		r.URL = DOCKER_REGISTRY_SERVER_ADDRESS
+	}
+
 	tempdir, err := ioutil.TempDir(os.TempDir(), "download-layer-")
 	if err != nil {
 		return err
@@ -448,7 +454,11 @@ func (p *Pvr) GenerateApplicationSquashFS(
 				return err
 			}
 
-			_, err = buf.WriteTo(file)
+			writedCount, err := buf.WriteTo(file)
+			if writedCount != layer.Size {
+				return ErrDownloadedLayerDiffSize
+			}
+
 			if err != nil {
 				return err
 			}
