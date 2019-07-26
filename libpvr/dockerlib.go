@@ -16,9 +16,7 @@
 package libpvr
 
 import (
-	"archive/tar"
 	"bufio"
-	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -270,82 +268,14 @@ func GetFileContentType(src string) (string, error) {
 
 // Untar : Untar a file or folder
 func Untar(dst string, src string) error {
-	contentType, err := GetFileContentType(src)
+	tarPath, err := exec.LookPath(TAR_CMD)
 	if err != nil {
 		return err
 	}
-
-	file, err := os.Open(src)
-	defer file.Close()
-	if err != nil {
-		return err
-	}
-	tr := tar.NewReader(file)
-
-	if contentType == "application/x-gzip" {
-		// For zip content types, eg: application/x-gzip
-		gzr, err := gzip.NewReader(file)
-		if err != nil {
-			return err
-		}
-		defer gzr.Close()
-		tr = tar.NewReader(gzr)
-	}
-
-	for {
-		header, err := tr.Next()
-
-		switch {
-
-		// if no more files are found return
-		case err == io.EOF:
-			return nil
-
-		// return any other error
-		case err != nil:
-			return err
-
-		// if the header is nil, just skip it (not sure how this happens)
-		case header == nil:
-			continue
-		}
-
-		// the target location where the dir/file should be created
-		target := filepath.Join(dst, header.Name)
-
-		// the following switch could also be done using fi.Mode(), not sure if there
-		// a benefit of using one vs. the other.
-		// fi := header.FileInfo()
-
-		// check the file type
-		switch header.Typeflag {
-
-		// if its a dir and it doesn't exist create it
-		case tar.TypeDir:
-			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(target, 0777); err != nil {
-					return err
-				}
-			}
-
-		// if it's a file create it
-		case tar.TypeReg:
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
-			if err != nil {
-				log.Print("Open Error")
-				return err
-			}
-
-			// copy over contents
-			if _, err := io.Copy(f, tr); err != nil {
-				return err
-			}
-
-			// manually close here after each file operation; defering would cause each file close
-			// to wait until all operations have completed.
-			f.Close()
-		}
-	}
+	args := []string{tarPath, "xzvf", src, "-C", dst}
+	untar := exec.Command(args[0], args[1:]...)
+	err = untar.Run()
+	return err
 }
 
 func (p *Pvr) GenerateApplicationSquashFS(
