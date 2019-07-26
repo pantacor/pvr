@@ -375,7 +375,12 @@ func (p *Pvr) GenerateApplicationSquashFS(
 	if err != nil {
 		return err
 	}
-	image.Domain = DOCKER_REGISTRY_SERVER_ADDRESS
+
+	if image.Domain == "" {
+		image.Domain = DOCKER_REGISTRY_SERVER_ADDRESS
+		log.Println("Adjusted Image Domain for docker hub: " + image.Domain)
+	}
+
 	auth, err := repoutils.GetAuthConfig(username, password, image.Domain)
 	if err != nil {
 		return err
