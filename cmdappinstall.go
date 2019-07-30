@@ -18,6 +18,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
 
@@ -65,6 +66,10 @@ func CommandAppInstall() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
+
+			// fix up trailing/leading / from appnames
+			appname = strings.Trim(appname, "/")
+
 			err = pvr.InstallApplication(
 				appname,
 				username,
