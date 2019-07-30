@@ -53,7 +53,15 @@ lxc.init.cwd = {{ .Docker.WorkingDir }}
 lxc.environment = {{ . }}
 	{{- end }}
 {{- end }}
-lxc.namespace.keep = user net ipc
+lxc.namespace.keep = user
+{{- if .Source.vars.PV_LXC_NETWORK_TYPE -}}
+{{- if eq .Source.vars.PV_LXC_NETWORK_TYPE "host" -}}
+{{ " " }} net
+{{- end -}}
+{{- else -}}
+{{ " " }} net
+{{- end -}}
+{{ " " }} ipc
 lxc.console.path = none
 lxc.mount.auto = proc sys:rw cgroup-full
 {{- if .Source.vars.PV_SECURITY_FULLDEV }}
@@ -71,12 +79,19 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | rep
 {{- end -}}
 {{- end -}}
 {{- end }}
+{{- if .Source.vars.PV_LXC_NETWORK_TYPE -}}
+{{- if eq .Source.vars.PV_LXC_NETWORK_TYPE "veth" }}
+lxc.net.0.type = veth
+lxc.net.0.link = lxcbr0
+{{- end }}
+{{- end }}
+
 `
 
 	RUN_JSON = `{{ "" -}}
 {
-	"#spec":"service-manifest-run@1",
-	"config":"lxc.container.conf",
+	"#spec": "service-manifest-run@1",
+	"config": "lxc.container.conf",
 	"name":"{{- .Source.name -}}",
 	"storage":{
 		{{- range $key, $value := .Source.persistence -}}
