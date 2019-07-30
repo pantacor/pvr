@@ -250,7 +250,7 @@ func (p *Pvr) UpdateApplication(appname, username, password string) error {
 
 	src.DockerDigest = dockerDigest
 
-	srcContent, err := json.Marshal(src)
+	srcContent, err := json.MarshalIndent(src, " ", " ")
 	if err != nil {
 		return err
 	}
