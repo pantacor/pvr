@@ -59,10 +59,18 @@ func (p *Pvr) GetApplicationManifest(appname string) (map[string]interface{}, er
 		return nil, err
 	}
 
-	var result map[string]interface{}
+	result := map[string]interface{}{}
+
 	err = json.Unmarshal(js, &result)
 	if err != nil {
 		return nil, err
+	}
+
+	if result["vars"] == nil {
+		result["vars"] = map[string]interface{}{}
+	}
+	if result["config"] == nil {
+		result["config"] = map[string]interface{}{}
 	}
 
 	return result, nil
@@ -250,7 +258,7 @@ func (p *Pvr) UpdateApplication(appname, username, password string) error {
 
 	src.DockerDigest = dockerDigest
 
-	srcContent, err := json.Marshal(src)
+	srcContent, err := json.MarshalIndent(src, " ", " ")
 	if err != nil {
 		return err
 	}
