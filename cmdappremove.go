@@ -17,6 +17,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -47,6 +48,10 @@ func CommandAppRemove() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 			appname := c.Args().Get(0)
+
+			// fix up trailing/leading / from appnames
+			appname = strings.Trim(appname, "/")
+
 			err = pvr.RemoveApplication(appname)
 			if err != nil {
 				return cli.NewExitError(err, 3)

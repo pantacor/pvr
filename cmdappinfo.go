@@ -17,6 +17,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -48,6 +49,10 @@ func CommandAppInfo() cli.Command {
 			}
 
 			appname := c.Args().Get(0)
+
+			// fix up trailing/leading / from appnames
+			appname = strings.Trim(appname, "/")
+
 			err = pvr.GetApplicationInfo(appname)
 			if err != nil {
 				return cli.NewExitError(err, 3)

@@ -18,6 +18,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
 
@@ -58,6 +59,9 @@ func CommandAppAdd() cli.Command {
 			from := c.String("from")
 			config := c.String("config-json")
 			volumes := c.StringSlice("volume")
+
+			// fix up trailing/leading / from appnames
+			appname = strings.Trim(appname, "/")
 
 			err = pvr.AddApplication(appname, username, password, from, config, volumes)
 			if err != nil {
