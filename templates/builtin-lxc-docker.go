@@ -19,6 +19,9 @@ const (
 	LXC_CONTAINER_CONF = `{{ "" -}}
 lxc.tty.max = {{ .Source.vars.LXC_TTY_MAX | pvr_ifNull "8" }}
 lxc.pty.max = {{ .Source.vars.LXC_PTY_MAX | pvr_ifNull "1024" }}
+{{- if .Source.vars.PV_DEBUG_MODE }}
+lxc.log.file = {{ .Source.name }}.log
+{{- end }}
 lxc.cgroup.devices.allow = {{ .Source.vars.LXC_CGROUP_DEVICES_ALLOW | pvr_ifNull "a" }}
 lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
