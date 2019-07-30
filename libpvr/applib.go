@@ -44,6 +44,7 @@ var (
 type Source struct {
 	Spec         string                 `json:"#spec"`
 	Template     string                 `json:"template"`
+	TemplateVars map[string]interface{} `json:"vars"`
 	Config       map[string]interface{} `json:"config"`
 	DockerName   string                 `json:"docker_name"`
 	DockerTag    string                 `json:"docker_tag"`
@@ -338,6 +339,7 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 	src := Source{
 		Spec:         SRC_SPEC,
 		Template:     TEMPLATE_BUILTIN_LXC_DOCKER,
+		TemplateVars: map[string]interface{}{},
 		Config:       map[string]interface{}{},
 		DockerName:   path.Join(image.Domain, image.Path),
 		DockerTag:    image.Tag,
