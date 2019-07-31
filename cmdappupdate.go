@@ -18,6 +18,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
 
@@ -52,7 +53,8 @@ func CommandAppUpdate() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
-			appname := c.Args().Get(0)
+			// fix up trailing/leading / from appnames
+			appname := strings.Trim(c.Args().Get(0), "/")
 			username := c.String("username")
 			password := c.String("password")
 
