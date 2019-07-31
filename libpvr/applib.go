@@ -42,6 +42,7 @@ var (
 )
 
 type Source struct {
+	Name         string                 `json:"name,omitempty"`
 	Spec         string                 `json:"#spec"`
 	Template     string                 `json:"template"`
 	TemplateVars map[string]interface{} `json:"vars"`
@@ -52,32 +53,28 @@ type Source struct {
 	Persistence  map[string]string      `json:"persistence"`
 }
 
-func (p *Pvr) GetApplicationManifest(appname string) (map[string]interface{}, error) {
+func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 	appManifestFile := filepath.Join(p.Dir, appname, SRC_FILE)
 	js, err := ioutil.ReadFile(appManifestFile)
 	if err != nil {
 		return nil, err
 	}
 
-	result := map[string]interface{}{}
+	result := Source{
+		TemplateVars: map[string]interface{}{},
+		Config:       map[string]interface{}{},
+	}
 
 	err = json.Unmarshal(js, &result)
 	if err != nil {
 		return nil, err
 	}
 
-	if result["vars"] == nil {
-		result["vars"] = map[string]interface{}{}
-	}
-	if result["config"] == nil {
-		result["config"] = map[string]interface{}{}
-	}
-
-	return result, nil
+	return &result, nil
 }
 
-func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[string]interface{}, appManifest map[string]interface{}) error {
-	appConfig := appManifest["config"].(map[string]interface{})
+func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[string]interface{}, appManifest *Source) error {
+	appConfig := appManifest.Config
 	for k, _ := range dockerConfig {
 		value := appConfig[k]
 		if value != nil {
@@ -86,17 +83,23 @@ func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[
 	}
 
 	// add application name to proccess template
-	appManifest["name"] = appname
+	appManifest.Name = appname
+
+	appManifestMap, err := StructToMap(appManifest)
+
+	if err != nil {
+		return err
+	}
 
 	configValues := map[string]interface{}{}
-	configValues["Source"] = appManifest
+	configValues["Source"] = appManifestMap
 	configValues["Docker"] = dockerConfig
 
-	if appManifest["template"] == nil {
+	if appManifest.Template == "" {
 		return fmt.Errorf("empty template")
 	}
 
-	appTemplate := appManifest["template"].(string)
+	appTemplate := appManifest.Template
 	templateHandler := templates.Handlers[appTemplate]
 	if templateHandler == nil {
 		return fmt.Errorf("invalid template, no handler for %s", appTemplate)
@@ -124,13 +127,13 @@ func (p *Pvr) GetTrackURL(appname string) (string, error) {
 		return "", err
 	}
 
-	if appManifest["docker_name"] == nil {
+	if appManifest.DockerName == "" {
 		return "", err
 	}
 
-	trackURL := appManifest["docker_name"].(string)
-	if appManifest["docker_tag"] != nil {
-		trackURL += fmt.Sprintf(":%s", appManifest["docker_tag"])
+	trackURL := appManifest.DockerName
+	if appManifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
 	}
 	return trackURL, nil
 }
@@ -142,18 +145,19 @@ func (p *Pvr) InstallApplication(
 	password string,
 	localImage LocalDockerImage,
 ) error {
+
 	appManifest, err := p.GetApplicationManifest(appname)
 	if err != nil {
 		return err
 	}
 
-	if appManifest["docker_name"] == nil {
+	if appManifest.DockerName == "" {
 		return err
 	}
 
-	trackURL := appManifest["docker_name"].(string)
-	if appManifest["docker_tag"] != nil {
-		trackURL += fmt.Sprintf(":%s", appManifest["docker_tag"])
+	trackURL := appManifest.DockerName
+	if appManifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
 	}
 	if localImage.Exists {
 		trackURL, err = p.GetSourceRepo(localImage.RepoTags, username, password)
@@ -200,14 +204,15 @@ func (p *Pvr) InstallApplication(
 }
 
 func (p *Pvr) UpdateApplication(appname, username, password string) error {
+
 	appManifest, err := p.GetApplicationManifest(appname)
 	if err != nil {
 		return err
 	}
 
-	trackURL := appManifest["docker_name"].(string)
-	if appManifest["docker_tag"] != nil {
-		trackURL += fmt.Sprintf(":%s", appManifest["docker_tag"])
+	trackURL := appManifest.DockerName
+	if appManifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
 	}
 	localImage, err := ImageExistsInLocalDocker(trackURL)
 	if err != nil {
@@ -244,25 +249,14 @@ func (p *Pvr) UpdateApplication(appname, username, password string) error {
 		return nil
 	}
 
+	appManifest.DockerDigest = dockerDigest
+
+	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
+	if err != nil {
+		return err
+	}
+
 	srcFilePath := filepath.Join(p.Dir, appname, SRC_FILE)
-	content, err := ioutil.ReadFile(srcFilePath)
-	if err != nil {
-		return err
-	}
-
-	var src Source
-	err = json.Unmarshal(content, &src)
-	if err != nil {
-		return err
-	}
-
-	src.DockerDigest = dockerDigest
-
-	srcContent, err := json.MarshalIndent(src, " ", " ")
-	if err != nil {
-		return err
-	}
-
 	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
 	if err != nil {
 		return err

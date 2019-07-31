@@ -284,7 +284,7 @@ func (p *Pvr) GenerateApplicationSquashFS(
 	password string,
 	dockerManifest *schema2.Manifest,
 	dockerConfig map[string]interface{},
-	appmanifest map[string]interface{},
+	appmanifest *Source,
 	destinationPath string,
 	localImage LocalDockerImage,
 ) error {

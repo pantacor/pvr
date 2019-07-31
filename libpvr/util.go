@@ -261,3 +261,20 @@ func ReportError(err error, knowSolutions ...string) error {
 
 	return errors.New(msg)
 }
+
+func StructToMap(s interface{}) (map[string]interface{}, error) {
+
+	b, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	result := map[string]interface{}{}
+
+	err = json.Unmarshal(b, &result)
+
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
