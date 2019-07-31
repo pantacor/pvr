@@ -22,7 +22,6 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"time"
 
@@ -313,7 +312,7 @@ func processDownloads(downloads chan *downloadData, totalLayers int) ([]string, 
 
 func downloadlayers(layerdata *layerData) {
 	i := layerdata.Number
-	filename := filepath.Join(layerdata.OutputDir, cacheFilePrefix+strconv.Itoa(i)+cacheFileExt)
+	filename := filepath.Join(layerdata.OutputDir, string(layerdata.LayerDigest)+cacheFileExt)
 
 	sameFile, err := FileHasSameSha(filename, string(layerdata.LayerDigest))
 	if err != nil {
@@ -324,7 +323,6 @@ func downloadlayers(layerdata *layerData) {
 		}
 		return
 	}
-
 	if sameFile {
 		layerdata.Downloads <- &downloadData{
 			filename: filename,
@@ -375,7 +373,6 @@ func downloadlayers(layerdata *layerData) {
 		}
 		return
 	}
-
 	layerdata.Downloads <- &downloadData{
 		filename: filename,
 		number:   i,
