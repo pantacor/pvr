@@ -312,6 +312,7 @@ type AppData struct {
 	Password        string
 	DockerManifest  *schema2.Manifest
 	DockerConfig    map[string]interface{}
+	TemplateArgs    map[string]interface{}
 	Appmanifest     *Source
 	DestinationPath string
 	LocalImage      LocalDockerImage

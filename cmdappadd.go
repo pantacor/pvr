@@ -55,13 +55,27 @@ func CommandAppAdd() cli.Command {
 			appname := c.Args().Get(0)
 			// fix up trailing/leading / from appnames
 			appname = strings.Trim(appname, "/")
+
+			templateArgs := map[string]interface{}{}
+
+			varSlice := c.StringSlice("arg")
+			for _, v := range varSlice {
+				va := strings.SplitN(v, "=", 2)
+				if len(va) == 2 {
+					templateArgs[va[0]] = va[1]
+				} else {
+					templateArgs[va[0]] = ""
+				}
+			}
+
 			app := libpvr.AppData{
-				Appname:    appname,
-				Username:   c.String("username"),
-				Password:   c.String("password"),
-				From:       c.String("from"),
-				ConfigFile: c.String("config-json"),
-				Volumes:    c.StringSlice("volume"),
+				Appname:      appname,
+				Username:     c.String("username"),
+				Password:     c.String("password"),
+				From:         c.String("from"),
+				ConfigFile:   c.String("config-json"),
+				Volumes:      c.StringSlice("volume"),
+				TemplateArgs: templateArgs,
 			}
 			err = pvr.AddApplication(app)
 			if err != nil {
@@ -94,6 +108,11 @@ func CommandAppAdd() cli.Command {
 			Name:   "config-json",
 			Usage:  "Docker image config",
 			EnvVar: "PVR_CONFIG_JSON",
+		},
+		cli.StringSliceFlag{
+			Name:   "arg",
+			Usage:  "Template Arguments",
+			EnvVar: "PVR_TEMPLATE_ARG",
 		},
 		cli.StringSliceFlag{
 			Name:   "volume",
