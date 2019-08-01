@@ -279,7 +279,7 @@ func (p *Pvr) AddApplication(app AppData) error {
 	src := Source{
 		Spec:         SRC_SPEC,
 		Template:     TEMPLATE_BUILTIN_LXC_DOCKER,
-		TemplateArgs: map[string]interface{}{},
+		TemplateArgs: app.TemplateArgs,
 		Config:       map[string]interface{}{},
 		Persistence:  persistence,
 	}
