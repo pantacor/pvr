@@ -17,12 +17,12 @@ package templates
 
 const (
 	LXC_CONTAINER_CONF = `{{ "" -}}
-lxc.tty.max = {{ .Source.vars.LXC_TTY_MAX | pvr_ifNull "8" }}
-lxc.pty.max = {{ .Source.vars.LXC_PTY_MAX | pvr_ifNull "1024" }}
-{{- if .Source.vars.PV_DEBUG_MODE }}
+lxc.tty.max = {{ .Source.args.LXC_TTY_MAX | pvr_ifNull "8" }}
+lxc.pty.max = {{ .Source.args.LXC_PTY_MAX | pvr_ifNull "1024" }}
+{{- if .Source.args.PV_DEBUG_MODE }}
 lxc.log.file = /pv/logs/{{ .Source.name }}.log
 {{- end }}
-lxc.cgroup.devices.allow = {{ .Source.vars.LXC_CGROUP_DEVICES_ALLOW | pvr_ifNull "a" }}
+lxc.cgroup.devices.allow = {{ .Source.args.LXC_CGROUP_DEVICES_ALLOW | pvr_ifNull "a" }}
 lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
 {{- if .Docker.Entrypoint }}
@@ -54,8 +54,8 @@ lxc.environment = {{ . }}
 	{{- end }}
 {{- end }}
 lxc.namespace.keep = user
-{{- if .Source.vars.PV_LXC_NETWORK_TYPE -}}
-{{- if eq .Source.vars.PV_LXC_NETWORK_TYPE "host" -}}
+{{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
+{{- if eq .Source.args.PV_LXC_NETWORK_TYPE "host" -}}
 {{ " " }} net
 {{- end -}}
 {{- else -}}
@@ -64,10 +64,10 @@ lxc.namespace.keep = user
 {{ " " }} ipc
 lxc.console.path = none
 lxc.mount.auto = proc sys:rw cgroup-full
-{{- if .Source.vars.PV_SECURITY_FULLDEV }}
+{{- if .Source.args.PV_SECURITY_FULLDEV }}
 lxc.mount.entry = /dev/ dev none bind,rw,create=dir 0 0
 {{- end }}
-{{- if .Source.vars.PV_SECURITY_WITH_STORAGE }}
+{{- if .Source.args.PV_SECURITY_WITH_STORAGE }}
 lxc.mount.entry = /storage storage none bind,rw,create=dir 0 0
 {{- end }}
 lxc.mount.entry = /etc/resolv.conf etc/resolv.conf none bind,rw,create=file 0 0
@@ -79,8 +79,8 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | rep
 {{- end -}}
 {{- end -}}
 {{- end }}
-{{- if .Source.vars.PV_LXC_NETWORK_TYPE -}}
-{{- if eq .Source.vars.PV_LXC_NETWORK_TYPE "veth" }}
+{{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
+{{- if eq .Source.args.PV_LXC_NETWORK_TYPE "veth" }}
 lxc.net.0.type = veth
 lxc.net.0.link = lxcbr0
 {{- end }}
