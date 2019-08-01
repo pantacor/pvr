@@ -52,18 +52,18 @@ func CommandAppAdd() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
-
 			appname := c.Args().Get(0)
-			username := c.String("username")
-			password := c.String("password")
-			from := c.String("from")
-			config := c.String("config-json")
-			volumes := c.StringSlice("volume")
-
 			// fix up trailing/leading / from appnames
 			appname = strings.Trim(appname, "/")
-
-			err = pvr.AddApplication(appname, username, password, from, config, volumes)
+			app := libpvr.AppData{
+				Appname:    appname,
+				Username:   c.String("username"),
+				Password:   c.String("password"),
+				From:       c.String("from"),
+				ConfigFile: c.String("config-json"),
+				Volumes:    c.StringSlice("volume"),
+			}
+			err = pvr.AddApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -81,7 +80,6 @@ func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[
 			dockerConfig[k] = value
 		}
 	}
-
 	// add application name to proccess template
 	appManifest.Name = appname
 
@@ -139,14 +137,8 @@ func (p *Pvr) GetTrackURL(appname string) (string, error) {
 }
 
 // InstallApplication : Install Application
-func (p *Pvr) InstallApplication(
-	appname string,
-	username string,
-	password string,
-	localImage LocalDockerImage,
-) error {
-
-	appManifest, err := p.GetApplicationManifest(appname)
+func (p *Pvr) InstallApplication(app AppData) error {
+	appManifest, err := p.GetApplicationManifest(app.Appname)
 	if err != nil {
 		return err
 	}
@@ -159,53 +151,48 @@ func (p *Pvr) InstallApplication(
 	if appManifest.DockerTag != "" {
 		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
 	}
-	if localImage.Exists {
-		trackURL, err = p.GetSourceRepo(localImage.RepoTags, username, password)
+
+	app.DockerURL = trackURL
+
+	dockerConfig := map[string]interface{}{}
+
+	if app.LocalImage.Exists {
+		dockerConfig = app.LocalImage.Config
+	} else {
+
+		image, err := registry.ParseImage(trackURL)
 		if err != nil {
 			return err
 		}
+		auth, err := p.AuthConfig(app.Username, app.Password, image.Domain)
+		if err != nil {
+			return err
+		}
+		dockerManifest, err := p.GetDockerManifest(image, auth)
+		if err != nil {
+			return ReportDockerManifestError(err, trackURL)
+		}
+		dockerConfig, err = p.GetDockerConfig(dockerManifest, image, auth)
+		if err != nil {
+			return ReportDockerManifestError(err, trackURL)
+		}
+		app.Username = auth.Username
+		app.Password = auth.Password
+		app.DockerManifest = dockerManifest
+		app.DockerConfig = dockerConfig
+		app.Appmanifest = appManifest
 	}
-	image, err := registry.ParseImage(trackURL)
+	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, appManifest)
 	if err != nil {
 		return err
 	}
+	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
 
-	auth, err := p.AuthConfig(username, password, image.Domain)
-	if err != nil {
-		return err
-	}
-
-	dockerManifest, err := p.GetDockerManifest(image, auth)
-	if err != nil {
-		return ReportDockerManifestError(err, trackURL)
-	}
-
-	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, auth)
-	if err != nil {
-		return ReportDockerManifestError(err, trackURL)
-	}
-
-	err = p.GenerateApplicationTemplateFiles(appname, dockerConfig, appManifest)
-	if err != nil {
-		return err
-	}
-
-	destinationPath := filepath.Join(p.Dir, appname)
-	return p.GenerateApplicationSquashFS(
-		trackURL,
-		auth.Username,
-		auth.Password,
-		dockerManifest,
-		dockerConfig,
-		appManifest,
-		destinationPath,
-		localImage,
-	)
+	return p.GenerateApplicationSquashFS(app)
 }
 
-func (p *Pvr) UpdateApplication(appname, username, password string) error {
-
-	appManifest, err := p.GetApplicationManifest(appname)
+func (p *Pvr) UpdateApplication(app AppData) error {
+	appManifest, err := p.GetApplicationManifest(app.Appname)
 	if err != nil {
 		return err
 	}
@@ -214,37 +201,38 @@ func (p *Pvr) UpdateApplication(appname, username, password string) error {
 	if appManifest.DockerTag != "" {
 		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
 	}
-	localImage, err := ImageExistsInLocalDocker(trackURL)
+	app.LocalImage, err = ImageExistsInLocalDocker(trackURL)
 	if err != nil {
 		return err
 	}
-	if localImage.Exists {
-		trackURL, err = p.GetSourceRepo(localImage.RepoTags, username, password)
+
+	dockerDigest := ""
+	if app.LocalImage.Exists {
+		dockerDigest = app.LocalImage.ImageID
+	} else {
+		image, err := registry.ParseImage(trackURL)
 		if err != nil {
 			return err
 		}
+		auth, err := p.AuthConfig(app.Username, app.Password, image.Domain)
+		if err != nil {
+			return err
+		}
+		dockerManifest, err := p.GetDockerManifest(image, auth)
+		if err != nil {
+			return ReportDockerManifestError(err, trackURL)
+		}
+		dockerDigest = string(dockerManifest.Config.Digest)
+
+		app.Username = auth.Username
+		app.Password = auth.Password
 	}
-	image, err := registry.ParseImage(trackURL)
+
+	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
 	if err != nil {
 		return err
 	}
 
-	auth, err := p.AuthConfig(username, password, image.Domain)
-	if err != nil {
-		return err
-	}
-
-	dockerManifest, err := p.GetDockerManifest(image, auth)
-	if err != nil {
-		return ReportDockerManifestError(err, trackURL)
-	}
-
-	squashFSDigest, err := p.GetSquashFSDigest(appname)
-	if err != nil {
-		return err
-	}
-
-	dockerDigest := string(dockerManifest.Config.Digest)
 	if dockerDigest == squashFSDigest {
 		return nil
 	}
@@ -256,80 +244,30 @@ func (p *Pvr) UpdateApplication(appname, username, password string) error {
 		return err
 	}
 
-	srcFilePath := filepath.Join(p.Dir, appname, SRC_FILE)
+	srcFilePath := filepath.Join(p.Dir, app.Appname, SRC_FILE)
 	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
 	if err != nil {
 		return err
 	}
 
-	return p.InstallApplication(appname, auth.Username, auth.Password, localImage)
+	return p.InstallApplication(app)
 }
 
-func (p *Pvr) AddApplication(appname, username, password, from, configFile string, volumes []string) error {
-	if appname == "" {
+func (p *Pvr) AddApplication(app AppData) error {
+	if app.Appname == "" {
 		return ErrEmptyAppName
 	}
 
-	appPath := filepath.Join(p.Dir, appname)
+	appPath := filepath.Join(p.Dir, app.Appname)
 	if _, err := os.Stat(appPath); !os.IsNotExist(err) {
 		return nil
 	}
 
-	if from == "" {
+	if app.From == "" {
 		return ErrEmptyFrom
 	}
-	localImage, err := ImageExistsInLocalDocker(from)
-	if err != nil {
-		return err
-	}
-	if localImage.Exists {
-		from, err = p.GetSourceRepo(localImage.RepoTags, username, password)
-		if err != nil {
-			return err
-		}
-	}
-
-	image, err := registry.ParseImage(from)
-	if err != nil {
-		return err
-	}
-
-	auth, err := p.AuthConfig(username, password, image.Domain)
-	if err != nil {
-		return err
-	}
-
-	dockerManifest, err := p.GetDockerManifest(image, auth)
-	if err != nil {
-		return ReportDockerManifestError(err, from)
-	}
-	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, auth)
-	if err != nil {
-		return ReportDockerManifestError(err, from)
-	}
-
-	dockerDigest := string(dockerManifest.Config.Digest)
-
-	if configFile != "" {
-		var config map[string]interface{}
-		content, err := ioutil.ReadFile(configFile)
-		if err != nil {
-			return err
-		}
-
-		err = json.Unmarshal(content, &config)
-		if err != nil {
-			return err
-		}
-
-		for k, v := range config {
-			dockerConfig[k] = v
-		}
-
-	}
-
 	persistence := map[string]string{}
-	for _, volume := range volumes {
+	for _, volume := range app.Volumes {
 		split := strings.Split(volume, ":")
 		if len(split) < 2 {
 			return ErrInvalidVolumeFormat
@@ -343,10 +281,63 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 		Template:     TEMPLATE_BUILTIN_LXC_DOCKER,
 		TemplateArgs: map[string]interface{}{},
 		Config:       map[string]interface{}{},
-		DockerName:   path.Join(image.Domain, image.Path),
-		DockerTag:    image.Tag,
-		DockerDigest: string(dockerDigest),
 		Persistence:  persistence,
+	}
+	components := strings.Split(app.From, ":")
+	if len(components) < 2 {
+		src.DockerTag = "latest"
+	} else {
+		src.DockerTag = components[len(components)-1]
+	}
+	src.DockerName = strings.Replace(app.From, ":"+src.DockerTag, "", 1)
+
+	localImage, err := ImageExistsInLocalDocker(app.From)
+	if err != nil {
+		return err
+	}
+	app.LocalImage = localImage
+	dockerConfig := map[string]interface{}{}
+	if app.LocalImage.Exists {
+		//docker config
+		dockerConfig = app.LocalImage.Config
+		src.DockerDigest = app.LocalImage.ImageID
+	} else {
+		// Remote repo.
+		image, err := registry.ParseImage(app.From)
+		if err != nil {
+			return err
+		}
+		auth, err := p.AuthConfig(app.Username, app.Password, image.Domain)
+		if err != nil {
+			return err
+		}
+		dockerManifest, err := p.GetDockerManifest(image, auth)
+		if err != nil {
+			return ReportDockerManifestError(err, app.From)
+		}
+		dockerConfig, err = p.GetDockerConfig(dockerManifest, image, auth)
+		if err != nil {
+			return ReportDockerManifestError(err, app.From)
+		}
+		src.DockerDigest = string(dockerManifest.Config.Digest)
+	}
+
+	if app.ConfigFile != "" {
+		var config map[string]interface{}
+		content, err := ioutil.ReadFile(app.ConfigFile)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(content, &config)
+		if err != nil {
+			return err
+		}
+
+		for k, v := range config {
+			dockerConfig[k] = v
+		}
+
 	}
 
 	srcContent, err := json.MarshalIndent(src, " ", " ")
@@ -365,7 +356,7 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 		return err
 	}
 
-	return p.InstallApplication(appname, username, password, localImage)
+	return p.InstallApplication(app)
 }
 
 // ListApplications : List Applications

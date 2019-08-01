@@ -52,13 +52,15 @@ func CommandAppUpdate() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
-
 			// fix up trailing/leading / from appnames
 			appname := strings.Trim(c.Args().Get(0), "/")
-			username := c.String("username")
-			password := c.String("password")
+			app := libpvr.AppData{
+				Appname:  appname,
+				Username: c.String("username"),
+				Password: c.String("password"),
+			}
 
-			err = pvr.UpdateApplication(appname, username, password)
+			err = pvr.UpdateApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
