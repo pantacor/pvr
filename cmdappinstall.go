@@ -66,16 +66,15 @@ func CommandAppInstall() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
-
 			// fix up trailing/leading / from appnames
 			appname = strings.Trim(appname, "/")
-
-			err = pvr.InstallApplication(
-				appname,
-				username,
-				password,
-				localImage,
-			)
+			app := libpvr.AppData{
+				Appname:    appname,
+				Username:   username,
+				Password:   password,
+				LocalImage: localImage,
+			}
+			err = pvr.InstallApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
