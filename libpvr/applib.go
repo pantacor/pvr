@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/genuinetools/reg/registry"
 	"gitlab.com/pantacor/pvr/templates"
 )
 
@@ -156,30 +155,12 @@ func (p *Pvr) InstallApplication(app AppData) error {
 
 	dockerConfig := map[string]interface{}{}
 
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
-		dockerConfig = app.LocalImage.Config
-	} else {
-
-		image, err := registry.ParseImage(trackURL)
-		if err != nil {
-			return err
-		}
-		auth, err := p.AuthConfig(app.Username, app.Password, image.Domain)
-		if err != nil {
-			return err
-		}
-		dockerManifest, err := p.GetDockerManifest(image, auth)
-		if err != nil {
-			return ReportDockerManifestError(err, trackURL)
-		}
-		dockerConfig, err = p.GetDockerConfig(dockerManifest, image, auth)
-		if err != nil {
-			return ReportDockerManifestError(err, trackURL)
-		}
-		app.Username = auth.Username
-		app.Password = auth.Password
-		app.DockerManifest = dockerManifest
-		app.DockerConfig = dockerConfig
+		dockerConfig = app.LocalImage.DockerConfig
+	} else if app.RemoteImage.Exists {
+		dockerConfig = app.RemoteImage.DockerConfig
 		app.Appmanifest = appManifest
 	}
 	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, appManifest)
@@ -201,31 +182,14 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 	if appManifest.DockerTag != "" {
 		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
 	}
-	app.LocalImage, err = ImageExistsInLocalDocker(trackURL)
-	if err != nil {
-		return err
-	}
 
 	dockerDigest := ""
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
 		dockerDigest = app.LocalImage.ImageID
-	} else {
-		image, err := registry.ParseImage(trackURL)
-		if err != nil {
-			return err
-		}
-		auth, err := p.AuthConfig(app.Username, app.Password, image.Domain)
-		if err != nil {
-			return err
-		}
-		dockerManifest, err := p.GetDockerManifest(image, auth)
-		if err != nil {
-			return ReportDockerManifestError(err, trackURL)
-		}
-		dockerDigest = string(dockerManifest.Config.Digest)
-
-		app.Username = auth.Username
-		app.Password = auth.Password
+	} else if app.RemoteImage.Exists {
+		dockerDigest = app.RemoteImage.ImageID
 	}
 
 	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
@@ -291,35 +255,17 @@ func (p *Pvr) AddApplication(app AppData) error {
 	}
 	src.DockerName = strings.Replace(app.From, ":"+src.DockerTag, "", 1)
 
-	localImage, err := ImageExistsInLocalDocker(app.From)
-	if err != nil {
-		return err
-	}
-	app.LocalImage = localImage
 	dockerConfig := map[string]interface{}{}
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
 		//docker config
-		dockerConfig = app.LocalImage.Config
 		src.DockerDigest = app.LocalImage.ImageID
-	} else {
+		dockerConfig = app.LocalImage.DockerConfig
+	} else if app.RemoteImage.Exists {
 		// Remote repo.
-		image, err := registry.ParseImage(app.From)
-		if err != nil {
-			return err
-		}
-		auth, err := p.AuthConfig(app.Username, app.Password, image.Domain)
-		if err != nil {
-			return err
-		}
-		dockerManifest, err := p.GetDockerManifest(image, auth)
-		if err != nil {
-			return ReportDockerManifestError(err, app.From)
-		}
-		dockerConfig, err = p.GetDockerConfig(dockerManifest, image, auth)
-		if err != nil {
-			return ReportDockerManifestError(err, app.From)
-		}
-		src.DockerDigest = string(dockerManifest.Config.Digest)
+		src.DockerDigest = app.RemoteImage.ImageID
+		dockerConfig = app.RemoteImage.DockerConfig
 	}
 
 	if app.ConfigFile != "" {
@@ -336,6 +282,13 @@ func (p *Pvr) AddApplication(app AppData) error {
 
 		for k, v := range config {
 			dockerConfig[k] = v
+		}
+		//	Exists flag is true only if the image got loaded which will depend on
+		//  priority order provided in --source=local,remote
+		if app.LocalImage.Exists {
+			app.LocalImage.DockerConfig = dockerConfig
+		} else if app.RemoteImage.Exists {
+			app.RemoteImage.DockerConfig = dockerConfig
 		}
 
 	}

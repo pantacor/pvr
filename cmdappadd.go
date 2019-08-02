@@ -25,6 +25,9 @@ import (
 	"github.com/urfave/cli"
 )
 
+// SourceFlagUsage : Source Flag Usage Description
+var SourceFlagUsage = "Comma separated priority list of source (valid sources: local and remote)"
+
 func CommandAppAdd() cli.Command {
 	cmd := cli.Command{
 		Name:        "add",
@@ -73,9 +76,14 @@ func CommandAppAdd() cli.Command {
 				Username:     c.String("username"),
 				Password:     c.String("password"),
 				From:         c.String("from"),
+				Source:       c.String("source"),
 				ConfigFile:   c.String("config-json"),
 				Volumes:      c.StringSlice("volume"),
 				TemplateArgs: templateArgs,
+			}
+			err = pvr.FindDockerImage(&app)
+			if err != nil {
+				return cli.NewExitError(err, 3)
 			}
 			err = pvr.AddApplication(app)
 			if err != nil {
@@ -103,6 +111,12 @@ func CommandAppAdd() cli.Command {
 			Name:   "from",
 			Usage:  "Container image to add",
 			EnvVar: "PVR_FROM",
+		},
+		cli.StringFlag{
+			Name:   "source",
+			Usage:  SourceFlagUsage,
+			EnvVar: "PVR_SOURCE",
+			Value:  "remote,local",
 		},
 		cli.StringFlag{
 			Name:   "config-json",

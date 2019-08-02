@@ -57,22 +57,24 @@ func CommandAppInstall() cli.Command {
 			username := c.String("username")
 			password := c.String("password")
 
+			// fix up trailing/leading / from appnames
+			appname = strings.Trim(appname, "/")
+
 			trackURL, err := pvr.GetTrackURL(appname)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
-			//Check if there is local docker image exists or not
-			localImage, err := libpvr.ImageExistsInLocalDocker(trackURL)
-			if err != nil {
-				return cli.NewExitError(err, 2)
-			}
-			// fix up trailing/leading / from appnames
-			appname = strings.Trim(appname, "/")
+
 			app := libpvr.AppData{
-				Appname:    appname,
-				Username:   username,
-				Password:   password,
-				LocalImage: localImage,
+				Appname:  appname,
+				From:     trackURL,
+				Source:   c.String("source"),
+				Username: username,
+				Password: password,
+			}
+			err = pvr.FindDockerImage(&app)
+			if err != nil {
+				return cli.NewExitError(err, 3)
 			}
 			err = pvr.InstallApplication(app)
 			if err != nil {
@@ -95,6 +97,12 @@ func CommandAppInstall() cli.Command {
 			Name:   "password, p",
 			Usage:  "Use `PVR_REGISTRY_PASSWORD` for authorization with docker registrar",
 			EnvVar: "PVR_REGISTRY_PASSWORD",
+		},
+		cli.StringFlag{
+			Name:   "source",
+			Usage:  SourceFlagUsage,
+			EnvVar: "PVR_SOURCE",
+			Value:  "local,remote",
 		},
 	}
 
