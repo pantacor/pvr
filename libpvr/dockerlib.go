@@ -25,13 +25,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/distribution/manifest/schema2"
@@ -195,71 +195,148 @@ func DownloadLayersFromLocalDocker(imageID string) (io.ReadCloser, error) {
 	return res.Body, nil
 }
 
-// LocalDockerImage : return type of ImageExistsInLocalDocker()
-type LocalDockerImage struct {
-	Exists   bool
-	ImageID  string
-	RepoTags []string
-	Config   map[string]interface{}
+// DockerImage : return type of ImageExistsInLocalDocker()
+type DockerImage struct {
+	Exists         bool
+	ImageID        string
+	DockerConfig   map[string]interface{}
+	DockerManifest *schema2.Manifest
+	DockerRegistry *registry.Registry
+	ImagePath      string
 }
 
-// ImageExistsInLocalDocker : To check whether Image Exist In Local Docker Or Not
-func ImageExistsInLocalDocker(dockerURL string) (LocalDockerImage, error) {
-	image := LocalDockerImage{
-		Exists:   false,
-		ImageID:  "",
-		RepoTags: []string{},
+// FindDockerImage : Find Docker Image
+func (p *Pvr) FindDockerImage(app *AppData) error {
+	app.LocalImage.Exists = false
+	app.RemoteImage.Exists = false
+
+	sourceOrder := strings.Split(app.Source, ",")
+	for _, source := range sourceOrder {
+		fmt.Printf("Checking repo in " + source + " docker\n")
+		if source == "local" {
+			err := LoadLocalImage(app)
+			if err != nil {
+				return err
+			}
+			if app.LocalImage.Exists {
+				return nil
+			}
+
+		} else if source == "remote" {
+			err := p.LoadRemoteImage(app)
+			if err != nil {
+				return err
+			}
+			if app.RemoteImage.Exists {
+				return nil
+			}
+		} else {
+			return errors.New("Invalid source:" + source)
+		}
+	}
+	return errors.New("Image not found in source:" + app.Source + "\n")
+}
+
+// LoadRemoteImage : To check whether Image Exist In Remote Docker Or Not
+func (p *Pvr) LoadRemoteImage(app *AppData) error {
+	app.RemoteImage = DockerImage{
+		Exists:  false,
+		ImageID: "",
+	}
+	image, err := registry.ParseImage(app.From)
+	if err != nil {
+		return err
+	}
+	auth, err := p.AuthConfig(app.Username, app.Password, image.Domain)
+	if err != nil {
+		return err
+	}
+	dockerManifest, err := p.GetDockerManifest(image, auth)
+	if err != nil {
+		manifestErr := ReportDockerManifestError(err, app.From)
+		if err.Error() == "image not found or you do not have access" {
+			fmt.Printf(manifestErr.Error() + "\n")
+			return nil
+		}
+		return manifestErr
+	}
+	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, auth)
+	if err != nil {
+		err = ReportDockerManifestError(err, app.From)
+		return err
+	}
+	dockerRegistry, err := p.GetDockerRegistry(image, auth)
+	if err != nil {
+		return err
+	}
+	app.Username = auth.Username
+	app.Password = auth.Password
+
+	app.RemoteImage.Exists = true
+	app.RemoteImage.ImageID = string(dockerManifest.Config.Digest)
+	app.RemoteImage.DockerConfig = dockerConfig
+	app.RemoteImage.DockerManifest = dockerManifest
+	app.RemoteImage.DockerRegistry = dockerRegistry
+	app.RemoteImage.ImagePath = image.Path
+
+	return nil
+}
+
+// LoadLocalImage : To check whether Image Exist In Local Docker Or Not
+func LoadLocalImage(app *AppData) error {
+	app.LocalImage = DockerImage{
+		Exists:  false,
+		ImageID: "",
 	}
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	cli.NegotiateAPIVersion(ctx)
 	defer cli.Close()
 	if err != nil {
-		return image, err
+		return err
 	}
-	inspect, _, err := cli.ImageInspectWithRaw(ctx, dockerURL)
+	inspect, _, err := cli.ImageInspectWithRaw(ctx, app.From)
 	if err != nil {
-		if err.Error() == "Error: No such image: "+dockerURL {
+		if err.Error() == "Error: No such image: "+app.From {
 			fmt.Printf("Repo not exists in local docker\n")
-			return image, nil
+			return nil
 		}
-		return image, err
+		return err
 	}
 	fmt.Printf("Repo exists in local docker\n")
-	image.Exists = true
-	image.ImageID = inspect.ID
-	image.RepoTags = inspect.RepoTags
+	app.LocalImage.Exists = true
+	app.LocalImage.ImageID = inspect.ID
 	//Setting Docker Config values
-	image.Config = map[string]interface{}{}
-	image.Config["Hostname"] = inspect.Config.Hostname
-	image.Config["Domainname"] = inspect.Config.Domainname
-	image.Config["User"] = inspect.Config.User
-	image.Config["AttachStdin"] = inspect.Config.AttachStdin
-	image.Config["AttachStdout"] = inspect.Config.AttachStdout
-	image.Config["AttachStderr"] = inspect.Config.AttachStderr
-	image.Config["ExposedPorts"] = inspect.Config.ExposedPorts
-	image.Config["Tty"] = inspect.Config.Tty
-	image.Config["OpenStdin"] = inspect.Config.OpenStdin
-	image.Config["StdinOnce"] = inspect.Config.StdinOnce
-	image.Config["Env"] = inspect.Config.Env
-	image.Config["Cmd"] = []interface{}{}
+	app.LocalImage.DockerConfig = map[string]interface{}{}
+	app.LocalImage.DockerConfig["Hostname"] = inspect.Config.Hostname
+	app.LocalImage.DockerConfig["Domainname"] = inspect.Config.Domainname
+	app.LocalImage.DockerConfig["User"] = inspect.Config.User
+	app.LocalImage.DockerConfig["AttachStdin"] = inspect.Config.AttachStdin
+	app.LocalImage.DockerConfig["AttachStdout"] = inspect.Config.AttachStdout
+	app.LocalImage.DockerConfig["AttachStderr"] = inspect.Config.AttachStderr
+	app.LocalImage.DockerConfig["ExposedPorts"] = inspect.Config.ExposedPorts
+	app.LocalImage.DockerConfig["Tty"] = inspect.Config.Tty
+	app.LocalImage.DockerConfig["OpenStdin"] = inspect.Config.OpenStdin
+	app.LocalImage.DockerConfig["StdinOnce"] = inspect.Config.StdinOnce
+	app.LocalImage.DockerConfig["Env"] = inspect.Config.Env
+	app.LocalImage.DockerConfig["Cmd"] = []interface{}{}
 	for _, v := range inspect.Config.Cmd {
-		image.Config["Cmd"] = append(image.Config["Cmd"].([]interface{}), v)
+		app.LocalImage.DockerConfig["Cmd"] = append(app.LocalImage.DockerConfig["Cmd"].([]interface{}), v)
 	}
-	image.Config["Healthcheck"] = inspect.Config.Healthcheck
-	image.Config["ArgsEscaped"] = inspect.Config.ArgsEscaped
-	image.Config["Image"] = inspect.Config.Image
-	image.Config["Volumes"] = inspect.Config.Volumes
-	image.Config["WorkingDir"] = inspect.Config.WorkingDir
-	image.Config["Entrypoint"] = inspect.Config.Entrypoint
-	image.Config["NetworkDisabled"] = inspect.Config.NetworkDisabled
-	image.Config["MacAddress"] = inspect.Config.MacAddress
-	image.Config["OnBuild"] = inspect.Config.OnBuild
-	image.Config["Labels"] = inspect.Config.Labels
-	image.Config["StopSignal"] = inspect.Config.StopSignal
-	image.Config["StopTimeout"] = inspect.Config.StopTimeout
-	image.Config["Shell"] = inspect.Config.Shell
-	return image, nil
+	app.LocalImage.DockerConfig["Healthcheck"] = inspect.Config.Healthcheck
+	app.LocalImage.DockerConfig["ArgsEscaped"] = inspect.Config.ArgsEscaped
+	app.LocalImage.DockerConfig["Image"] = inspect.Config.Image
+	app.LocalImage.DockerConfig["Volumes"] = inspect.Config.Volumes
+	app.LocalImage.DockerConfig["WorkingDir"] = inspect.Config.WorkingDir
+	app.LocalImage.DockerConfig["Entrypoint"] = inspect.Config.Entrypoint
+	app.LocalImage.DockerConfig["NetworkDisabled"] = inspect.Config.NetworkDisabled
+	app.LocalImage.DockerConfig["MacAddress"] = inspect.Config.MacAddress
+	app.LocalImage.DockerConfig["OnBuild"] = inspect.Config.OnBuild
+	app.LocalImage.DockerConfig["Labels"] = inspect.Config.Labels
+	app.LocalImage.DockerConfig["StopSignal"] = inspect.Config.StopSignal
+	app.LocalImage.DockerConfig["StopTimeout"] = inspect.Config.StopTimeout
+	app.LocalImage.DockerConfig["Shell"] = inspect.Config.Shell
+	return nil
 }
 
 // GetFileContentType : Get File Content Type of a file
@@ -304,19 +381,19 @@ func Untar(dst string, src string) error {
 	return err
 }
 
-// AppData : Argument for GenerateApplicationSquashFS()
+// AppData : To hold all required App Information
 type AppData struct {
 	Appname         string
 	DockerURL       string
 	Username        string
 	Password        string
-	DockerManifest  *schema2.Manifest
-	DockerConfig    map[string]interface{}
-	TemplateArgs    map[string]interface{}
 	Appmanifest     *Source
+	TemplateArgs    map[string]interface{}
 	DestinationPath string
-	LocalImage      LocalDockerImage
+	LocalImage      DockerImage
+	RemoteImage     DockerImage
 	From            string
+	Source          string
 	ConfigFile      string
 	Volumes         []string
 }
@@ -324,10 +401,12 @@ type AppData struct {
 func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	digestFile := filepath.Join(app.DestinationPath, DOCKER_DIGEST_FILE)
 	digest := ""
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
 		digest = app.LocalImage.ImageID
-	} else {
-		digest = string(app.DockerManifest.Config.Digest)
+	} else if app.RemoteImage.Exists {
+		digest = app.RemoteImage.ImageID
 	}
 
 	currentDigest, err := os.Open(digestFile)
@@ -351,7 +430,8 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 
 	files := []string{}
 	fmt.Println("Downloading layers...")
-
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
 		fmt.Println("Downloading layers from local docker")
 		imageReader, err := DownloadLayersFromLocalDocker(app.LocalImage.ImageID)
@@ -393,33 +473,10 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 			files = append(files, filename)
 		}
 
-	} else {
+	} else if app.RemoteImage.Exists {
 		//Download from remote repo.
-		image, err := registry.ParseImage(app.DockerURL)
-		if err != nil {
-			return err
-		}
-		if image.Domain == "" {
-			image.Domain = DOCKER_REGISTRY_SERVER_ADDRESS
-			log.Println("Adjusted Image Domain for docker hub: " + image.Domain)
-		}
-
-		auth, err := repoutils.GetAuthConfig(app.Username, app.Password, image.Domain)
-		if err != nil {
-			return err
-		}
-
-		r, err := p.GetDockerRegistry(image, auth)
-		if err != nil {
-			return err
-		}
-
-		if r.URL == DOCKER_DOMAIN_URL {
-			r.URL = DOCKER_REGISTRY_SERVER_ADDRESS
-		}
-
-		for i, layer := range app.DockerManifest.Layers {
-			layerReader, err := r.DownloadLayer(context.Background(), image.Path, layer.Digest)
+		for i, layer := range app.RemoteImage.DockerManifest.Layers {
+			layerReader, err := app.RemoteImage.DockerRegistry.DownloadLayer(context.Background(), app.RemoteImage.ImagePath, layer.Digest)
 			if err != nil {
 				return err
 			}
