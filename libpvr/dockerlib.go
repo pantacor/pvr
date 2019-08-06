@@ -30,7 +30,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -418,6 +417,8 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 			}
 		}
 	}
+	configDir := p.Session.configDir
+	cacheDir := filepath.Join(configDir, cacheFolder)
 
 	fmt.Println("Generating squashfs...")
 
@@ -433,24 +434,34 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	//	Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
-		fmt.Println("Downloading layers from local docker")
-		imageReader, err := DownloadLayersFromLocalDocker(app.LocalImage.ImageID)
+		filename := filepath.Join(cacheDir, app.LocalImage.ImageID) + ".tar.gz"
+		fileExistInCache, err := IsFileExists(filename)
 		if err != nil {
 			return err
 		}
-		buf := bufio.NewReader(imageReader)
-		filename := filepath.Join(tempdir, "layers") + ".tar.gz"
-		file, err := os.Create(filename)
-		if err != nil {
-			return err
+		if fileExistInCache {
+			fmt.Println("Layers Found in Cache")
+			fmt.Printf("Extracting layers folder(cache)\n")
+		} else {
+			fmt.Println("Layers Not Found in Cache")
+			fmt.Println("Downloading layers from local docker")
+			imageReader, err := DownloadLayersFromLocalDocker(app.LocalImage.ImageID)
+			if err != nil {
+				return err
+			}
+			buf := bufio.NewReader(imageReader)
+			//filename := filepath.Join(tempdir, "layers") + ".tar.gz"
+			file, err := os.Create(filename)
+			if err != nil {
+				return err
+			}
+			_, err = buf.WriteTo(file)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Layers downloaded from local docker\n")
+			fmt.Printf("Extracting layers folder\n")
 		}
-		_, err = buf.WriteTo(file)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Layers downloaded from local\n")
-
-		fmt.Printf("Extracting layers folder\n")
 
 		os.MkdirAll(tempdir+"/layers", 0777)
 		err = Untar(tempdir+"/layers", filename)
@@ -483,7 +494,17 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 
 			buf := bufio.NewReader(layerReader)
 
-			filename := filepath.Join(tempdir, strconv.Itoa(i)) + ".tar.gz"
+			filename := filepath.Join(cacheDir, string(layer.Digest)) + ".tar.gz"
+			fileExistInCache, err := IsFileExists(filename)
+			if err != nil {
+				return err
+			}
+			if fileExistInCache {
+				fmt.Printf("Layer %d downloaded(cache)\n", i)
+				files = append(files, filename)
+				continue
+			}
+
 			file, err := os.Create(filename)
 			if err != nil {
 				return err
