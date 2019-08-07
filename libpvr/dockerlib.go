@@ -306,35 +306,14 @@ func LoadLocalImage(app *AppData) error {
 	app.LocalImage.Exists = true
 	app.LocalImage.ImageID = inspect.ID
 	//Setting Docker Config values
-	app.LocalImage.DockerConfig = map[string]interface{}{}
-	app.LocalImage.DockerConfig["Hostname"] = inspect.Config.Hostname
-	app.LocalImage.DockerConfig["Domainname"] = inspect.Config.Domainname
-	app.LocalImage.DockerConfig["User"] = inspect.Config.User
-	app.LocalImage.DockerConfig["AttachStdin"] = inspect.Config.AttachStdin
-	app.LocalImage.DockerConfig["AttachStdout"] = inspect.Config.AttachStdout
-	app.LocalImage.DockerConfig["AttachStderr"] = inspect.Config.AttachStderr
-	app.LocalImage.DockerConfig["ExposedPorts"] = inspect.Config.ExposedPorts
-	app.LocalImage.DockerConfig["Tty"] = inspect.Config.Tty
-	app.LocalImage.DockerConfig["OpenStdin"] = inspect.Config.OpenStdin
-	app.LocalImage.DockerConfig["StdinOnce"] = inspect.Config.StdinOnce
-	app.LocalImage.DockerConfig["Env"] = inspect.Config.Env
-	app.LocalImage.DockerConfig["Cmd"] = []interface{}{}
-	for _, v := range inspect.Config.Cmd {
-		app.LocalImage.DockerConfig["Cmd"] = append(app.LocalImage.DockerConfig["Cmd"].([]interface{}), v)
+	configData, err := json.Marshal(inspect.Config)
+	if err != nil {
+		return err
 	}
-	app.LocalImage.DockerConfig["Healthcheck"] = inspect.Config.Healthcheck
-	app.LocalImage.DockerConfig["ArgsEscaped"] = inspect.Config.ArgsEscaped
-	app.LocalImage.DockerConfig["Image"] = inspect.Config.Image
-	app.LocalImage.DockerConfig["Volumes"] = inspect.Config.Volumes
-	app.LocalImage.DockerConfig["WorkingDir"] = inspect.Config.WorkingDir
-	app.LocalImage.DockerConfig["Entrypoint"] = inspect.Config.Entrypoint
-	app.LocalImage.DockerConfig["NetworkDisabled"] = inspect.Config.NetworkDisabled
-	app.LocalImage.DockerConfig["MacAddress"] = inspect.Config.MacAddress
-	app.LocalImage.DockerConfig["OnBuild"] = inspect.Config.OnBuild
-	app.LocalImage.DockerConfig["Labels"] = inspect.Config.Labels
-	app.LocalImage.DockerConfig["StopSignal"] = inspect.Config.StopSignal
-	app.LocalImage.DockerConfig["StopTimeout"] = inspect.Config.StopTimeout
-	app.LocalImage.DockerConfig["Shell"] = inspect.Config.Shell
+	err = json.Unmarshal(configData, &app.LocalImage.DockerConfig)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
