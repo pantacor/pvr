@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2019 Jeevanandam M (jeeva@myjeeva.com), All rights reserved.
+// Copyright (c) 2015-2017 Jeevanandam M (jeeva@myjeeva.com), All rights reserved.
 // resty source code and usage is governed by a MIT style
 // license that can be found in the LICENSE file.
 
@@ -6,7 +6,6 @@ package resty
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -120,31 +119,20 @@ func (r *Response) RawBody() io.ReadCloser {
 	return r.RawResponse.Body
 }
 
-// IsSuccess method returns true if HTTP status code >= 200 and <= 299 otherwise false.
-func (r *Response) IsSuccess() bool {
-	return r.StatusCode() > 199 && r.StatusCode() < 300
-}
-
-// IsError method returns true if HTTP status code >= 400 otherwise false.
-func (r *Response) IsError() bool {
-	return r.StatusCode() > 399
-}
-
-func (r *Response) fmtBodyString(sl int64) string {
+func (r *Response) fmtBodyString() string {
+	bodyStr := "***** NO CONTENT *****"
 	if r.body != nil {
-		if int64(len(r.body)) > sl {
-			return fmt.Sprintf("***** RESPONSE TOO LARGE (size - %d) *****", len(r.body))
-		}
 		ct := r.Header().Get(hdrContentTypeKey)
 		if IsJSONType(ct) {
 			out := acquireBuffer()
 			defer releaseBuffer(out)
 			if err := json.Indent(out, r.body, "", "   "); err == nil {
-				return out.String()
+				bodyStr = string(out.Bytes())
 			}
+		} else {
+			bodyStr = r.String()
 		}
-		return r.String()
 	}
 
-	return "***** NO CONTENT *****"
+	return bodyStr
 }

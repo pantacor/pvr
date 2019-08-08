@@ -108,9 +108,7 @@ func CamelCaseToUnderscore(str string) string {
 	var output []rune
 	var segment []rune
 	for _, r := range str {
-
-		// not treat number as separate segment
-		if !unicode.IsLower(r) && string(r) != "_" && !unicode.IsNumber(r) {
+		if !unicode.IsLower(r) {
 			output = addSegment(output, segment)
 			segment = nil
 		}
@@ -261,10 +259,4 @@ func buildPadStr(str string, padStr string, padLen int, padLeft bool, padRight b
 	}
 
 	return leftSide + str + rightSide
-}
-
-// TruncatingErrorf removes extra args from fmt.Errorf if not formatted in the str object
-func TruncatingErrorf(str string, args ...interface{}) error {
-	n := strings.Count(str, "%s")
-	return fmt.Errorf(str, args[:n]...)
 }

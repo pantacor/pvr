@@ -1,5 +1,5 @@
 // +build linux darwin freebsd netbsd openbsd solaris dragonfly
-// +build !appengine !js
+// +build !appengine
 
 package pb
 
@@ -58,25 +58,25 @@ func lockEcho() (shutdownCh chan struct{}, err error) {
 	echoLockMutex.Lock()
 	defer echoLockMutex.Unlock()
 	if istty {
-		if origTermStatePtr != nil {
-			return shutdownCh, ErrPoolWasStarted
-		}
+	if origTermStatePtr != nil {
+		return shutdownCh, ErrPoolWasStarted
+	}
 
-		fd := int(tty.Fd())
+	fd := int(tty.Fd())
 
-		origTermStatePtr, err = unix.IoctlGetTermios(fd, ioctlReadTermios)
-		if err != nil {
-			return nil, fmt.Errorf("Can't get terminal settings: %v", err)
-		}
+	origTermStatePtr, err = unix.IoctlGetTermios(fd, ioctlReadTermios)
+	if err != nil {
+		return nil, fmt.Errorf("Can't get terminal settings: %v", err)
+	}
 
-		oldTermios := *origTermStatePtr
-		newTermios := oldTermios
-		newTermios.Lflag &^= syscall.ECHO
-		newTermios.Lflag |= syscall.ICANON | syscall.ISIG
-		newTermios.Iflag |= syscall.ICRNL
-		if err := unix.IoctlSetTermios(fd, ioctlWriteTermios, &newTermios); err != nil {
-			return nil, fmt.Errorf("Can't set terminal settings: %v", err)
-		}
+	oldTermios := *origTermStatePtr
+	newTermios := oldTermios
+	newTermios.Lflag &^= syscall.ECHO
+	newTermios.Lflag |= syscall.ICANON | syscall.ISIG
+	newTermios.Iflag |= syscall.ICRNL
+	if err := unix.IoctlSetTermios(fd, ioctlWriteTermios, &newTermios); err != nil {
+		return nil, fmt.Errorf("Can't set terminal settings: %v", err)
+	}
 
 	}
 	shutdownCh = make(chan struct{})
@@ -88,15 +88,15 @@ func unlockEcho() error {
 	echoLockMutex.Lock()
 	defer echoLockMutex.Unlock()
 	if istty {
-		if origTermStatePtr == nil {
-			return nil
-		}
+	if origTermStatePtr == nil {
+		return nil
+	}
 
-		fd := int(tty.Fd())
+	fd := int(tty.Fd())
 
-		if err := unix.IoctlSetTermios(fd, ioctlWriteTermios, origTermStatePtr); err != nil {
-			return fmt.Errorf("Can't set terminal settings: %v", err)
-		}
+	if err := unix.IoctlSetTermios(fd, ioctlWriteTermios, origTermStatePtr); err != nil {
+		return fmt.Errorf("Can't set terminal settings: %v", err)
+	}
 
 	}
 	origTermStatePtr = nil

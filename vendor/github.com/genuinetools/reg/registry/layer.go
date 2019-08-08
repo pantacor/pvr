@@ -21,7 +21,6 @@ func (r *Registry) DownloadLayer(ctx context.Context, repository string, digest 
 	if err != nil {
 		return nil, err
 	}
-
 	resp, err := r.Client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
