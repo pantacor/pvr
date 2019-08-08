@@ -11,6 +11,8 @@ before_script:
   - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
   - apk update
   - apk add zip
+  - docker run --rm -v $PWD:/src -w /src golang:alpine sh -c "apk update && apk add git && go mod download && go mod vendor"
+  - tar -cvzf "vendor.tar.gz" ./vendor/
 
 build-tags:
   stage: build
@@ -38,6 +40,7 @@ build-tags:
     - pvr-$CI_BUILD_TAG.darwin.amd64.tar.gz
     - pvr-$CI_BUILD_TAG.windows.x32.zip
     - pvr-$CI_BUILD_TAG.windows.x64.zip
+    - vendor.tar.gz
   only:
     - tags
 
@@ -65,6 +68,7 @@ build-master:
     - pvr.darwin.amd64.tar.gz
     - pvr.windows.x32.zip
     - pvr.windows.x64.zip
+    - vendor.tar.gz
   only:
     - master
 
@@ -92,8 +96,8 @@ build:
     - pvr.darwin.amd64.tar.gz
     - pvr.windows.x32.zip
     - pvr.windows.x64.zip
+    - vendor.tar.gz
   only:
     - branches
   except:
     - master
-
