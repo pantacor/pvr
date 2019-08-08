@@ -124,9 +124,7 @@ func main() {
 		CommandScan(),
 		CommandPs(),
 		CommandLogs(),
-		CommandAppInstall(),
-		CommandAppUpdate(),
-		CommandAppAdd(),
+		CommandApp(),
 		CommandSelfUpdate(),
 		CommandGlobalConfig(),
 	}

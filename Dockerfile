@@ -1,56 +1,44 @@
 FROM golang:alpine as src
 
-WORKDIR /go/src/gitlab.com/pantacor/pvr
+ENV GO111MODULES=on
+
+WORKDIR /app/
 COPY . .
 
 ARG DOCKERTAG=latest
 RUN apk update; apk add git
 RUN version=`git describe --tags` && sed -i "s/NA/$version/" version.go
 RUN sed -i "s/defaultDistributionTag = \"develop\"/defaultDistributionTag = \"${DOCKERTAG}\"/" ./libpvr/configurationlib.go
+RUN go get
 
 # build amd64 linux static
-FROM golang:alpine as linux_amd64
+FROM src as linux_amd64
 
-WORKDIR /go/src/gitlab.com/pantacor/pvr
-COPY --from=src /go/src/gitlab.com/pantacor/pvr .
 RUN apk update; apk add git
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go get -d -v ./...
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /go/bin/linux_amd64/pvr -v .
 
 # build armv6 linux static
-FROM golang:alpine as linux_armv6
+FROM src as linux_armv6
 
-WORKDIR /go/src/gitlab.com/pantacor/pvr
-COPY --from=src /go/src/gitlab.com/pantacor/pvr .
 RUN apk update; apk add git
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=5 go get -d -v ./...
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=5 go build -o /go/bin/linux_armv6/pvr -v .
 
 # build windows i386 static
-FROM golang:alpine as windows_386
+FROM src as windows_386
 
-WORKDIR /go/src/gitlab.com/pantacor/pvr
-COPY --from=src /go/src/gitlab.com/pantacor/pvr .
 RUN apk update; apk add git
-RUN CGO_ENABLED=0 GOOS=windows GOARCH=386 go get -d -v ./...
 RUN CGO_ENABLED=0 GOOS=windows GOARCH=386 go build -o /go/bin/windows_386/pvr.exe -v .
 
 # build windows amd64 static
-FROM golang:alpine as windows_amd64
+FROM src as windows_amd64
 
-WORKDIR /go/src/gitlab.com/pantacor/pvr
-COPY --from=src /go/src/gitlab.com/pantacor/pvr .
 RUN apk update; apk add git
-RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go get -d -v ./...
 RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /go/bin/windows_amd64/pvr.exe -v .
 
 # build darwin amd64 static
-FROM golang:alpine as darwin_amd64
+FROM src as darwin_amd64
 
-WORKDIR /go/src/gitlab.com/pantacor/pvr
-COPY --from=src /go/src/gitlab.com/pantacor/pvr .
 RUN apk update; apk add git
-RUN CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go get -d -v ./...
 RUN CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o /go/bin/darwin_amd64/pvr -v .
 
 

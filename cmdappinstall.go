@@ -18,6 +18,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
 
@@ -26,7 +27,7 @@ import (
 
 func CommandAppInstall() cli.Command {
 	cmd := cli.Command{
-		Name:        "app-install",
+		Name:        "install",
 		Aliases:     []string{"ai"},
 		ArgsUsage:   "[appname]",
 		Usage:       "install new applications.",
@@ -56,7 +57,26 @@ func CommandAppInstall() cli.Command {
 			username := c.String("username")
 			password := c.String("password")
 
-			err = pvr.InstallApplication(appname, username, password)
+			// fix up trailing/leading / from appnames
+			appname = strings.Trim(appname, "/")
+
+			trackURL, err := pvr.GetTrackURL(appname)
+			if err != nil {
+				return cli.NewExitError(err, 2)
+			}
+
+			app := libpvr.AppData{
+				Appname:  appname,
+				From:     trackURL,
+				Source:   c.String("source"),
+				Username: username,
+				Password: password,
+			}
+			err = pvr.FindDockerImage(&app)
+			if err != nil {
+				return cli.NewExitError(err, 3)
+			}
+			err = pvr.InstallApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
@@ -77,6 +97,12 @@ func CommandAppInstall() cli.Command {
 			Name:   "password, p",
 			Usage:  "Use `PVR_REGISTRY_PASSWORD` for authorization with docker registrar",
 			EnvVar: "PVR_REGISTRY_PASSWORD",
+		},
+		cli.StringFlag{
+			Name:   "source",
+			Usage:  SourceFlagUsage,
+			EnvVar: "PVR_SOURCE",
+			Value:  "local,remote",
 		},
 	}
 

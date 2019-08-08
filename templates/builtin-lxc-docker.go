@@ -17,9 +17,12 @@ package templates
 
 const (
 	LXC_CONTAINER_CONF = `{{ "" -}}
-lxc.tty.max = 4
-lxc.pty.max = 1024
-lxc.cgroup.devices.allow = a
+lxc.tty.max = {{ .Source.args.LXC_TTY_MAX | pvr_ifNull "8" }}
+lxc.pty.max = {{ .Source.args.LXC_PTY_MAX | pvr_ifNull "1024" }}
+{{- if .Source.args.PV_DEBUG_MODE }}
+lxc.log.file = /pv/logs/{{ .Source.name }}.log
+{{- end }}
+lxc.cgroup.devices.allow = {{ .Source.args.LXC_CGROUP_DEVICES_ALLOW | pvr_ifNull "a" }}
 lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
 {{- if .Docker.Entrypoint }}
@@ -50,11 +53,25 @@ lxc.init.cwd = {{ .Docker.WorkingDir }}
 lxc.environment = {{ . }}
 	{{- end }}
 {{- end }}
-lxc.namespace.keep = user net ipc
+lxc.namespace.keep = user
+{{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
+{{- if eq .Source.args.PV_LXC_NETWORK_TYPE "host" -}}
+{{ " " }} net
+{{- end -}}
+{{- else -}}
+{{ " " }} net
+{{- end -}}
+{{ " " }} ipc
 lxc.console.path = none
-lxc.mount.auto = proc sys:rw cgroup-full
+lxc.mount.auto = {{ .Source.args.LXC_MOUNT_AUTO_PROC | pvr_ifNull "proc" }}
+	{{- " " }} {{ .Source.args.LXC_MOUNT_AUTO_SYS | pvr_ifNull "sys:rw" }}
+	{{- " " }} {{ .Source.args.LXC_MOUNT_AUTO_GROUP | pvr_ifNull "cgroup" }}
+{{- if .Source.args.PV_SECURITY_FULLDEV }}
 lxc.mount.entry = /dev/ dev none bind,rw,create=dir 0 0
-lxc.mount.entry = /storage pvstorage none bind,rw,create=dir 0 0
+{{- end }}
+{{- if .Source.args.PV_SECURITY_WITH_STORAGE }}
+lxc.mount.entry = /storage storage none bind,rw,create=dir 0 0
+{{- end }}
 lxc.mount.entry = /etc/resolv.conf etc/resolv.conf none bind,rw,create=file 0 0
 lxc.mount.entry = tmpfs run tmpfs rw,nodev,relatime,mode=755 0 0
 {{- with $src := .Source -}}
@@ -64,12 +81,19 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | rep
 {{- end -}}
 {{- end -}}
 {{- end }}
+{{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
+{{- if eq .Source.args.PV_LXC_NETWORK_TYPE "veth" }}
+lxc.net.0.type = veth
+lxc.net.0.link = lxcbr0
+{{- end }}
+{{- end }}
+
 `
 
 	RUN_JSON = `{{ "" -}}
 {
-	"#spec":"service-manifest-run@1",
-	"config":"lxc.container.conf",
+	"#spec": "service-manifest-run@1",
+	"config": "lxc.container.conf",
 	"name":"{{- .Source.name -}}",
 	"storage":{
 		{{- range $key, $value := .Source.persistence -}}

@@ -17,22 +17,25 @@ package libpvr
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"github.com/genuinetools/reg/registry"
 	"github.com/genuinetools/reg/repoutils"
 )
@@ -43,15 +46,17 @@ const (
 	SQUASH_FILE                    = "root.squashfs"
 	DOCKER_DIGEST_FILE             = "root.squashfs.docker-digest"
 	DOCKER_DOMAIN                  = "docker.io"
+	DOCKER_DOMAIN_URL              = "https://" + DOCKER_DOMAIN
 	DOCKER_REGISTRY                = "https://index.docker.io/v1/"
 	DOCKER_REGISTRY_SERVER_ADDRESS = "https://registry-1.docker.io"
 )
 
 var (
-	ErrMakeSquashFSNotFound = errors.New("mksquashfs not found in your PATH, please install before continue")
-	ErrTarNotFound          = errors.New("tar not found in your PATH, please install before continue")
-	ErrImageNotFound        = errors.New("image not found or you do not have access")
-	stripFilesList          = []string{
+	ErrMakeSquashFSNotFound    = errors.New("mksquashfs not found in your PATH, please install before continue")
+	ErrTarNotFound             = errors.New("tar not found in your PATH, please install before continue")
+	ErrImageNotFound           = errors.New("image not found or you do not have access")
+	ErrDownloadedLayerDiffSize = errors.New("size of downloaded layer is different from expected")
+	stripFilesList             = []string{
 		"usr/bin/qemu-arm-static",
 	}
 )
@@ -171,34 +176,230 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 	return config, nil
 }
 
-func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, dockerManifest *schema2.Manifest, dockerConfig map[string]interface{}, appmanifest map[string]interface{}, destinationPath string) error {
-	digestFile := filepath.Join(destinationPath, DOCKER_DIGEST_FILE)
+// DownloadLayersFromLocalDocker : Download Layers From Local Docker
+func DownloadLayersFromLocalDocker(imageID string) (io.ReadCloser, error) {
+	ctx := context.Background()
+	cli, err := client.NewEnvClient()
+	cli.NegotiateAPIVersion(ctx)
+	httpClient := cli.HTTPClient()
+	url := "http://v" + cli.ClientVersion() + "/images/" + imageID + "/get"
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return res.Body, nil
+}
+
+// DockerImage : return type of ImageExistsInLocalDocker()
+type DockerImage struct {
+	Exists         bool
+	ImageID        string
+	DockerConfig   map[string]interface{}
+	DockerManifest *schema2.Manifest
+	DockerRegistry *registry.Registry
+	ImagePath      string
+}
+
+// FindDockerImage : Find Docker Image
+func (p *Pvr) FindDockerImage(app *AppData) error {
+	app.LocalImage.Exists = false
+	app.RemoteImage.Exists = false
+
+	sourceOrder := strings.Split(app.Source, ",")
+	for _, source := range sourceOrder {
+		fmt.Printf("Checking repo in " + source + " docker\n")
+		if source == "local" {
+			err := LoadLocalImage(app)
+			if err != nil {
+				return err
+			}
+			if app.LocalImage.Exists {
+				return nil
+			}
+
+		} else if source == "remote" {
+			err := p.LoadRemoteImage(app)
+			if err != nil {
+				return err
+			}
+			if app.RemoteImage.Exists {
+				return nil
+			}
+		} else {
+			return errors.New("Invalid source:" + source)
+		}
+	}
+	return errors.New("Image not found in source:" + app.Source + "\n")
+}
+
+// LoadRemoteImage : To check whether Image Exist In Remote Docker Or Not
+func (p *Pvr) LoadRemoteImage(app *AppData) error {
+	app.RemoteImage = DockerImage{
+		Exists:  false,
+		ImageID: "",
+	}
+	image, err := registry.ParseImage(app.From)
+	if err != nil {
+		return err
+	}
+	auth, err := p.AuthConfig(app.Username, app.Password, image.Domain)
+	if err != nil {
+		return err
+	}
+	dockerManifest, err := p.GetDockerManifest(image, auth)
+	if err != nil {
+		manifestErr := ReportDockerManifestError(err, app.From)
+		if err.Error() == "image not found or you do not have access" {
+			fmt.Printf(manifestErr.Error() + "\n")
+			return nil
+		}
+		return manifestErr
+	}
+	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, auth)
+	if err != nil {
+		err = ReportDockerManifestError(err, app.From)
+		return err
+	}
+	dockerRegistry, err := p.GetDockerRegistry(image, auth)
+	if err != nil {
+		return err
+	}
+	app.Username = auth.Username
+	app.Password = auth.Password
+
+	app.RemoteImage.Exists = true
+	app.RemoteImage.ImageID = string(dockerManifest.Config.Digest)
+	app.RemoteImage.DockerConfig = dockerConfig
+	app.RemoteImage.DockerManifest = dockerManifest
+	app.RemoteImage.DockerRegistry = dockerRegistry
+	app.RemoteImage.ImagePath = image.Path
+
+	return nil
+}
+
+// LoadLocalImage : To check whether Image Exist In Local Docker Or Not
+func LoadLocalImage(app *AppData) error {
+	app.LocalImage = DockerImage{
+		Exists:  false,
+		ImageID: "",
+	}
+	ctx := context.Background()
+	cli, err := client.NewEnvClient()
+	cli.NegotiateAPIVersion(ctx)
+	defer cli.Close()
+	if err != nil {
+		return err
+	}
+	inspect, _, err := cli.ImageInspectWithRaw(ctx, app.From)
+	if err != nil {
+		if err.Error() == "Error: No such image: "+app.From {
+			fmt.Printf("Repo not exists in local docker\n")
+			return nil
+		}
+		return err
+	}
+	fmt.Printf("Repo exists in local docker\n")
+	app.LocalImage.Exists = true
+	app.LocalImage.ImageID = inspect.ID
+	//Setting Docker Config values
+	configData, err := json.Marshal(inspect.Config)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(configData, &app.LocalImage.DockerConfig)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetFileContentType : Get File Content Type of a file
+func GetFileContentType(src string) (string, error) {
+	file, err := os.Open(src)
+	defer file.Close()
+	if err != nil {
+		return "", err
+	}
+	buffer := make([]byte, 512)
+	_, err = file.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+	contentType := http.DetectContentType(buffer)
+	return contentType, nil
+}
+
+// Untar : Untar a file or folder
+func Untar(dst string, src string) error {
+	contentType, err := GetFileContentType(src)
+	if err != nil {
+		return err
+	}
+	tarPath, err := exec.LookPath(TAR_CMD)
+	if err != nil {
+		return err
+	}
+	args := []string{tarPath, "xzvf", src, "-C", dst}
+	if contentType == "application/octet-stream" {
+		args = []string{tarPath, "xvf", src, "-C", dst}
+	}
+	untar := exec.Command(args[0], args[1:]...)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	untar.Stdout = &out
+	untar.Stderr = &stderr
+	err = untar.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+	}
+	return err
+}
+
+// AppData : To hold all required App Information
+type AppData struct {
+	Appname         string
+	DockerURL       string
+	Username        string
+	Password        string
+	Appmanifest     *Source
+	TemplateArgs    map[string]interface{}
+	DestinationPath string
+	LocalImage      DockerImage
+	RemoteImage     DockerImage
+	From            string
+	Source          string
+	ConfigFile      string
+	Volumes         []string
+}
+
+func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
+	digestFile := filepath.Join(app.DestinationPath, DOCKER_DIGEST_FILE)
+	digest := ""
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
+	if app.LocalImage.Exists {
+		digest = app.LocalImage.ImageID
+	} else if app.RemoteImage.Exists {
+		digest = app.RemoteImage.ImageID
+	}
+
 	currentDigest, err := os.Open(digestFile)
 	if err == nil {
 		currentDigestContent, err := ioutil.ReadAll(currentDigest)
 		if err == nil {
-			if string(currentDigestContent) == string(dockerManifest.Config.Digest) {
+			if string(currentDigestContent) == string(digest) {
 				return nil
 			}
 		}
 	}
+	configDir := p.Session.configDir
+	cacheDir := filepath.Join(configDir, cacheFolder)
 
 	fmt.Println("Generating squashfs...")
-
-	image, err := registry.ParseImage(dockerURL)
-	if err != nil {
-		return err
-	}
-
-	auth, err := repoutils.GetAuthConfig(username, password, image.Domain)
-	if err != nil {
-		return err
-	}
-
-	r, err := p.GetDockerRegistry(image, auth)
-	if err != nil {
-		return err
-	}
 
 	tempdir, err := ioutil.TempDir(os.TempDir(), "download-layer-")
 	if err != nil {
@@ -209,23 +410,96 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 
 	files := []string{}
 	fmt.Println("Downloading layers...")
-	for i, layer := range dockerManifest.Layers {
-		layerReader, err := r.DownloadLayer(context.Background(), image.Path, layer.Digest)
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
+	if app.LocalImage.Exists {
+		filename := filepath.Join(cacheDir, app.LocalImage.ImageID) + ".tar.gz"
+		fileExistInCache, err := IsFileExists(filename)
 		if err != nil {
 			return err
 		}
+		if fileExistInCache {
+			fmt.Println("Layers Found in Cache")
+			fmt.Printf("Extracting layers folder(cache)\n")
+		} else {
+			fmt.Println("Layers Not Found in Cache")
+			fmt.Println("Downloading layers from local docker")
+			imageReader, err := DownloadLayersFromLocalDocker(app.LocalImage.ImageID)
+			if err != nil {
+				return err
+			}
+			buf := bufio.NewReader(imageReader)
+			//filename := filepath.Join(tempdir, "layers") + ".tar.gz"
+			file, err := os.Create(filename)
+			if err != nil {
+				return err
+			}
+			_, err = buf.WriteTo(file)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Layers downloaded from local docker\n")
+			fmt.Printf("Extracting layers folder\n")
+		}
 
-		buf := bufio.NewReader(layerReader)
-
-		filename := filepath.Join(tempdir, strconv.Itoa(i)) + ".tar.gz"
-		file, err := os.Create(filename)
+		os.MkdirAll(tempdir+"/layers", 0777)
+		err = Untar(tempdir+"/layers", filename)
 		if err != nil {
 			return err
 		}
+		// Read layer.tar file locations from manifest.json
+		manifestFile, err := ioutil.ReadFile(tempdir + "/layers/manifest.json")
+		if err != nil {
+			return err
+		}
+		manifestData := []map[string]interface{}{}
+		err = json.Unmarshal([]byte(manifestFile), &manifestData)
+		if err != nil {
+			return err
+		}
+		//Populate layer.tar file locations in files array
+		for _, layer := range manifestData[0]["Layers"].([]interface{}) {
+			filename := filepath.Join(tempdir, "layers") + "/" + layer.(string)
+			files = append(files, filename)
+		}
 
-		_, err = buf.WriteTo(file)
-		files = append(files, filename)
-		fmt.Printf("Layer %d downloaded\n", i)
+	} else if app.RemoteImage.Exists {
+		//Download from remote repo.
+		for i, layer := range app.RemoteImage.DockerManifest.Layers {
+			layerReader, err := app.RemoteImage.DockerRegistry.DownloadLayer(context.Background(), app.RemoteImage.ImagePath, layer.Digest)
+			if err != nil {
+				return err
+			}
+
+			buf := bufio.NewReader(layerReader)
+
+			filename := filepath.Join(cacheDir, string(layer.Digest)) + ".tar.gz"
+			fileExistInCache, err := IsFileExists(filename)
+			if err != nil {
+				return err
+			}
+			if fileExistInCache {
+				fmt.Printf("Layer %d downloaded(cache)\n", i)
+				files = append(files, filename)
+				continue
+			}
+
+			file, err := os.Create(filename)
+			if err != nil {
+				return err
+			}
+
+			writedCount, err := buf.WriteTo(file)
+			if writedCount != layer.Size {
+				return ErrDownloadedLayerDiffSize
+			}
+
+			if err != nil {
+				return err
+			}
+			files = append(files, filename)
+			fmt.Printf("Layer %d downloaded\n", i)
+		}
 	}
 
 	extractPath := filepath.Join(tempdir, "rootfs")
@@ -242,10 +516,11 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 
 	fmt.Println("Extracting layers...")
 	for layerNumber, file := range files {
-		args := []string{tarPath, "xzvf", file, "-C", extractPath}
-		untar := exec.Command(args[0], args[1:]...)
+		err := Untar(extractPath, file)
+		if err != nil {
+			return err
+		}
 		fmt.Printf("Extracting layer %d\n", layerNumber)
-		untar.Run()
 	}
 
 	fmt.Println("Stripping qemu files...")
@@ -268,11 +543,20 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 		return ErrMakeSquashFSNotFound
 	}
 
-	tempSquashFile := filepath.Join(destinationPath, SQUASH_FILE+".new")
-	squashFile := filepath.Join(destinationPath, SQUASH_FILE)
+	tempSquashFile := filepath.Join(app.DestinationPath, SQUASH_FILE+".new")
+	squashFile := filepath.Join(app.DestinationPath, SQUASH_FILE)
 
+	squashExist, err := IsFileExists(squashFile)
+	if err != nil {
+		return err
+	}
 	// make sure the squashfs file did not exists
-	os.Remove(squashFile)
+	if squashExist {
+		err := os.Remove(squashFile)
+		if err != nil {
+			return err
+		}
+	}
 
 	args := []string{makeSquashfsPath, extractPath, tempSquashFile, "-comp", "xz", "-all-root"}
 
@@ -289,8 +573,7 @@ func (p *Pvr) GenerateApplicationSquashFS(dockerURL, username, password string, 
 	if err != nil {
 		return err
 	}
-
-	return ioutil.WriteFile(digestFile, []byte(dockerManifest.Config.Digest), 0644)
+	return ioutil.WriteFile(digestFile, []byte(digest), 0644)
 }
 
 func (p *Pvr) GetSquashFSDigest(appName string) (string, error) {
@@ -314,4 +597,17 @@ func (p *Pvr) AuthConfig(username, password, registry string) (types.AuthConfig,
 	}
 
 	return repoutils.GetAuthConfig(username, password, registry)
+}
+
+// IsFileExists : Check if File Exists  or not
+func IsFileExists(filePath string) (bool, error) {
+	//Check if file exists in cache
+	_, err := os.Stat(filePath)
+
+	if os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
 }

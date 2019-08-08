@@ -21,11 +21,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
-	"github.com/genuinetools/reg/registry"
 	"gitlab.com/pantacor/pvr/templates"
 )
 
@@ -42,8 +40,10 @@ var (
 )
 
 type Source struct {
+	Name         string                 `json:"name,omitempty"`
 	Spec         string                 `json:"#spec"`
 	Template     string                 `json:"template"`
+	TemplateArgs map[string]interface{} `json:"args"`
 	Config       map[string]interface{} `json:"config"`
 	DockerName   string                 `json:"docker_name"`
 	DockerTag    string                 `json:"docker_tag"`
@@ -51,43 +51,52 @@ type Source struct {
 	Persistence  map[string]string      `json:"persistence"`
 }
 
-func (p *Pvr) GetApplicationManifest(appname string) (map[string]interface{}, error) {
+func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 	appManifestFile := filepath.Join(p.Dir, appname, SRC_FILE)
 	js, err := ioutil.ReadFile(appManifestFile)
 	if err != nil {
 		return nil, err
 	}
 
-	var result map[string]interface{}
+	result := Source{
+		TemplateArgs: map[string]interface{}{},
+		Config:       map[string]interface{}{},
+	}
+
 	err = json.Unmarshal(js, &result)
 	if err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	return &result, nil
 }
 
-func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[string]interface{}, appManifest map[string]interface{}) error {
-	appConfig := appManifest["config"].(map[string]interface{})
+func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[string]interface{}, appManifest *Source) error {
+	appConfig := appManifest.Config
 	for k, _ := range dockerConfig {
 		value := appConfig[k]
 		if value != nil {
 			dockerConfig[k] = value
 		}
 	}
-
 	// add application name to proccess template
-	appManifest["name"] = appname
+	appManifest.Name = appname
+
+	appManifestMap, err := StructToMap(appManifest)
+
+	if err != nil {
+		return err
+	}
 
 	configValues := map[string]interface{}{}
-	configValues["Source"] = appManifest
+	configValues["Source"] = appManifestMap
 	configValues["Docker"] = dockerConfig
 
-	if appManifest["template"] == nil {
+	if appManifest.Template == "" {
 		return fmt.Errorf("empty template")
 	}
 
-	appTemplate := appManifest["template"].(string)
+	appTemplate := appManifest.Template
 	templateHandler := templates.Handlers[appTemplate]
 	if templateHandler == nil {
 		return fmt.Errorf("invalid template, no handler for %s", appTemplate)
@@ -108,152 +117,160 @@ func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[
 	return nil
 }
 
-func (p *Pvr) InstallApplication(appname, username, password string) error {
+// GetTrackURL : Get Track URL
+func (p *Pvr) GetTrackURL(appname string) (string, error) {
 	appManifest, err := p.GetApplicationManifest(appname)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	if appManifest["docker_name"] == nil {
-		return err
+	if appManifest.DockerName == "" {
+		return "", err
 	}
 
-	trackURL := appManifest["docker_name"].(string)
-	if appManifest["docker_tag"] != nil {
-		trackURL += fmt.Sprintf(":%s", appManifest["docker_tag"])
+	trackURL := appManifest.DockerName
+	if appManifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
 	}
-
-	image, err := registry.ParseImage(trackURL)
-	if err != nil {
-		return err
-	}
-
-	auth, err := p.AuthConfig(username, password, image.Domain)
-	if err != nil {
-		return err
-	}
-
-	dockerManifest, err := p.GetDockerManifest(image, auth)
-	if err != nil {
-		return ReportDockerManifestError(err)
-	}
-
-	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, auth)
-	if err != nil {
-		return ReportDockerManifestError(err)
-	}
-
-	err = p.GenerateApplicationTemplateFiles(appname, dockerConfig, appManifest)
-	if err != nil {
-		return err
-	}
-
-	destinationPath := filepath.Join(p.Dir, appname)
-	return p.GenerateApplicationSquashFS(trackURL, auth.Username, auth.Password, dockerManifest, dockerConfig, appManifest, destinationPath)
+	return trackURL, nil
 }
 
-func (p *Pvr) UpdateApplication(appname, username, password string) error {
-	appManifest, err := p.GetApplicationManifest(appname)
+// InstallApplication : Install Application
+func (p *Pvr) InstallApplication(app AppData) error {
+	appManifest, err := p.GetApplicationManifest(app.Appname)
 	if err != nil {
 		return err
 	}
 
-	trackURL := appManifest["docker_name"].(string)
-	if appManifest["docker_tag"] != nil {
-		trackURL += fmt.Sprintf(":%s", appManifest["docker_tag"])
+	if appManifest.DockerName == "" {
+		return err
 	}
 
-	image, err := registry.ParseImage(trackURL)
+	trackURL := appManifest.DockerName
+	if appManifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
+	}
+
+	app.DockerURL = trackURL
+
+	dockerConfig := map[string]interface{}{}
+
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
+	if app.LocalImage.Exists {
+		dockerConfig = app.LocalImage.DockerConfig
+	} else if app.RemoteImage.Exists {
+		dockerConfig = app.RemoteImage.DockerConfig
+		app.Appmanifest = appManifest
+	}
+	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, appManifest)
+	if err != nil {
+		return err
+	}
+	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
+
+	return p.GenerateApplicationSquashFS(app)
+}
+
+func (p *Pvr) UpdateApplication(app AppData) error {
+	appManifest, err := p.GetApplicationManifest(app.Appname)
 	if err != nil {
 		return err
 	}
 
-	auth, err := p.AuthConfig(username, password, image.Domain)
+	trackURL := appManifest.DockerName
+	if appManifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
+	}
+
+	dockerDigest := ""
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
+	if app.LocalImage.Exists {
+		dockerDigest = app.LocalImage.ImageID
+	} else if app.RemoteImage.Exists {
+		dockerDigest = app.RemoteImage.ImageID
+	}
+
+	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
 	if err != nil {
 		return err
 	}
 
-	dockerManifest, err := p.GetDockerManifest(image, auth)
-	if err != nil {
-		return ReportDockerManifestError(err)
-	}
-
-	squashFSDigest, err := p.GetSquashFSDigest(appname)
-	if err != nil {
-		return err
-	}
-
-	dockerDigest := string(dockerManifest.Config.Digest)
 	if dockerDigest == squashFSDigest {
 		return nil
 	}
 
-	srcFilePath := filepath.Join(p.Dir, appname, SRC_FILE)
-	content, err := ioutil.ReadFile(srcFilePath)
+	appManifest.DockerDigest = dockerDigest
+
+	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
 	if err != nil {
 		return err
 	}
 
-	var src Source
-	err = json.Unmarshal(content, &src)
-	if err != nil {
-		return err
-	}
-
-	src.DockerDigest = dockerDigest
-
-	srcContent, err := json.Marshal(src)
-	if err != nil {
-		return err
-	}
-
+	srcFilePath := filepath.Join(p.Dir, app.Appname, SRC_FILE)
 	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
 	if err != nil {
 		return err
 	}
 
-	return p.InstallApplication(appname, auth.Username, auth.Password)
+	return p.InstallApplication(app)
 }
 
-func (p *Pvr) AddApplication(appname, username, password, from, configFile string, volumes []string) error {
-	if appname == "" {
+func (p *Pvr) AddApplication(app AppData) error {
+	if app.Appname == "" {
 		return ErrEmptyAppName
 	}
 
-	appPath := filepath.Join(p.Dir, appname)
+	appPath := filepath.Join(p.Dir, app.Appname)
 	if _, err := os.Stat(appPath); !os.IsNotExist(err) {
 		return nil
 	}
 
-	if from == "" {
+	if app.From == "" {
 		return ErrEmptyFrom
 	}
+	persistence := map[string]string{}
+	for _, volume := range app.Volumes {
+		split := strings.Split(volume, ":")
+		if len(split) < 2 {
+			return ErrInvalidVolumeFormat
+		}
 
-	image, err := registry.ParseImage(from)
-	if err != nil {
-		return err
+		persistence[split[0]] = split[1]
 	}
 
-	auth, err := p.AuthConfig(username, password, image.Domain)
-	if err != nil {
-		return err
+	src := Source{
+		Spec:         SRC_SPEC,
+		Template:     TEMPLATE_BUILTIN_LXC_DOCKER,
+		TemplateArgs: app.TemplateArgs,
+		Config:       map[string]interface{}{},
+		Persistence:  persistence,
+	}
+	components := strings.Split(app.From, ":")
+	if len(components) < 2 {
+		src.DockerTag = "latest"
+	} else {
+		src.DockerTag = components[len(components)-1]
+	}
+	src.DockerName = strings.Replace(app.From, ":"+src.DockerTag, "", 1)
+
+	dockerConfig := map[string]interface{}{}
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
+	if app.LocalImage.Exists {
+		//docker config
+		src.DockerDigest = app.LocalImage.ImageID
+		dockerConfig = app.LocalImage.DockerConfig
+	} else if app.RemoteImage.Exists {
+		// Remote repo.
+		src.DockerDigest = app.RemoteImage.ImageID
+		dockerConfig = app.RemoteImage.DockerConfig
 	}
 
-	dockerManifest, err := p.GetDockerManifest(image, auth)
-	if err != nil {
-		return ReportDockerManifestError(err)
-	}
-
-	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, auth)
-	if err != nil {
-		return ReportDockerManifestError(err)
-	}
-
-	dockerDigest := string(dockerManifest.Config.Digest)
-
-	if configFile != "" {
+	if app.ConfigFile != "" {
 		var config map[string]interface{}
-		content, err := ioutil.ReadFile(configFile)
+		content, err := ioutil.ReadFile(app.ConfigFile)
 		if err != nil {
 			return err
 		}
@@ -266,27 +283,14 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 		for k, v := range config {
 			dockerConfig[k] = v
 		}
-
-	}
-
-	persistence := map[string]string{}
-	for _, volume := range volumes {
-		split := strings.Split(volume, ":")
-		if len(split) < 2 {
-			return ErrInvalidVolumeFormat
+		//	Exists flag is true only if the image got loaded which will depend on
+		//  priority order provided in --source=local,remote
+		if app.LocalImage.Exists {
+			app.LocalImage.DockerConfig = dockerConfig
+		} else if app.RemoteImage.Exists {
+			app.RemoteImage.DockerConfig = dockerConfig
 		}
 
-		persistence[split[0]] = split[1]
-	}
-
-	src := Source{
-		Spec:         SRC_SPEC,
-		Template:     TEMPLATE_BUILTIN_LXC_DOCKER,
-		Config:       map[string]interface{}{},
-		DockerName:   path.Join(image.Domain, image.Path),
-		DockerTag:    image.Tag,
-		DockerDigest: string(dockerDigest),
-		Persistence:  persistence,
 	}
 
 	srcContent, err := json.MarshalIndent(src, " ", " ")
@@ -305,13 +309,62 @@ func (p *Pvr) AddApplication(appname, username, password, from, configFile strin
 		return err
 	}
 
-	return p.InstallApplication(appname, username, password)
+	return p.InstallApplication(app)
 }
 
-func ReportDockerManifestError(err error) error {
+// ListApplications : List Applications
+func (p *Pvr) ListApplications() error {
+	files, err := ioutil.ReadDir(p.Dir)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		containerConfPath := filepath.Join(p.Dir, f.Name(), "lxc.container.conf")
+		if _, err := os.Stat(containerConfPath); err == nil {
+			fmt.Println(f.Name())
+		}
+	}
+	return nil
+}
+
+// GetApplicationInfo : Get Application Info
+func (p *Pvr) GetApplicationInfo(appname string) error {
+	srcFilePath := filepath.Join(p.Dir, appname, "src.json")
+	if _, err := os.Stat(srcFilePath); err != nil {
+		return errors.New("App '" + appname + "' doesn't exist")
+	}
+	src, _ := ioutil.ReadFile(srcFilePath)
+	var fileData interface{}
+	err := json.Unmarshal(src, &fileData)
+	if err != nil {
+		return err
+	}
+	jsonData, err := json.MarshalIndent(fileData, "", "    ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(jsonData))
+	return nil
+}
+
+// RemoveApplication : Remove Application
+func (p *Pvr) RemoveApplication(appname string) error {
+	appPath := filepath.Join(p.Dir, appname)
+	if _, err := os.Stat(appPath); err != nil {
+		return errors.New("App '" + appname + "' doesn't exist")
+	}
+	err := os.RemoveAll(appPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func ReportDockerManifestError(err error, image string) error {
 	return ReportError(
 		err,
-		"double check that the image exists",
+		"The docker image "+image+" has to exist in local docker or in a remote registry; try docker pull "+image,
 		"if the image is not public please use the --user and --password parameters or use docker login command",
 	)
 }

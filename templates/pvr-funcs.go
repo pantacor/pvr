@@ -47,6 +47,14 @@ var pvrFuncMap = map[string]interface{}{
 		}
 		return false
 	},
+	"ifNull": func(arg interface{}, value interface{}) interface{} {
+
+		if value != nil {
+			return value
+		}
+
+		return arg
+	},
 }
 
 func PvrFuncMap() map[string]interface{} {

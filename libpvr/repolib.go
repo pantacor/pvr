@@ -453,7 +453,7 @@ func (p *Pvr) Commit(msg string) error {
 	}
 
 	for _, v := range status.ChangedFiles {
-		fmt.Println("Committing " + filepath.Join(p.Objdir+v))
+		fmt.Println("Committing " + filepath.Join(p.Objdir, v))
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
@@ -973,11 +973,12 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 	filePutResults := p.putFiles(filePuts...)
 
 	for _, v := range filePutResults {
-
+		if v.err != nil {
+			return fmt.Errorf("Error putting file %s: %s", v.objName, v.err.Error())
+		}
 		if 200 != v.res.StatusCode {
 			return errors.New("REST call failed. " +
 				strconv.Itoa(v.res.StatusCode) + "  " + v.res.Status)
-
 		}
 	}
 
@@ -1225,7 +1226,14 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 			"\n\t" + string(response.Body()))
 	}
 
-	fmt.Println("Posted JSON: " + string(response.Body()))
+	responseMap := map[string]interface{}{}
+	err = json.Unmarshal(response.Body(), &responseMap)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Successfully posted Revision %d (%s) to device id %s\n", int(responseMap["rev"].(float64)),
+		responseMap["state-sha"].(string)[:8], responseMap["trail-id"])
 
 	p.Pvrconfig.DefaultPostUrl = uri
 	if p.Pvrconfig.DefaultGetUrl == "" {

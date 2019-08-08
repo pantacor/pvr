@@ -238,11 +238,9 @@ func ExtractFiles(files []string, extractPath string) error {
 	}
 
 	for _, file := range files {
-		args := []string{tarPath, "xzvf", file, "-C", extractPath}
-		untar := exec.Command(args[0], args[1:]...)
-		untarError := untar.Run()
-		if untarError != nil {
-			return untarError
+		err := Untar(extractPath, file)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -262,4 +260,21 @@ func ReportError(err error, knowSolutions ...string) error {
 	}
 
 	return errors.New(msg)
+}
+
+func StructToMap(s interface{}) (map[string]interface{}, error) {
+
+	b, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	result := map[string]interface{}{}
+
+	err = json.Unmarshal(b, &result)
+
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

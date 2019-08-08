@@ -18,15 +18,19 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
 
 	"github.com/urfave/cli"
 )
 
+// SourceFlagUsage : Source Flag Usage Description
+var SourceFlagUsage = "Comma separated priority list of source (valid sources: local and remote)"
+
 func CommandAppAdd() cli.Command {
 	cmd := cli.Command{
-		Name:        "app-add",
+		Name:        "add",
 		Aliases:     []string{"aa"},
 		ArgsUsage:   "[appname]",
 		Usage:       "add new applications.",
@@ -51,15 +55,37 @@ func CommandAppAdd() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
-
 			appname := c.Args().Get(0)
-			username := c.String("username")
-			password := c.String("password")
-			from := c.String("from")
-			config := c.String("config-json")
-			volumes := c.StringSlice("volume")
+			// fix up trailing/leading / from appnames
+			appname = strings.Trim(appname, "/")
 
-			err = pvr.AddApplication(appname, username, password, from, config, volumes)
+			templateArgs := map[string]interface{}{}
+
+			varSlice := c.StringSlice("arg")
+			for _, v := range varSlice {
+				va := strings.SplitN(v, "=", 2)
+				if len(va) == 2 {
+					templateArgs[va[0]] = va[1]
+				} else {
+					templateArgs[va[0]] = ""
+				}
+			}
+
+			app := libpvr.AppData{
+				Appname:      appname,
+				Username:     c.String("username"),
+				Password:     c.String("password"),
+				From:         c.String("from"),
+				Source:       c.String("source"),
+				ConfigFile:   c.String("config-json"),
+				Volumes:      c.StringSlice("volume"),
+				TemplateArgs: templateArgs,
+			}
+			err = pvr.FindDockerImage(&app)
+			if err != nil {
+				return cli.NewExitError(err, 3)
+			}
+			err = pvr.AddApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
@@ -87,9 +113,20 @@ func CommandAppAdd() cli.Command {
 			EnvVar: "PVR_FROM",
 		},
 		cli.StringFlag{
+			Name:   "source",
+			Usage:  SourceFlagUsage,
+			EnvVar: "PVR_SOURCE",
+			Value:  "remote,local",
+		},
+		cli.StringFlag{
 			Name:   "config-json",
 			Usage:  "Docker image config",
 			EnvVar: "PVR_CONFIG_JSON",
+		},
+		cli.StringSliceFlag{
+			Name:   "arg",
+			Usage:  "Template Arguments",
+			EnvVar: "PVR_TEMPLATE_ARG",
 		},
 		cli.StringSliceFlag{
 			Name:   "volume",
