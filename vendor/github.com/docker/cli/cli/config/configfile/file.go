@@ -175,21 +175,15 @@ func (configFile *ConfigFile) Save() error {
 		return errors.Errorf("Can't save config with empty filename")
 	}
 
-	dir := filepath.Dir(configFile.Filename)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(configFile.Filename), 0700); err != nil {
 		return err
 	}
-	temp, err := ioutil.TempFile(dir, filepath.Base(configFile.Filename))
+	f, err := os.OpenFile(configFile.Filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
-	err = configFile.SaveToWriter(temp)
-	temp.Close()
-	if err != nil {
-		os.Remove(temp.Name())
-		return err
-	}
-	return os.Rename(temp.Name(), configFile.Filename)
+	defer f.Close()
+	return configFile.SaveToWriter(f)
 }
 
 // ParseProxyConfig computes proxy configuration by retrieving the config for the provided host and
