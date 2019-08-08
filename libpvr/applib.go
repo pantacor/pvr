@@ -50,6 +50,7 @@ type Source struct {
 	DockerName   string                 `json:"docker_name"`
 	DockerTag    string                 `json:"docker_tag"`
 	DockerDigest string                 `json:"docker_digest"`
+	DockerSource string                 `json:"docker_source"`
 	Persistence  map[string]string      `json:"persistence"`
 }
 
@@ -278,6 +279,7 @@ func (p *Pvr) AddApplication(app AppData) error {
 		TemplateArgs: app.TemplateArgs,
 		Config:       map[string]interface{}{},
 		Persistence:  persistence,
+		DockerSource: app.Source,
 	}
 	components := strings.Split(app.From, ":")
 	if len(components) < 2 {
