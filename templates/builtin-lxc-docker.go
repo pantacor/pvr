@@ -44,10 +44,12 @@ lxc.init.cmd =
 		{{- end }}
 	{{- end }}
 {{- end }}
-{{- if and (.Docker.WorkingDir) (ne .Docker.WorkingDir "") }}
-lxc.init.cwd = {{ .Docker.WorkingDir }}
-{{- end }}
 {{- if and (not .Docker.Cmd) (not .Docker.Entrypoint) }} /sbin/init{{- end }}
+{{- if .Docker.WorkingDir }}
+	{{- if ne .Docker.WorkingDir "" }}
+lxc.init.cwd = {{ .Docker.WorkingDir }}
+	{{- end }}
+{{- end }}
 {{- if .Docker.Env }}
 	{{- range .Docker.Env }}
 lxc.environment = {{ . }}
