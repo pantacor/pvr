@@ -34,6 +34,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.1
 	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/sirupsen/logrus v1.4.2 // indirect
+	github.com/skratchdot/open-golang v0.0.0-20190402232053-79abb63cd66e
 	github.com/urfave/cli v1.20.0
 	gitlab.com/pantacor/pantahub-base v0.0.0-20190724204618-9041e257b8c8
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4

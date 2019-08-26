@@ -16,8 +16,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
 )
@@ -40,22 +38,17 @@ func CommandRegister() cli.Command {
 			p := c.String("pass")
 			e := c.String("email")
 
-			aEp := "https://api.pantahub.com"
-
+			aEp := c.App.Metadata["PVR_BASEURL"].(string)
 			if c.NArg() > 1 {
 				return cli.NewExitError("Only one argument (pantahub url) allowed. See --help.", 2)
 			} else if c.NArg() == 1 {
 				aEp = c.Args()[0]
 			}
 
-			err := libpvr.DoRegister(aEp, e, u, p)
-
+			err := libpvr.ShowOrOpenRegisterLink(aEp, e, u, p)
 			if err != nil {
-				return cli.NewExitError("Error Registering User: "+err.Error(), 3)
+				return cli.NewExitError(err.Error(), 2)
 			}
-
-			fmt.Println("User '" + u + "' registered. Follow email instructions sent to '" + e + "' before you can log in.")
-
 			return nil
 		},
 	}

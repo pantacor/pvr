@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty"
+	"github.com/skratchdot/open-golang/open"
 	"gitlab.com/pantacor/pantahub-base/logs"
 )
 
@@ -44,32 +45,60 @@ const (
 	PhLogsEpCursor = PhLogsEp + "cursor"
 )
 
-func DoRegister(authEp, email, username, password string) error {
+// ShowOrOpenRegisterLink show or open the user the registration link
+func ShowOrOpenRegisterLink(baseAPIURL, email, username, password string) error {
+	encryptedAccount, err := GetEncryptedAccount(baseAPIURL, email, username, password)
+	if err != nil {
+		return err
+	}
 
+	fmt.Printf("\n\r\n\rYour registration process needs to be finished on a browser \r\n")
+	fmt.Printf("%s \r\n\r\n", encryptedAccount.RedirectURI)
+
+	open.Run(encryptedAccount.RedirectURI)
+
+	return nil
+}
+
+// Account data model
+type Account struct {
+	Email    string `json:"email" bson:"email"`
+	Nick     string `json:"nick" bson:"nick"`
+	Password string `json:"password,omitempty" bson:"password"`
+}
+
+// EncryptedAccountData Encrypted account response
+type EncryptedAccountData struct {
+	Token       string `json:"token"`
+	RedirectURI string `json:"redirect-uri"`
+}
+
+// GetEncryptedAccount encrypt account data in order to open the browser to finish the registration process
+func GetEncryptedAccount(authEp, email, username, password string) (*EncryptedAccountData, error) {
 	if authEp == "" {
-		return errors.New("DoRegister: no authentication endpoint provided.")
+		return nil, errors.New("GetEncryptedAccount: no authentication endpoint provided.")
 	}
 	if email == "" {
-		return errors.New("DoRegister: no email provided.")
+		return nil, errors.New("GetEncryptedAccount: no email provided.")
 	}
 	if username == "" {
-		return errors.New("DoRegister: no username provided.")
+		return nil, errors.New("GetEncryptedAccount: no username provided.")
 	}
 	if password == "" {
-		return errors.New("DoRegister: no password provided.")
+		return nil, errors.New("GetEncryptedAccount: no password provided.")
 	}
 
 	u1, err := url.Parse(authEp)
 	if err != nil {
-		return errors.New("DoRegister: error parsing EP url.")
+		return nil, errors.New("GetEncryptedAccount: error parsing EP url.")
 	}
 
-	accountsEp := u1.String() + PhAccountsEp
+	accountsEp := u1.Scheme + "://" + u1.Hostname() + ":" + u1.Port() + PhAccountsEp
 
-	m := map[string]string{
-		"email":    email,
-		"nick":     username,
-		"password": password,
+	m := Account{
+		Email:    email,
+		Nick:     username,
+		Password: password,
 	}
 
 	response, err := resty.R().SetBody(m).
@@ -77,24 +106,22 @@ func DoRegister(authEp, email, username, password string) error {
 
 	if err != nil {
 		log.Fatal("Error calling POST for registration: " + err.Error())
-		return err
+		return nil, err
 	}
 
-	m1 := map[string]interface{}{}
+	m1 := EncryptedAccountData{}
 	err = json.Unmarshal(response.Body(), &m1)
 
 	if err != nil {
 		log.Fatal("Error parsing Register body(" + err.Error() + ") for " + accountsEp + ": " + string(response.Body()))
-		return err
+		return nil, err
 	}
 
 	if response.StatusCode() != 200 {
-		return errors.New("Failed to register: " + string(response.Body()))
+		return nil, errors.New("Failed to register: " + string(response.Body()))
 	}
 
-	fmt.Println("Registration Response: " + string(response.Body()))
-
-	return nil
+	return &m1, nil
 }
 
 type PantahubDevice struct {
