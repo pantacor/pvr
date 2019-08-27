@@ -268,15 +268,14 @@ func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh bool) (s
 		username, password := readCredentials(authEp + " (realm=" + realm + ")")
 		if username == "REGISTER" {
 			email, username, password := readRegistration(authEp + " (realm=" + realm + ")")
-			err = DoRegister(authEp, email, username, password)
-
+			err = ShowOrOpenRegisterLink(authEp, email, username, password)
 			if err != nil {
 				log.Fatal("error registering with PH: " + err.Error())
 				os.Exit(122)
 			}
+			os.Exit(0)
 		}
 		accessToken, refreshToken, err = doAuthenticate(authEp, username, password)
-
 		if err != nil {
 			continue
 		}
