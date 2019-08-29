@@ -290,3 +290,19 @@ func StructToMap(s interface{}) (map[string]interface{}, error) {
 	}
 	return result, nil
 }
+
+// LogPrettyJSON : Pretty print Json content
+func LogPrettyJSON(content []byte) error {
+	var data interface{}
+	err := json.Unmarshal(content, &data)
+	if err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(data, "", "    ")
+	if err != nil {
+		return err
+	}
+	fmt.Print(string(b))
+	fmt.Print("\n")
+	return nil
+}

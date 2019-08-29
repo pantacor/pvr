@@ -390,3 +390,47 @@ example2$ pvr logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.
 	]	
 } 	
 ```
+
+## pvr login [END_POINT]
+
+```
+Login to pantahub with your username & password with an optional end point
+Note:Default endpoint is https://api.pantahub.com/auth/auth_status
+
+
+```
+example1$  pvr login
+*** Login (/type [R] to register) @ https://api.pantahub.com/auth (realm=pantahub services) ***
+Username: sirinibin2006@gmail.com
+Password: *****
+Response of GET https://api.pantahub.com/auth/auth_status
+{
+    "exp": 1568206179,
+    "id": "sirinibin2006@gmail.com",
+    "nick": "sirinibin",
+    "orig_iat": 1568205279,
+    "prn": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
+    "roles": "user",
+    "scopes": "prn:pantahub.com:apis:/base/all",
+    "type": "USER"
+}
+LoggedIn Successfully!
+```
+
+```
+example2$  pvr login https://api2.pantahub.com/auth
+*** Login (/type [R] to register) @ https://api2.pantahub.com/auth (realm=pantahub services) ***
+Username: sirinibin2006@gmail.com
+Password: *****
+Response of GET https://api2.pantahub.com/auth/auth_status
+{
+    "exp": 1568206179,
+    "id": "sirinibin2006@gmail.com",
+    "nick": "sirinibin",
+    "orig_iat": 1568205279,
+    "prn": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
+    "roles": "user",
+    "scopes": "prn:pantahub.com:apis:/base/all",
+    "type": "USER"
+}
+LoggedIn Successfully!

@@ -67,6 +67,17 @@ func (s *Session) GetApp() *cli.App {
 	return s.app
 }
 
+// Login : Login to a given URL
+func (s *Session) Login(APIURL string) (*resty.Response, error) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(APIURL)
+	})
+	if err != nil {
+		return response, err
+	}
+	return response, nil
+}
+
 func (s *Session) DoAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error) {
 
 	var bearer string
