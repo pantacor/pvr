@@ -331,3 +331,62 @@ $ pvr ps
   5b08464f   helped_aphid                3   NEW      xxxx    about 23 hours ago   message....
 ```
 
+## pvr logs <deviceid|devicenick>[/source][@Level]
+
+```pvr logs list the logs with filter options of device,source & level
+
+```
+example1$ pvr logs 5d555d5e80123b31faa3cff2/pantavisor.log@INFO
+	{
+    "start": 0,
+    "page": 1,
+    "count": 1,
+    "entries":[
+        {
+            "id": "5d12142980123bb4654d11fc",
+            "dev": "prn:::devices:/5d555d5e80123b31faa3cff2",
+            "own": "prn:pantahub.com:auth:/user1",
+            "time-created": "2019-06-25T12:31:37.178Z",
+            "tsec": 1496532292,
+            "tnano": 802110514,
+            "src": "pantavisor.log",
+            "lvl": "INFO",
+            "msg": "My log line to remember"
+        }
+	]		
+}
+```
+```pvr logs list the logs with filter options of multiple device,source & level
+
+```
+example2$ pvr logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
+{
+    "start": 0,
+    "page": 1,
+    "count": 2,
+    "entries":[
+        {
+            "id": "5d12142980123bb4654d11fc",
+            "dev": "prn:::devices:/5d555d5e80123b31faa3cff2",
+            "own": "prn:pantahub.com:auth:/user1",
+            "time-created": "2019-06-25T12:31:37.178Z",
+            "tsec": 1496532292,
+            "tnano": 802110514,
+            "src": "pantavisor.log",
+            "lvl": "INFO",
+            "msg": "My log line to remember"
+        },
+		{
+            "id": "5d12142980123bb4654d11fc",
+            "dev": "prn:::devices:/5d555d5e80123b31faa3cff5",
+            "own": "prn:pantahub.com:auth:/user1",
+            "time-created": "2019-06-25T12:31:37.178Z",
+            "tsec": 1496532292,
+            "tnano": 802110514,
+            "src": "pantavisor2.log",
+            "lvl": "INFO2",
+            "msg": "My log line to remember"
+        }
+	]	
+} 	
+```

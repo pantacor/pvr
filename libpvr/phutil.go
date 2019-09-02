@@ -203,7 +203,20 @@ func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*log
 	return resultPage.Entries, resultPage.NextCursor, nil
 }
 
-func (p *Session) DoLogs(baseurl string, deviceIds []string, startTime *time.Time, cursor bool) (logEntries []*logs.LogsEntry, cursorID string, err error) {
+// LogFilter : Log Filter
+type LogFilter struct {
+	Devices string
+	Sources string
+	Levels  string
+}
+
+func (p *Session) DoLogs(
+	baseurl string,
+	deviceIds []string,
+	startTime *time.Time,
+	cursor bool,
+	logFilter LogFilter,
+) (logEntries []*logs.LogsEntry, cursorID string, err error) {
 	res, err := p.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		burl, err := url.Parse(baseurl)
 		if err != nil {
@@ -227,6 +240,15 @@ func (p *Session) DoLogs(baseurl string, deviceIds []string, startTime *time.Tim
 
 		if startTime != nil {
 			q.Add("after", startTime.UTC().Format(time.RFC3339))
+		}
+		if logFilter.Devices != "" {
+			q.Add("dev", logFilter.Devices)
+		}
+		if logFilter.Sources != "" {
+			q.Add("src", logFilter.Sources)
+		}
+		if logFilter.Levels != "" {
+			q.Add("lvl", logFilter.Levels)
 		}
 
 		fullURL.RawQuery = q.Encode()

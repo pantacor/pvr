@@ -39,9 +39,39 @@ func CommandLogs() cli.Command {
 			}
 
 			from := time.Now().Add(time.Duration(-1 * time.Minute))
+			splits := []string{}
+			devices := []string{}
+			source := ""
+			level := ""
+			filter := c.Args().Get(0)
+
+			if filter != "" {
+				splits = strings.Split(filter, "/")
+			}
+			if len(splits) > 0 {
+				devices = []string{splits[0]}
+			}
+
+			if len(splits) > 1 {
+				splits2 := strings.Split(splits[1], "@")
+				source = splits2[0]
+				if len(splits2) > 1 {
+					level = splits2[1]
+				}
+			}
+			for k, deviceID := range devices {
+				if !strings.HasPrefix(deviceID, "prn:::devices:/") {
+					devices[k] = "prn:::devices:/" + deviceID
+				}
+			}
+			logFilter := libpvr.LogFilter{
+				Devices: strings.Join(devices, ","),
+				Levels:  level,
+				Sources: source,
+			}
 
 			for {
-				logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, &from, true)
+				logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, &from, true, logFilter)
 
 				if err != nil {
 					return cli.NewExitError("Error getting device list: "+err.Error(), 4)
