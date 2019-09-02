@@ -127,6 +127,7 @@ func main() {
 		CommandApp(),
 		CommandSelfUpdate(),
 		CommandGlobalConfig(),
+		CommandWhoami(),
 	}
 	app.Run(os.Args)
 }
