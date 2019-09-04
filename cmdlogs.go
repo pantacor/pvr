@@ -59,11 +59,6 @@ func CommandLogs() cli.Command {
 					level = splits2[1]
 				}
 			}
-			for k, deviceID := range devices {
-				if !strings.HasPrefix(deviceID, "prn:::devices:/") {
-					devices[k] = "prn:::devices:/" + deviceID
-				}
-			}
 			logFilter := libpvr.LogFilter{
 				Devices: strings.Join(devices, ","),
 				Levels:  level,
