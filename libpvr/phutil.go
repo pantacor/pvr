@@ -52,7 +52,11 @@ func ShowOrOpenRegisterLink(baseAPIURL, email, username, password string) error 
 		return err
 	}
 
-	fmt.Printf("\n\r\n\rYour registration process needs to be finished on a browser \r\n")
+	fmt.Printf("\n\r\n\rYour registration process needs to be complete two steps \r\n")
+	fmt.Println("1.- Confirm you aren't a bot")
+	fmt.Println("2.- Confirm your email address")
+
+	fmt.Printf("\n\r\n\rFollow this link to continue and after that come back and continue \r\n")	
 	fmt.Printf("%s \r\n\r\n", encryptedAccount.RedirectURI)
 
 	open.Run(encryptedAccount.RedirectURI)

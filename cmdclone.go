@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"io/ioutil"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -41,21 +42,23 @@ func CommandClone() cli.Command {
 				return cli.NewExitError("clone needs need repository argument. See --help", 2)
 			}
 
-			newUrl, err := url.Parse(c.Args().Get(0))
+			newURL, err := url.Parse(c.Args().Get(0))
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
 
-			base := path.Base(newUrl.Path)
+			base := path.Base(newURL.Path)
 			base = path.Join(wd, base)
 			if c.NArg() == 2 {
 				base = c.Args().Get(1)
 			}
 
-			err = os.Mkdir(base, 0755)
+			tempdir, err := ioutil.TempDir(os.TempDir(), "pvr-clone-")
 			if err != nil {
 				return cli.NewExitError(err, 4)
 			}
+
+			defer os.RemoveAll(tempdir)
 
 			session, err := libpvr.NewSession(c.App)
 
@@ -63,7 +66,7 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 4)
 			}
 
-			pvr, err := libpvr.NewPvr(session, base)
+			pvr, err := libpvr.NewPvr(session, tempdir)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
@@ -78,7 +81,7 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 6)
 			}
 
-			err = pvr.GetRepo(newUrl.String(), false)
+			err = pvr.GetRepo(newURL.String(), false)
 			if err != nil {
 				return cli.NewExitError(err, 7)
 			}
@@ -87,6 +90,11 @@ func CommandClone() cli.Command {
 
 			if err != nil {
 				return cli.NewExitError(err, 8)
+			}
+
+			err = os.Rename(tempdir, base)
+			if err != nil {
+				return cli.NewExitError(err, 9)
 			}
 
 			return nil

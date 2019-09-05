@@ -32,6 +32,18 @@ import (
 	"strings"
 )
 
+// RemoveAll remove a path, could be a file or a folder
+func RemoveAll(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		return errors.New(path + "' doesn't exist")
+	}
+	err := os.RemoveAll(path)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func Copy(dst, src string) error {
 	in, err := os.Open(src)
 	if err != nil {

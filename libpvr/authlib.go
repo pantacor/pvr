@@ -273,7 +273,6 @@ func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh bool) (s
 				log.Fatal("error registering with PH: " + err.Error())
 				os.Exit(122)
 			}
-			os.Exit(0)
 		}
 		accessToken, refreshToken, err = doAuthenticate(authEp, username, password)
 		if err != nil {
