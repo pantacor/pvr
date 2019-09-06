@@ -25,6 +25,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -32,6 +33,8 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/go-resty/resty"
 )
 
 // RemoveAll remove a path, could be a file or a folder
@@ -291,6 +294,90 @@ func StructToMap(s interface{}) (map[string]interface{}, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+// CreateDevice : Create Device
+func (s *Session) CreateDevice(baseURL string, deviceNick string) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		body := map[string]interface{}{}
+		if deviceNick != "" {
+			body["nick"] = deviceNick
+		}
+		return req.SetBody(body).Post(baseURL + "/devices/")
+	})
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error creating device")
+}
+
+// LoginDevice : Login Device
+func LoginDevice(
+	baseURL string,
+	prn string,
+	secret string,
+) (
+	string,
+	error,
+) {
+
+	body := map[string]interface{}{}
+	body["username"] = prn
+	body["password"] = secret
+	req := resty.R().SetBody(body)
+	response, err := req.Post(baseURL + "/auth/login")
+	if err != nil {
+		return "", err
+	}
+	if response.StatusCode() == http.StatusOK {
+		responseData := map[string]interface{}{}
+		err = json.Unmarshal(response.Body(), &responseData)
+		if err != nil {
+			return "", err
+		}
+		return responseData["token"].(string), nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return "", err
+	}
+	return "", errors.New("Error login device")
+}
+
+// CreateTrail : Create Trail
+func CreateTrail(baseURL string,
+	deviceAccessToken string,
+	state map[string]interface{},
+) (
+	*resty.Response,
+	error,
+) {
+	req := resty.R().SetAuthToken(deviceAccessToken).SetBody(state)
+	response, err := req.Post(baseURL + "/trails/")
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error creating trail")
 }
 
 // LogPrettyJSON : Pretty print Json content

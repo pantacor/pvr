@@ -434,3 +434,24 @@ Response of GET https://api2.pantahub.com/auth/auth_status
     "type": "USER"
 }
 LoggedIn Successfully!
+## pvr device create <DEVICE_NICK>
+
+```pvr device create creates a new device from an existing device diretory usings its same state values.
+
+```
+example1$ pvr device create mydevice1
+Device Secret: *****
+{
+    "device-meta": {},
+    "garbage": false,
+    "id": "5d7645019061a500098617bd",
+    "nick": "mydevice1",
+    "owner": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
+    "prn": "prn:::devices:/5d7645019061a500098617bd",
+    "public": false,
+    "secret": "123",
+    "time-created": "2019-09-09T12:26:41.289253663Z",
+    "time-modified": "2019-09-09T12:26:41.289253663Z",
+    "user-meta": {}
+}
+Device Created Successfully
