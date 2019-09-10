@@ -66,7 +66,7 @@ lxc.namespace.keep = user
 {{ " " }} ipc
 {{- if .Source.args.PV_LXC_DISABLE_CONSOLE }}
 lxc.console.path = none
-{{- end -}}
+{{- end }}
 lxc.mount.auto = {{ .Source.args.LXC_MOUNT_AUTO_PROC | pvr_ifNull "proc" }}
 	{{- " " }} {{ .Source.args.LXC_MOUNT_AUTO_SYS | pvr_ifNull "sys:rw" }}
 	{{- " " }} {{ .Source.args.LXC_MOUNT_AUTO_GROUP | pvr_ifNull "cgroup" }}
