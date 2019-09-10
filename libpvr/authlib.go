@@ -17,6 +17,7 @@ package libpvr
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -298,4 +299,29 @@ func newDefaultAuthConfig(filePath string) *PvrAuthConfig {
 		Tokens: map[string]PvrAuthTokens{},
 		path:   filePath,
 	}
+}
+
+// Whoami : List all loggedin nick names
+func (s *Session) Whoami() error {
+	pvrAuthConfig := s.auth
+	for k := range pvrAuthConfig.Tokens {
+		splits := strings.Split(k, " ")
+		if len(splits) == 0 {
+			continue
+		}
+		authEndPoint := splits[0]
+		response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+			return req.Get(authEndPoint + "/auth_status")
+		})
+		if err != nil {
+			return err
+		}
+		responseBody := map[string]interface{}{}
+		err = json.Unmarshal(response.Body(), &responseBody)
+		if err != nil {
+			return err
+		}
+		fmt.Print(responseBody["nick"].(string) + "(" + responseBody["prn"].(string) + ") at " + authEndPoint + "\n")
+	}
+	return nil
 }
