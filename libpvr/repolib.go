@@ -1540,7 +1540,6 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool) error {
 	}
 
 	remotePvr, err := p.initializeRemote(url)
-
 	if err != nil {
 		return err
 	}
@@ -1579,7 +1578,6 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool) error {
 }
 
 func (p *Pvr) GetRepo(uri string, merge bool) error {
-
 	if uri == "" {
 		uri = p.Pvrconfig.DefaultPutUrl
 	}

@@ -37,7 +37,6 @@ type Session struct {
 }
 
 func NewSession(app *cli.App) (*Session, error) {
-
 	configDir := app.Metadata["PVR_CONFIG_DIR"].(string)
 	authConfigPath := filepath.Join(configDir, "auth.json")
 	generalConfigPath := filepath.Join(configDir, ConfigurationFile)

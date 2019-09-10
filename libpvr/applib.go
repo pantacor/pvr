@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -34,9 +35,10 @@ const (
 )
 
 var (
-	ErrInvalidVolumeFormat = errors.New("invalid volume format")
-	ErrEmptyAppName        = errors.New("empty app name")
-	ErrEmptyFrom           = errors.New("empty from")
+	ErrInvalidVolumeFormat = errors.New("Invalid volume format")
+	ErrEmptyAppName        = errors.New("Empty app name")
+	ErrEmptyFrom           = errors.New("Empty from")
+	ErrNeedBeRoot          = errors.New("Please run this command as root or use fakeroot utility")
 )
 
 type Source struct {
@@ -49,6 +51,24 @@ type Source struct {
 	DockerTag    string                 `json:"docker_tag"`
 	DockerDigest string                 `json:"docker_digest"`
 	Persistence  map[string]string      `json:"persistence"`
+}
+
+func (p *Pvr) isRunningAsRoot() bool {
+	whoami := exec.Command("whoami")
+	out, err := whoami.Output()
+	if err != nil {
+		return false
+	}
+
+	return strings.Trim(string(out), "\n") == "root"
+}
+
+func (p *Pvr) checkIfIsRunningAsRoot() error {
+	if !p.isRunningAsRoot() {
+		return ErrNeedBeRoot
+	}
+
+	return nil
 }
 
 func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
@@ -146,6 +166,10 @@ func (p *Pvr) InstallApplication(app AppData) error {
 		return err
 	}
 
+	if err := p.checkIfIsRunningAsRoot(); err != nil {
+		return err
+	}
+
 	trackURL := appManifest.DockerName
 	if appManifest.DockerTag != "" {
 		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
@@ -175,6 +199,10 @@ func (p *Pvr) InstallApplication(app AppData) error {
 func (p *Pvr) UpdateApplication(app AppData) error {
 	appManifest, err := p.GetApplicationManifest(app.Appname)
 	if err != nil {
+		return err
+	}
+
+	if err := p.checkIfIsRunningAsRoot(); err != nil {
 		return err
 	}
 
@@ -220,6 +248,10 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 func (p *Pvr) AddApplication(app AppData) error {
 	if app.Appname == "" {
 		return ErrEmptyAppName
+	}
+
+	if err := p.checkIfIsRunningAsRoot(); err != nil {
+		return err
 	}
 
 	appPath := filepath.Join(p.Dir, app.Appname)
