@@ -211,7 +211,6 @@ func (p *Pvr) FindDockerImage(app *AppData) error {
 
 	sourceOrder := strings.Split(app.Source, ",")
 	for _, source := range sourceOrder {
-		fmt.Printf("Checking repo in " + source + " docker\n")
 		if source == "local" {
 			err := LoadLocalImage(app)
 			if err != nil {
