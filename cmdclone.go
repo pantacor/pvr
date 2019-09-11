@@ -16,10 +16,10 @@
 package main
 
 import (
+	"io/ioutil"
 	"net/url"
 	"os"
 	"path"
-	"io/ioutil"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -53,7 +53,7 @@ func CommandClone() cli.Command {
 				base = c.Args().Get(1)
 			}
 
-			tempdir, err := ioutil.TempDir(os.TempDir(), "pvr-clone-")
+			tempdir, err := ioutil.TempDir(wd, "pvr-clone-")
 			if err != nil {
 				return cli.NewExitError(err, 4)
 			}
