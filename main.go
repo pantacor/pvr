@@ -128,6 +128,7 @@ func main() {
 		CommandSelfUpdate(),
 		CommandGlobalConfig(),
 		CommandWhoami(),
+		CommandLogin(),
 	}
 	app.Run(os.Args)
 }
