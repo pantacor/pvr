@@ -24,8 +24,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -305,4 +307,32 @@ func LogPrettyJSON(content []byte) error {
 	fmt.Print(string(b))
 	fmt.Print("\n")
 	return nil
+}
+
+// SetTempFilesInterrupHandler : Set Temp Files Interrup Handler
+/*
+This function will capture Interrupt signals and delete all temp files
+*/
+func SetTempFilesInterrupHandler(tempdir string) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(
+		sigs,
+		os.Interrupt,
+	)
+	go func() {
+		<-sigs
+		fileExist, err := IsFileExists(tempdir)
+		if err != nil {
+			log.Fatal(err.Error())
+			os.Exit(1)
+		}
+		if fileExist {
+			err := os.RemoveAll(tempdir)
+			if err != nil {
+				log.Fatal(err.Error())
+				os.Exit(1)
+			}
+		}
+		os.Exit(0)
+	}()
 }

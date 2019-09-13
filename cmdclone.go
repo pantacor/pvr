@@ -59,6 +59,7 @@ func CommandClone() cli.Command {
 			}
 
 			defer os.RemoveAll(tempdir)
+			libpvr.SetTempFilesInterrupHandler(tempdir)
 
 			session, err := libpvr.NewSession(c.App)
 
