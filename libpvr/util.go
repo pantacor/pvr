@@ -25,6 +25,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -36,6 +37,7 @@ import (
 	"strings"
 	"time"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/go-resty/resty"
 )
 
@@ -578,6 +580,69 @@ func ValidateSourceFlag(source string) error {
 		if v != "remote" && v != "local" {
 			return errors.New("Source flag only accepts remote / local, (e.g. --source=remote,local)")
 		}
+// DownloadFile will download a url to a local file.
+func DownloadFile(url string, destination string) (string, error) {
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	contentDisposition := resp.Header.Get("Content-Disposition")
+	_, params, err := mime.ParseMediaType(contentDisposition)
+	if err != nil {
+		return "", err
+	}
+	filename := params["filename"]
+	out, err := os.Create(destination + "/" + filename)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	counter := &DownloadCounter{}
+	_, err = io.Copy(out, io.TeeReader(resp.Body, counter))
+	if err != nil {
+		return "", err
+	}
+	return filename, nil
+}
+
+type DownloadCounter struct {
+	Total uint64
+}
+
+func (dc *DownloadCounter) Write(p []byte) (int, error) {
+	n := len(p)
+	dc.Total += uint64(n)
+	fmt.Printf("\rDownloading... %s complete", humanize.Bytes(dc.Total))
+	return n, nil
+}
+
+type UploadCounter struct {
+	Total uint64
+}
+
+func (dc *UploadCounter) Write(p []byte) (int, error) {
+	n := len(p)
+	dc.Total += uint64(n)
+	fmt.Printf("\rUploading... %s complete", humanize.Bytes(dc.Total))
+	return n, nil
+}
+
+// CheckoutDevice : Checkout Device
+func (s *Session) CheckoutDevice(folderName string) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	pvr, err := NewPvr(s, wd+"/"+folderName)
+	if err != nil {
+		return err
+	}
+	err = pvr.Reset()
+	if err != nil {
+		return err
 	}
 	return nil
 }

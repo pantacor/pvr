@@ -130,6 +130,7 @@ func main() {
 		CommandWhoami(),
 		CommandLogin(),
 		CommandDevice(),
+		CommandLocal(),
 	}
 	app.Run(os.Args)
 }
