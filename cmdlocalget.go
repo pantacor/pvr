@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -29,8 +30,8 @@ func CommandLocalGet() cli.Command {
 	cmd := cli.Command{
 		Name:        "get",
 		Aliases:     []string{"ge"},
-		ArgsUsage:   "[device_ip] [revision]",
-		Usage:       "pvr local get [device_ip] [revision]",
+		ArgsUsage:   "<DEVICE_IP|HOSTNAME> [REVISION] [CGI_PORT]",
+		Usage:       "pvr local get <DEVICE_IP|HOSTNAME> [REVISION] [CGI_PORT]",
 		Description: "Get a local device updates",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
@@ -41,17 +42,26 @@ func CommandLocalGet() cli.Command {
 				return cli.NewExitError(errors.New("Please cd to a device folder and try again"), 2)
 			}
 
+			deviceIP := ""
 			revision := "0"
-			deviceIP := "http://localhost:2005"
-
-			if c.NArg() == 1 {
-				deviceIP = c.Args().Get(0)
+			deviceCGIPort := "2005"
+			if c.NArg() < 1 {
+				return cli.NewExitError(errors.New("Device ip or hostname is required for pvr local clone <DEVICE_IP|HOSTNAME> [REVISION] [CGI_PORT]. See --help"), 3)
+			} else if c.NArg() == 1 {
+				deviceIP = c.Args().Get(0) + ":" + deviceCGIPort
 			} else if c.NArg() == 2 {
-				deviceIP = c.Args().Get(0)
+				deviceIP = c.Args().Get(0) + ":" + deviceCGIPort
+				revision = c.Args().Get(1)
+			} else if c.NArg() == 3 {
+				deviceIP = c.Args().Get(0) + ":" + c.Args().Get(2)
 				revision = c.Args().Get(1)
 			}
+			if !strings.HasPrefix(deviceIP, "http://") {
+				deviceIP = "http://" + deviceIP
+			}
+
 			//downloading tar file
-			filename, err := libpvr.DownloadFile(deviceIP + "/cgi-bin/pvrlocal/" + revision)
+			filename, err := libpvr.DownloadFile(deviceIP + "/cgi-bin/pvrlocal?revision=" + revision)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
@@ -65,7 +75,7 @@ func CommandLocalGet() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 4)
 			}
-			fmt.Println("\nDevice Updated Successfully from local\n")
+			fmt.Println("\nUpdated Successfully from local device:" + deviceIP + "\n")
 
 			return nil
 		},

@@ -27,9 +27,10 @@ func CommandLocal() cli.Command {
 		Subcommands: []cli.Command{
 			CommandLocalClone(),
 			CommandLocalGet(),
+			CommandLocalPost(),
 		},
 		Usage:       "pvr local <subcommand> :pvr local experience commands to interact directly with devices without using pantahub",
-		Description: "\n1.pvr local clone <DEVICE_IP> : to clone a local device",
+		Description: "\n1.Clone a local device\n2.Get updates from a local device\n3.Post to a local device",
 	}
 	return cmd
 }
