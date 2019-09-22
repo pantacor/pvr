@@ -18,6 +18,7 @@ require (
 	github.com/docker/docker-ce v0.0.0-20190724010320-53720a99f3c5 // indirect
 	github.com/docker/docker-credential-helpers v0.6.3 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/genuinetools/reg v0.16.1-0.20190610165748-e29a4fdc2e43
 	github.com/go-resty/resty v0.0.0-20190619084753-e284be3e6edc

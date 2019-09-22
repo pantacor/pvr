@@ -87,10 +87,11 @@ type Pvr struct {
 }
 
 type PvrConfig struct {
-	DefaultGetUrl  string
-	DefaultPutUrl  string
-	DefaultPostUrl string
-	ObjectsDir     string
+	DefaultGetUrl         string
+	DefaultPutUrl         string
+	DefaultPostUrl        string
+	DefaultLocalDeviceURL string
+	ObjectsDir            string
 
 	// tokens by realm
 	AccessTokens  map[string]string

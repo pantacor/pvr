@@ -18,15 +18,10 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net/http"
 	"os"
-	"strings"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
-	resty "gopkg.in/resty.v1"
 )
 
 // CommandLocalPost : pvr local post command
@@ -34,74 +29,37 @@ func CommandLocalPost() cli.Command {
 	cmd := cli.Command{
 		Name:        "post",
 		Aliases:     []string{"po"},
-		ArgsUsage:   "<DEVICE_IP|HOSTNAME> [CGI_PORT]",
-		Usage:       "pvr local post <DEVICE_IP|HOSTNAME> [CGI_PORT]",
+		ArgsUsage:   "[http://][deviceip|hostname][:PORT]",
+		Usage:       "pvr local post [http://][deviceip|hostname][:PORT]",
 		Description: "Post a local device updates",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
 				return cli.NewExitError(err, 1)
 			}
-			if _, err := os.Stat(wd + "/.pvr/json"); os.IsNotExist(err) {
-				return cli.NewExitError(errors.New("Please cd to a device folder and try again"), 2)
-			}
-			deviceIP := ""
-			deviceCGIPort := "2005"
-			if c.NArg() < 1 {
-				return cli.NewExitError(errors.New("Device ip or hostname is required for pvr local post <DEVICE_IP>. See --help"), 3)
-			} else if c.NArg() == 1 {
-				deviceIP = c.Args().Get(0) + ":" + deviceCGIPort
-			} else if c.NArg() == 2 {
-				deviceIP = c.Args().Get(0) + ":" + c.Args().Get(1)
-			}
-			if !strings.HasPrefix(deviceIP, "http://") {
-				deviceIP = "http://" + deviceIP
-			}
 			session, err := libpvr.NewSession(c.App)
-
 			if err != nil {
 				return cli.NewExitError(err, 4)
 			}
-
 			pvr, err := libpvr.NewPvr(session, wd)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
-			pvr.Session.GetConfigDir()
-			//Generate a tar file
-			tarfilename := "device.tar.gz"
-			err = pvr.Export(tarfilename)
-			if err != nil {
-				return cli.NewExitError(err, 3)
+			deviceURL := ""
+			if c.NArg() == 1 {
+				deviceURL = c.Args().Get(0)
 			}
-			//get sha of tar file
-			sha, err := libpvr.FiletoSha(wd + "/" + tarfilename)
-			if err != nil {
-				return cli.NewExitError(err, 4)
-			}
-			//read tar file content
-			fileContent, err := ioutil.ReadFile(wd + "/" + tarfilename)
-			if err != nil {
-				return cli.NewExitError(err, 3)
-			}
-			req := resty.R()
-			req.SetBody(fileContent)
-			res, err := req.Post(deviceIP + "/cgi-bin/pvrlocal?sha=" + sha)
-			if err != nil {
-				return cli.NewExitError(err, 4)
-			}
-			if res.StatusCode() == http.StatusOK {
-				//removing tar file
-				err = os.Remove(wd + "/" + tarfilename)
-				if err != nil {
-					return cli.NewExitError(err, 4)
+			if deviceURL == "" {
+				deviceURL = pvr.Pvrconfig.DefaultLocalDeviceURL
+				if deviceURL == "" {
+					return cli.NewExitError(errors.New("Default Local Device URL doesn't exist"), 2)
 				}
-				fmt.Println("\nPosted Successfully to local device:" + deviceIP + "\n")
-			} else {
-				fmt.Println("\nError posting to local device:" + deviceIP + "\n")
-				log.Print(res)
 			}
-
+			err = pvr.PostToLocalDevice(deviceURL)
+			if err != nil {
+				return cli.NewExitError(err, 4)
+			}
+			fmt.Println("\n\nPosted Successfully to local device:" + deviceURL + "\n")
 			return nil
 		},
 	}

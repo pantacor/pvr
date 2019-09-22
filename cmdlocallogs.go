@@ -17,21 +17,19 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"os"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
 )
 
-// CommandLocalGet : pvr local get command
-func CommandLocalGet() cli.Command {
-	cmd := cli.Command{
-		Name:        "get",
-		Aliases:     []string{"ge"},
-		ArgsUsage:   "[http://][deviceip|hostname][:PORT][/revision]",
-		Usage:       "pvr local get [http://][deviceip|hostname][:PORT][/revision]",
-		Description: "Get a local device updates",
+func CommandLocalLogs() cli.Command {
+	return cli.Command{
+		Name:        "logs",
+		Aliases:     []string{"log"},
+		Usage:       "pvr local logs [http://][deviceip|hostname][:PORT]",
+		ArgsUsage:   "[http://][deviceip|hostname][:PORT]",
+		Description: "Get streaming logs of local devices you own",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -55,15 +53,11 @@ func CommandLocalGet() cli.Command {
 					return cli.NewExitError(errors.New("Default Local Device URL doesn't exist"), 2)
 				}
 			}
-			err = pvr.GetLocalDevice(deviceURL)
+			err = pvr.GetLocalDeviceLogs(deviceURL)
 			if err != nil {
-				return cli.NewExitError(err, 2)
+				return cli.NewExitError("Error getting device logs: "+err.Error(), 4)
 			}
-			fmt.Println("\nUpdated Successfully from local device:" + deviceURL + "\n")
-
 			return nil
 		},
 	}
-
-	return cmd
 }

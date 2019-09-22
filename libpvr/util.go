@@ -580,6 +580,10 @@ func ValidateSourceFlag(source string) error {
 		if v != "remote" && v != "local" {
 			return errors.New("Source flag only accepts remote / local, (e.g. --source=remote,local)")
 		}
+	}
+	return nil
+}
+
 // DownloadFile will download a url to a local file.
 func DownloadFile(url string, destination string) (string, error) {
 	// Get the data
