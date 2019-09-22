@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 
 	"github.com/go-resty/resty"
@@ -69,6 +70,17 @@ func (s *Session) GetApp() *cli.App {
 
 // Login : Login to a given URL
 func (s *Session) Login(APIURL string) (*resty.Response, error) {
+	//clear token
+	u, err := url.Parse(APIURL)
+	if err != nil {
+		return nil, err
+	}
+	host := u.Scheme + "://" + u.Host
+	authHeader := "JWT realm=\"pantahub services\", ph-aeps=\"" + host + "/auth\""
+	err = s.auth.resetCachedAccessToken(authHeader)
+	if err != nil {
+		return nil, err
+	}
 	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		return req.Get(APIURL)
 	})
