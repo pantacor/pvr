@@ -50,6 +50,7 @@ type Source struct {
 	DockerName   string                 `json:"docker_name"`
 	DockerTag    string                 `json:"docker_tag"`
 	DockerDigest string                 `json:"docker_digest"`
+	DockerSource string                 `json:"docker_source"`
 	Persistence  map[string]string      `json:"persistence"`
 }
 
@@ -201,6 +202,13 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 	if err != nil {
 		return err
 	}
+	if app.Source == "" {
+		app.Source = appManifest.DockerSource
+	}
+	err = p.FindDockerImage(&app)
+	if err != nil {
+		return err
+	}
 
 	if err := p.checkIfIsRunningAsRoot(); err != nil {
 		return err
@@ -220,16 +228,8 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 		dockerDigest = app.RemoteImage.ImageID
 	}
 
-	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
-	if err != nil {
-		return err
-	}
-
-	if dockerDigest == squashFSDigest {
-		return nil
-	}
-
 	appManifest.DockerDigest = dockerDigest
+	appManifest.DockerSource = app.Source
 
 	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
 	if err != nil {
@@ -242,6 +242,13 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 		return err
 	}
 
+	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	if err != nil {
+		return err
+	}
+	if dockerDigest == squashFSDigest {
+		return nil
+	}
 	return p.InstallApplication(app)
 }
 
@@ -278,6 +285,7 @@ func (p *Pvr) AddApplication(app AppData) error {
 		TemplateArgs: app.TemplateArgs,
 		Config:       map[string]interface{}{},
 		Persistence:  persistence,
+		DockerSource: app.Source,
 	}
 	components := strings.Split(app.From, ":")
 	if len(components) < 2 {

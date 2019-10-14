@@ -65,10 +65,6 @@ func CommandAppUpdate() cli.Command {
 				Username: c.String("username"),
 				Password: c.String("password"),
 			}
-			err = pvr.FindDockerImage(&app)
-			if err != nil {
-				return cli.NewExitError(err, 3)
-			}
 			err = pvr.UpdateApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
@@ -95,7 +91,7 @@ func CommandAppUpdate() cli.Command {
 			Name:   "source",
 			Usage:  SourceFlagUsage,
 			EnvVar: "PVR_SOURCE",
-			Value:  "remote,local",
+			Value:  "",
 		},
 	}
 
