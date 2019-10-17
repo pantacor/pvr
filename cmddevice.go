@@ -29,9 +29,10 @@ func CommandDevice() cli.Command {
 			CommandLogs(),
 			CommandScan(),
 			CommandDeviceCreate(),
+			CommandDeviceGet(),
 		},
 		Usage:       "pvr device <ps|logs|scan>",
-		Description: "\n1.Show Owned Devices\n 2.Get logs for your devices (early preview)\n 3.Scan for pantavisor devices announcing themselves through MDNS on local network.\n4.Create new device",
+		Description: "\n1.Show Owned Devices\n 2.Get logs for your devices (early preview)\n 3.Scan for pantavisor devices announcing themselves through MDNS on local network.\n4.Create new device\n5.Get device details",
 	}
 	return cmd
 }
