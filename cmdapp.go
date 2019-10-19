@@ -32,7 +32,7 @@ func CommandApp() cli.Command {
 			CommandAppInstall(),
 			CommandAppUpdate(),
 		},
-		Usage:       "pvr app ls :list applications in pvr checkout,pvr app info <appname> output info and state of appname ,pvr app rm <appname> : remove app from pvr checkout",
+		Usage:       "pvr app ls :list applications in pvr checkout,pvr app info <appname> output info and state of appname ,pvr app rm <appname> : remove app from pvr checkout.",
 		Description: "\n1.Add new application\n2.List applications in pvr checkout\n3.Output info and state of appname\n4.Remove app from pvr checkout\n5.Install Application\n6.Update Application",
 	}
 	return cmd
