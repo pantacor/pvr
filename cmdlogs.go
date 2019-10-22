@@ -28,7 +28,8 @@ func CommandLogs() cli.Command {
 	return cli.Command{
 		Name:        "logs",
 		Aliases:     []string{"log"},
-		Usage:       "Get logs for your devices (early preview)",
+		ArgsUsage:   "<deviceid|devicenick>[/source][@Level]",
+		Usage:       "pvr device logs <deviceid|devicenick>[/source][@Level]",
 		Description: "Get streaming logs of devices you own from pantahub",
 		Action: func(c *cli.Context) error {
 
