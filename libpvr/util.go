@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -301,12 +302,26 @@ func (s *Session) CreateDevice(baseURL string, deviceNick string) (
 	*resty.Response,
 	error,
 ) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, err
+	}
+	//Get User Access token
+	host := u.Scheme + "://" + u.Host
+	authHeader := "JWT realm=\"pantahub services\", ph-aeps=\"" + host + "/auth\""
+	accessToken, err := s.auth.getCachedAccessToken(authHeader)
+	if err != nil {
+		return nil, err
+	}
 	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		body := map[string]interface{}{}
 		if deviceNick != "" {
 			body["nick"] = deviceNick
 		}
-		return req.SetBody(body).Post(baseURL + "/devices/")
+		return req.
+			SetBody(body).
+			SetAuthToken(accessToken).
+			Post(baseURL + "/devices/")
 	})
 	if err != nil {
 		return response, err
