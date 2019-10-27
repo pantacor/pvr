@@ -76,8 +76,12 @@ lxc.mount.entry = /dev/ dev none bind,rw,create=dir 0 0
 {{- if .Source.args.PV_SECURITY_WITH_STORAGE }}
 lxc.mount.entry = /storage storage none bind,rw,create=dir 0 0
 {{- end }}
-lxc.mount.entry = /etc/resolv.conf etc/resolv.conf none bind,rw,create=file 0 0
-lxc.mount.entry = tmpfs run tmpfs rw,nodev,relatime,mode=755 0 0
+{{- if (not .Source.args.PV_RESOLV_CONF_DISABLE) }}
+lxc.mount.entry = /etc/resolv.conf {{ .Source.args.PV_RESOLV_CONF_PATH | pvr_ifNull "etc/resolv.conf" }} none bind,rw,create=file 0 0
+{{- end }}
+{{- if (not .Source.args.PV_RUN_TMPFS_DISABLE) }}
+lxc.mount.entry = tmpfs {{ .Source.args.PV_RUN_TMPFS_PATH | pvr_ifNull "run" }} tmpfs rw,nodev,relatime,mode=755 0 0
+{{- end }}
 {{- with $src := .Source -}}
 {{- range $key, $value := $src.persistence -}}
 {{- if ne $key "lxc-overlay" }}
