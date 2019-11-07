@@ -82,6 +82,7 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 	result := Source{
 		TemplateArgs: map[string]interface{}{},
 		Config:       map[string]interface{}{},
+		DockerSource: "remote,local",
 	}
 
 	err = json.Unmarshal(js, &result)
