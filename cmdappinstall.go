@@ -65,6 +65,10 @@ func CommandAppInstall() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
+			err = libpvr.ValidateSourceFlag(c.String("source"))
+			if err != nil {
+				return cli.NewExitError(err, 3)
+			}
 			app := libpvr.AppData{
 				Appname:  appname,
 				From:     trackURL,

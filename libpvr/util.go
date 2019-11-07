@@ -565,3 +565,13 @@ func (s *Session) GetAuthStatus(baseURL string) (
 	}
 	return response, errors.New("Error getting auth status")
 }
+//ValidateSourceFlag : Validate Source Flag
+func ValidateSourceFlag(source string) error {
+	splits := strings.Split(source, ",")
+	for _, v := range splits {
+		if v != "remote" && v != "local" {
+			return errors.New("Source flag only accepts remote / local, (e.g. --source=remote,local)")
+		}
+	}
+	return nil
+}

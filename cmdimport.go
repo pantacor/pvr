@@ -16,6 +16,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 
 	"github.com/urfave/cli"
@@ -46,6 +47,12 @@ func CommandImport() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
+			if c.NArg() > 1 {
+				return errors.New("import can have at most 1 argument. See --help")
+			}
+			if c.NArg() < 1 {
+				return errors.New("repo-tarball name is required. See --help")
+			}
 			err = pvr.Import(c.Args()[0])
 			if err != nil {
 				return cli.NewExitError(err, 3)
