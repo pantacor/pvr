@@ -440,15 +440,45 @@ func SetTempFilesInterrupHandler(tempdir string) {
 	}()
 }
 
+// GetUserProfiles : Get User Profiles
+func (s *Session) GetUserProfiles(baseURL string,
+	userNick string,
+) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		response, err := req.Get(baseURL + "/profiles/?nick=^" + userNick)
+		return response, err
+	})
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error getting user profile details")
+}
+
 // GetDevices : Get Devices
 func (s *Session) GetDevices(baseURL string,
+	ownerNick string,
 	deviceNick string,
 ) (
 	*resty.Response,
 	error,
 ) {
 	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
-		return req.Get(baseURL + "/devices/?nick=^" + deviceNick)
+		ownerNickParam := ""
+		if ownerNick != "" {
+			ownerNickParam = "&owner-nick=" + ownerNick
+		}
+		return req.Get(baseURL + "/devices/?nick=^" + deviceNick + ownerNickParam)
 	})
 
 	if err != nil {
@@ -593,4 +623,104 @@ func ParseRFC3339(date string) (time.Time, error) {
 	}
 	from = from.Local()
 	return from, err
+}
+
+// SuggestNicks : Suggest Nicks (Either user nicks or device nicks)
+func (s *Session) SuggestNicks(searchTerm string, baseURL string) {
+	splits := strings.Split(searchTerm, "/")
+	if len(splits) == 1 {
+		searchTerm = splits[0]
+		s.SuggestUserNicks(searchTerm, baseURL)
+	} else if len(splits) == 2 {
+		searchTerm = splits[1]
+		s.SuggestDeviceNicks(splits[0], searchTerm, baseURL)
+	}
+
+}
+
+// SuggestDeviceNicks : Suggest Device Nicks
+func (s *Session) SuggestDeviceNicks(userNick, searchTerm string, baseURL string) {
+	IsLoggedIn, err := s.IsUserLoggedIn(baseURL)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	if !IsLoggedIn {
+		fmt.Println("Not-Loggedin -")
+		return
+	}
+
+	devicesResponse, err := s.GetDevices(baseURL, userNick, searchTerm)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	responseData := []interface{}{}
+	err = json.Unmarshal(devicesResponse.Body(), &responseData)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	if len(responseData) == 0 {
+		fmt.Println("No results\n")
+	} else {
+		for _, device := range responseData {
+			if userNick != "" {
+				fmt.Println(userNick + "/" + device.(map[string]interface{})["nick"].(string) + "\n")
+			} else {
+				fmt.Println(device.(map[string]interface{})["nick"].(string) + "\n")
+			}
+
+		}
+	}
+}
+
+// SuggestUserNicks : Suggest User Nicks
+func (s *Session) SuggestUserNicks(searchTerm string, baseURL string) {
+	IsLoggedIn, err := s.IsUserLoggedIn(baseURL)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	if !IsLoggedIn {
+		fmt.Println("Not-Loggedin -")
+		return
+	}
+	profilesResponse, err := s.GetUserProfiles(baseURL, searchTerm)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	responseData := []interface{}{}
+	err = json.Unmarshal(profilesResponse.Body(), &responseData)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	if len(responseData) == 0 {
+		fmt.Println("No results\n")
+	} else {
+		for _, profile := range responseData {
+			if len(responseData) == 1 {
+				fmt.Println(profile.(map[string]interface{})["nick"].(string) + "/\n")
+			} else {
+				fmt.Println(profile.(map[string]interface{})["nick"].(string) + "\n")
+			}
+		}
+	}
+}
+
+// IsValidUrl tests a string to determine if it is a well-structured url or not.
+func IsValidUrl(value string) bool {
+	_, err := url.ParseRequestURI(value)
+	if err != nil {
+		return false
+	}
+
+	u, err := url.Parse(value)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return false
+	}
+
+	return true
 }

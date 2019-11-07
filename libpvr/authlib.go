@@ -220,6 +220,29 @@ func (p *PvrAuthConfig) getCachedAccessToken(authHeader string) (string, error) 
 	return "", nil
 }
 
+// IsUserLoggedIn : To check if a user is logged in or not
+func (session *Session) IsUserLoggedIn(baseURL string) (bool, error) {
+	authEp := baseURL + "/auth"
+	authHeader := "JWT realm=\"pantahub services\", ph-aeps=\"" + baseURL + "/auth\""
+	authType, opts := getWwwAuthenticateInfo(authHeader)
+	if authType != "JWT" && authType != "Bearer" {
+		return false, nil
+	}
+	realm := opts["realm"]
+	s, ok := session.auth.Tokens[authEp+" realm="+realm]
+	if !ok {
+		return false, nil
+	}
+
+	accessToken, refreshToken, err := session.auth.DoRefresh(authEp, s.RefreshToken)
+	if err != nil {
+		return false, err
+	}
+	if accessToken != "" && refreshToken != "" {
+		return true, nil
+	}
+	return false, nil
+}
 func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh bool) (string, error) {
 
 	authType, opts := getWwwAuthenticateInfo(authHeader)
