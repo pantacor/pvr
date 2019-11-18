@@ -438,3 +438,27 @@ func SetTempFilesInterrupHandler(tempdir string) {
 		os.Exit(0)
 	}()
 }
+
+// GetDevice : Get Device
+func (s *Session) GetDevice(baseURL string,
+	deviceNick string,
+) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(baseURL + "/devices/" + deviceNick)
+	})
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error getting device details")
+}
