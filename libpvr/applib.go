@@ -187,9 +187,9 @@ func (p *Pvr) InstallApplication(app AppData) error {
 		dockerConfig = app.LocalImage.DockerConfig
 	} else if app.RemoteImage.Exists {
 		dockerConfig = app.RemoteImage.DockerConfig
-		app.Appmanifest = appManifest
 	}
-	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, appManifest)
+	app.Appmanifest = appManifest
+	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
 	if err != nil {
 		return err
 	}
