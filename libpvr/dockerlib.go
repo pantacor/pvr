@@ -557,7 +557,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		}
 	}
 
-	args := []string{makeSquashfsPath, extractPath, tempSquashFile, "-comp", "xz", "-all-root"}
+	args := []string{makeSquashfsPath, extractPath, tempSquashFile, "-comp", "xz"}
 
 	fmt.Println("Generating squashfs file")
 	makeSquashfs := exec.Command(args[0], args[1:]...)
