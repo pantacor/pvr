@@ -82,11 +82,10 @@ lxc.mount.entry = /etc/resolv.conf {{ .Source.args.PV_RESOLV_CONF_PATH | pvr_ifN
 {{- if (not .Source.args.PV_RUN_TMPFS_DISABLE) }}
 lxc.mount.entry = tmpfs {{ .Source.args.PV_RUN_TMPFS_PATH | pvr_ifNull "run" }} tmpfs rw,nodev,relatime,mode=755 0 0
 {{- end }}
-{{- with $src := .Source -}}
-{{- range $key, $value := $src.persistence -}}
+{{- $src := .Source -}}
+{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes $src.persistence -}}
 {{- if ne $key "lxc-overlay" }}
 lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | replace "/" "-" }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
-{{- end -}}
 {{- end -}}
 {{- end }}
 {{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
@@ -104,7 +103,7 @@ lxc.net.0.link = lxcbr0
 	"config": "lxc.container.conf",
 	"name":"{{- .Source.name -}}",
 	"storage":{
-		{{- range $key, $value := .Source.persistence -}}
+		{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes .Source.persistence -}}
 		{{- if ne $key "lxc-overlay" }}
 		"docker-{{ $key | trimSuffix "/" | replace "/" "-" -}}": {
 			"persistence": "{{ $value }}"
