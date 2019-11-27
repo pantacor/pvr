@@ -23,6 +23,13 @@ FROM src as linux_armv6
 RUN apk update; apk add git
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=5 go build -o /go/bin/linux_armv6/pvr -v .
 
+# build armv6 linux static
+FROM src as linux_arm64
+
+RUN apk update; apk add git
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOARM=5 go build -o /go/bin/linux_arm64/pvr -v .
+
+
 # build windows i386 static
 FROM src as windows_386
 
