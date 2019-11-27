@@ -92,9 +92,11 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | rep
 {{- if eq .Source.args.PV_LXC_NETWORK_TYPE "veth" }}
 lxc.net.0.type = veth
 lxc.net.0.link = lxcbr0
+{{- end -}}
 {{- end }}
+{{- if .Source.args.PV_LXC_EXTRA_CONF }}
+{{ .Source.args.PV_LXC_EXTRA_CONF }}
 {{- end }}
-
 `
 
 	RUN_JSON = `{{ "" -}}
