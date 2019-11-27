@@ -76,6 +76,9 @@ lxc.mount.entry = /dev/ dev none bind,rw,create=dir 0 0
 {{- if .Source.args.PV_SECURITY_WITH_HOST }}
 lxc.mount.entry = / host none bind,rw,create=dir 0 0
 {{- end }}
+{{- if .Source.args.PV_SECURITY_WITH_HOSTPROC }}
+lxc.mount.entry = /proc/ host/proc none bind,rw,create=dir 0 0
+{{- end }}
 {{- if .Source.args.PV_SECURITY_WITH_STORAGE }}
 lxc.mount.entry = /storage storage none bind,rw,create=dir 0 0
 {{- end }}
