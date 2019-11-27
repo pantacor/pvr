@@ -73,6 +73,9 @@ lxc.mount.auto = {{ .Source.args.LXC_MOUNT_AUTO_PROC | pvr_ifNull "proc" }}
 {{- if .Source.args.PV_SECURITY_FULLDEV }}
 lxc.mount.entry = /dev/ dev none bind,rw,create=dir 0 0
 {{- end }}
+{{- if .Source.args.PV_SECURITY_WITH_HOST }}
+lxc.mount.entry = / host none bind,rw,create=dir 0 0
+{{- end }}
 {{- if .Source.args.PV_SECURITY_WITH_STORAGE }}
 lxc.mount.entry = /storage storage none bind,rw,create=dir 0 0
 {{- end }}
