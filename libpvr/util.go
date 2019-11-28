@@ -462,3 +462,33 @@ func (s *Session) GetDevice(baseURL string,
 	}
 	return response, errors.New("Error getting device details")
 }
+
+// SliceContainsItem : checks if an item exists in a string array or not
+func SliceContainsItem(slice []string, item string) bool {
+    set := make(map[string]struct{}, len(slice))
+    for _, s := range slice {
+        set[s] = struct{}{}
+    }
+
+    _, ok := set[item]
+    return ok
+}
+
+func RemoveDirContents(dir string) error {
+    d, err := os.Open(dir)
+    if err != nil {
+        return err
+    }
+    defer d.Close()
+    names, err := d.Readdirnames(-1)
+    if err != nil {
+        return err
+    }
+    for _, name := range names {
+        err = os.RemoveAll(filepath.Join(dir, name))
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}

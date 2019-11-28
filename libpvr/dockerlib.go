@@ -16,8 +16,10 @@
 package libpvr
 
 import (
+	"archive/tar"
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -25,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -342,9 +345,9 @@ func Untar(dst string, src string) error {
 	if err != nil {
 		return err
 	}
-	args := []string{tarPath, "xzvf", src, "-C", dst}
+	args := []string{tarPath, "xzvf", src, "-C", dst, "--exclude", ".wh.*"}
 	if contentType == "application/octet-stream" {
-		args = []string{tarPath, "xvf", src, "-C", dst}
+		args = []string{tarPath, "xvf", src, "-C", dst, "--exclude", ".wh.*"}
 	}
 	untar := exec.Command(args[0], args[1:]...)
 	var out bytes.Buffer
@@ -515,7 +518,12 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 
 	fmt.Println("Extracting layers...")
 	for layerNumber, file := range files {
-		err := Untar(extractPath, file)
+		err := ProcessWhiteouts(extractPath, file, layerNumber)
+		if err != nil {
+			log.Print("Error processing whiteouts")
+			return err
+		}
+		err = Untar(extractPath, file)
 		if err != nil {
 			return err
 		}
@@ -575,6 +583,83 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	return ioutil.WriteFile(digestFile, []byte(digest), 0644)
 }
 
+//ProcessWhiteouts : FInd Whiteouts from a layer and process it in a given extract path
+func ProcessWhiteouts(extractPath string, layerPath string, layerNumber int) error {
+	whiteouts, err := FindWhiteoutsFromLayer(layerPath)
+	if err != nil {
+		return err
+	}
+	if len(whiteouts) == 0 {
+		return nil
+	}
+	fmt.Printf("Processing Whiteouts from layer %d\n", layerNumber)
+	for _, whiteoutFile := range whiteouts {
+
+		basename := filepath.Base(whiteoutFile)
+		dir := filepath.Join(extractPath, filepath.Dir(whiteoutFile))
+
+		if strings.HasPrefix(basename, ".wh.") && strings.HasSuffix(basename, "opq") {
+			//Clear all contents of the folder from the extract path
+			fmt.Println("Removing all contents of :" + dir)
+			err := RemoveDirContents(dir)
+			if err != nil {
+				return err
+			}
+
+		} else if strings.HasPrefix(basename, ".wh.") {
+			//Remove the indicated file from the extract path'
+			filePath := filepath.Join(dir, strings.TrimPrefix(basename, ".wh."))
+			fmt.Println("Removing:" + filePath)
+			err := RemoveAll(filePath) //removr a file / dir
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+//FindWhiteoutsFromLayer : Find Whiteout Files From a Layer
+func FindWhiteoutsFromLayer(layerPath string) ([]string, error) {
+	whiteoutPaths := []string{}
+	tarFile, err := os.Open(layerPath)
+	if err != nil {
+		return whiteoutPaths, err
+	}
+	contentType, err := GetFileContentType(layerPath)
+	if err != nil {
+		return whiteoutPaths, err
+	}
+
+	tr := tar.NewReader(tarFile)
+
+	if contentType == "application/x-gzip" {
+		// For zip content types, eg: application/x-gzip
+		gzr, err := gzip.NewReader(tarFile)
+		if err != nil {
+			return whiteoutPaths, err
+		}
+		defer gzr.Close()
+		tr = tar.NewReader(gzr)
+	}
+
+	for {
+		path, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return whiteoutPaths, err
+		}
+		basename := filepath.Base(path.Name)
+		if strings.HasPrefix(basename, ".wh.") {
+			if !SliceContainsItem(whiteoutPaths, path.Name) {
+				whiteoutPaths = append(whiteoutPaths, path.Name)
+			}
+		}
+	}
+	return whiteoutPaths, nil
+}
 func (p *Pvr) GetSquashFSDigest(appName string) (string, error) {
 	content, err := ioutil.ReadFile(filepath.Join(p.Dir, appName, DOCKER_DIGEST_FILE))
 	if os.IsNotExist(err) {
