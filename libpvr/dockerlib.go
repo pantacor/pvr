@@ -520,7 +520,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	for layerNumber, file := range files {
 		err := ProcessWhiteouts(extractPath, file, layerNumber)
 		if err != nil {
-			log.Print("Error processing whiteouts")
+			log.Println("Error processing whiteouts.")
 			return err
 		}
 		err = Untar(extractPath, file)
@@ -592,7 +592,7 @@ func ProcessWhiteouts(extractPath string, layerPath string, layerNumber int) err
 	if len(whiteouts) == 0 {
 		return nil
 	}
-	fmt.Printf("Processing Whiteouts from layer %d\n", layerNumber)
+	fmt.Printf("Processing Whiteouts from layer %d:%s\n", layerNumber, layerPath)
 	for _, whiteoutFile := range whiteouts {
 
 		basename := filepath.Base(whiteoutFile)
@@ -603,7 +603,8 @@ func ProcessWhiteouts(extractPath string, layerPath string, layerNumber int) err
 			fmt.Println("Removing all contents of :" + dir)
 			err := RemoveDirContents(dir)
 			if err != nil {
-				return err
+				fmt.Printf("WARNING: cannot process whiteout %s (err=%s)\n", whiteoutFile, err.Error())
+				continue
 			}
 
 		} else if strings.HasPrefix(basename, ".wh.") {
@@ -612,7 +613,8 @@ func ProcessWhiteouts(extractPath string, layerPath string, layerNumber int) err
 			fmt.Println("Removing:" + filePath)
 			err := RemoveAll(filePath) //removr a file / dir
 			if err != nil {
-				return err
+				fmt.Printf("WARNING: cannot process whiteout %s (err=%s)\n", whiteoutFile, err.Error())
+				continue
 			}
 		}
 	}
