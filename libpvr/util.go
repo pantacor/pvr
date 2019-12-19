@@ -439,6 +439,31 @@ func SetTempFilesInterrupHandler(tempdir string) {
 	}()
 }
 
+// GetDevices : Get Devices
+func (s *Session) GetDevices(baseURL string,
+	deviceNick string,
+) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(baseURL + "/devices/?nick=^" + deviceNick)
+	})
+
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error getting device details")
+}
+
 // GetDevice : Get Device
 func (s *Session) GetDevice(baseURL string,
 	deviceNick string,
@@ -491,4 +516,52 @@ func RemoveDirContents(dir string) error {
         }
     }
     return nil
+}
+// UpdateDevice : Update  user-meta or device-meta field of a device
+func (s *Session) UpdateDevice(
+	baseURL string,
+	deviceNick string,
+	data map[string]interface{},
+	updateField string,
+) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.SetBody(data).Patch(baseURL + "/devices/" + deviceNick + "/" + updateField)
+	})
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error Updating " + updateField + " field")
+}
+
+// GetAuthStatus : Get Auth Status, GET /auth/auth_status
+func (s *Session) GetAuthStatus(baseURL string) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(baseURL + "/auth/auth_status")
+	})
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error getting auth status")
 }
