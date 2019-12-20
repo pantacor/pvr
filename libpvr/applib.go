@@ -195,6 +195,23 @@ func (p *Pvr) InstallApplication(app AppData) error {
 	}
 	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
 
+	dockerDigest := ""
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
+	if app.LocalImage.Exists {
+		dockerDigest = app.LocalImage.ImageID
+	} else if app.RemoteImage.Exists {
+		dockerDigest = app.RemoteImage.ImageID
+	}
+	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	if err != nil {
+		return err
+	}
+	if dockerDigest == squashFSDigest {
+		fmt.Println("Application already up to date.")
+		return nil
+	}
+
 	return p.GenerateApplicationSquashFS(app)
 }
 
@@ -248,6 +265,7 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 		return err
 	}
 	if dockerDigest == squashFSDigest {
+		fmt.Println("Application already up to date.")
 		return nil
 	}
 	return p.InstallApplication(app)
