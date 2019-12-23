@@ -468,23 +468,29 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	} else if app.RemoteImage.Exists {
 		//Download from remote repo.
 		for i, layer := range app.RemoteImage.DockerManifest.Layers {
-			layerReader, err := app.RemoteImage.DockerRegistry.DownloadLayer(context.Background(), app.RemoteImage.ImagePath, layer.Digest)
-			if err != nil {
-				return err
-			}
-
-			buf := bufio.NewReader(layerReader)
-
 			filename := filepath.Join(cacheDir, string(layer.Digest)) + ".tar.gz"
 			fileExistInCache, err := IsFileExists(filename)
 			if err != nil {
 				return err
 			}
 			if fileExistInCache {
-				fmt.Printf("Layer %d downloaded(cache)\n", i)
-				files = append(files, filename)
-				continue
+				shaValid,err := FileHasSameSha(filename,string(layer.Digest))
+				if err != nil {
+					return err
+				}
+				if shaValid{
+					fmt.Printf("Layer %d downloaded(cache)\n", i)
+					files = append(files, filename)
+					continue
+				}	
 			}
+			
+			layerReader, err := app.RemoteImage.DockerRegistry.DownloadLayer(context.Background(), app.RemoteImage.ImagePath, layer.Digest)
+			if err != nil {
+				return err
+			}
+
+			buf := bufio.NewReader(layerReader)
 
 			file, err := os.Create(filename)
 			if err != nil {
