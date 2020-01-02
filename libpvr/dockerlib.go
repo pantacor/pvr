@@ -469,20 +469,14 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		//Download from remote repo.
 		for i, layer := range app.RemoteImage.DockerManifest.Layers {
 			filename := filepath.Join(cacheDir, string(layer.Digest)) + ".tar.gz"
-			fileExistInCache, err := IsFileExists(filename)
+			shaValid,err := FileHasSameSha(filename,string(layer.Digest))
 			if err != nil {
 				return err
 			}
-			if fileExistInCache {
-				shaValid,err := FileHasSameSha(filename,string(layer.Digest))
-				if err != nil {
-					return err
-				}
-				if shaValid{
-					fmt.Printf("Layer %d downloaded(cache)\n", i)
-					files = append(files, filename)
-					continue
-				}	
+			if shaValid {
+				fmt.Printf("Layer %d downloaded(cache)\n", i)
+				files = append(files, filename)
+				continue
 			}
 			
 			layerReader, err := app.RemoteImage.DockerRegistry.DownloadLayer(context.Background(), app.RemoteImage.ImagePath, layer.Digest)
