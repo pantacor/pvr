@@ -567,6 +567,9 @@ func (s *Session) GetAuthStatus(baseURL string) (
 }
 //ValidateSourceFlag : Validate Source Flag
 func ValidateSourceFlag(source string) error {
+	if source == "" {
+		return nil
+	}
 	splits := strings.Split(source, ",")
 	for _, v := range splits {
 		if v != "remote" && v != "local" {
