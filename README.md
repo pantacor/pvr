@@ -381,6 +381,54 @@ example2$ pvr device get heavily_strong_pika
 }
 ```
 
+## pvr device set <DEVICE_NICK|ID>  <KEY1>=<VALUE1> [KEY2]=[VALUE2]...[KEY-N]=[VALUE-N]
+
+pvr device set : Set or Update device user-meta & device-meta fields (Note:If you are logged in as USER then you can update user-meta field but if you are logged in as DEVICE then you can update device-meta field)
+
+```
+example1$ pvr device set 5df243ff0be81900099855e6 a=1 b=2
+{
+    "a": "1",
+    "b": "2"
+}
+user-meta field Updated Successfully
+
+```
+
+```
+example2$ pvr device set 5df243ff0be81900099855e6 a=1 b=2
+{
+    "a": "1",
+    "b": "2"
+}
+device-meta field Updated Successfully
+
+```
+## pvr device logs <deviceid|devicenick>[/source][@Level]
+
+pvr device logs list the logs with filter options of device,source & level
+
+```
+example1$ pvr device logs 5d555d5e80123b31faa3cff2/pantavisor.log@INFO
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+
+```
+pvr device logs list the logs with filter options of multiple device,source & level
+
+```
+example2$ pvr device logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:03Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:17Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:43Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:53Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+```
+
 ## pvr export <FILENAME.tar.gz>
 
 pvr export : Exports repo into single file (tarball)
@@ -406,6 +454,8 @@ regardless beyond publishing pvr repositories to pantahub trails.
 
 ## pvr ps
 
+```WARNING:```This command is DEPRECATED, please use ```pvr device ps``` instead
+
 ```pvr ps``` gets a list of devices like below:
 
 ```
@@ -421,62 +471,28 @@ $ pvr ps
 
 ## pvr logs <deviceid|devicenick>[/source][@Level]
 
+```WARNING:```This command is DEPRECATED, please use ```pvr device logs``` instead
+
 pvr logs list the logs with filter options of device,source & level
 
 ```
 example1$ pvr logs 5d555d5e80123b31faa3cff2/pantavisor.log@INFO
-	{
-    "start": 0,
-    "page": 1,
-    "count": 1,
-    "entries":[
-        {
-            "id": "5d12142980123bb4654d11fc",
-            "dev": "prn:::devices:/5d555d5e80123b31faa3cff2",
-            "own": "prn:pantahub.com:auth:/user1",
-            "time-created": "2019-06-25T12:31:37.178Z",
-            "tsec": 1496532292,
-            "tnano": 802110514,
-            "src": "pantavisor.log",
-            "lvl": "INFO",
-            "msg": "My log line to remember"
-        }
-	]
-}
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
 ```
 pvr logs list the logs with filter options of multiple device,source & level
 
 ```
 example2$ pvr logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
-{
-    "start": 0,
-    "page": 1,
-    "count": 2,
-    "entries":[
-        {
-            "id": "5d12142980123bb4654d11fc",
-            "dev": "prn:::devices:/5d555d5e80123b31faa3cff2",
-            "own": "prn:pantahub.com:auth:/user1",
-            "time-created": "2019-06-25T12:31:37.178Z",
-            "tsec": 1496532292,
-            "tnano": 802110514,
-            "src": "pantavisor.log",
-            "lvl": "INFO",
-            "msg": "My log line to remember"
-        },
-		{
-            "id": "5d12142980123bb4654d11fc",
-            "dev": "prn:::devices:/5d555d5e80123b31faa3cff5",
-            "own": "prn:pantahub.com:auth:/user1",
-            "time-created": "2019-06-25T12:31:37.178Z",
-            "tsec": 1496532292,
-            "tnano": 802110514,
-            "src": "pantavisor2.log",
-            "lvl": "INFO2",
-            "msg": "My log line to remember"
-        }
-	]
-}
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:03Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:17Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:43Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:53Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff5
 ```
 
 ## pvr login [END_POINT]
