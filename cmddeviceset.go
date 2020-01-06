@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/urfave/cli"
@@ -54,7 +53,6 @@ func CommandDeviceSet() cli.Command {
 				return cli.NewExitError(errors.New("<NICK|ID> is required. See --help"), 2)
 			}
 			data := map[string]interface{}{}
-			log.Print(keyValues)
 			splits := strings.Fields(keyValues)
 			for _, v := range splits {
 				splits := strings.Split(v, "=")
