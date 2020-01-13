@@ -28,7 +28,8 @@ func CommandLogs() cli.Command {
 	return cli.Command{
 		Name:        "logs",
 		Aliases:     []string{"log"},
-		Usage:       "Get logs for your devices (early preview)",
+		ArgsUsage:   "<deviceid|devicenick>[/source][@Level]",
+		Usage:       "pvr device logs <deviceid|devicenick>[/source][@Level]",
 		Description: "Get streaming logs of devices you own from pantahub",
 		Action: func(c *cli.Context) error {
 
@@ -39,9 +40,34 @@ func CommandLogs() cli.Command {
 			}
 
 			from := time.Now().Add(time.Duration(-1 * time.Minute))
+			splits := []string{}
+			devices := []string{}
+			source := ""
+			level := ""
+			filter := c.Args().Get(0)
+
+			if filter != "" {
+				splits = strings.Split(filter, "/")
+			}
+			if len(splits) > 0 {
+				devices = []string{splits[0]}
+			}
+
+			if len(splits) > 1 {
+				splits2 := strings.Split(splits[1], "@")
+				source = splits2[0]
+				if len(splits2) > 1 {
+					level = splits2[1]
+				}
+			}
+			logFilter := libpvr.LogFilter{
+				Devices: strings.Join(devices, ","),
+				Levels:  level,
+				Sources: source,
+			}
 
 			for {
-				logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, &from, true)
+				logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, &from, true, logFilter)
 
 				if err != nil {
 					return cli.NewExitError("Error getting device list: "+err.Error(), 4)

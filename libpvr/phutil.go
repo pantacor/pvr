@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty"
+	"github.com/skratchdot/open-golang/open"
 	"gitlab.com/pantacor/pantahub-base/logs"
 )
 
@@ -44,32 +45,64 @@ const (
 	PhLogsEpCursor = PhLogsEp + "cursor"
 )
 
-func DoRegister(authEp, email, username, password string) error {
+// ShowOrOpenRegisterLink show or open the user the registration link
+func ShowOrOpenRegisterLink(baseAPIURL, email, username, password string) error {
+	encryptedAccount, err := GetEncryptedAccount(baseAPIURL, email, username, password)
+	if err != nil {
+		return err
+	}
 
+	fmt.Printf("\n\r\n\rYour registration process needs to be complete two steps \r\n")
+	fmt.Println("1.- Confirm you aren't a bot")
+	fmt.Println("2.- Confirm your email address")
+
+	fmt.Printf("\n\r\n\rFollow this link to continue and after that come back and continue \r\n")
+	fmt.Printf("%s \r\n\r\n", encryptedAccount.RedirectURI)
+
+	open.Run(encryptedAccount.RedirectURI)
+
+	return nil
+}
+
+// Account data model
+type Account struct {
+	Email    string `json:"email" bson:"email"`
+	Nick     string `json:"nick" bson:"nick"`
+	Password string `json:"password,omitempty" bson:"password"`
+}
+
+// EncryptedAccountData Encrypted account response
+type EncryptedAccountData struct {
+	Token       string `json:"token"`
+	RedirectURI string `json:"redirect-uri"`
+}
+
+// GetEncryptedAccount encrypt account data in order to open the browser to finish the registration process
+func GetEncryptedAccount(authEp, email, username, password string) (*EncryptedAccountData, error) {
 	if authEp == "" {
-		return errors.New("DoRegister: no authentication endpoint provided.")
+		return nil, errors.New("GetEncryptedAccount: no authentication endpoint provided.")
 	}
 	if email == "" {
-		return errors.New("DoRegister: no email provided.")
+		return nil, errors.New("GetEncryptedAccount: no email provided.")
 	}
 	if username == "" {
-		return errors.New("DoRegister: no username provided.")
+		return nil, errors.New("GetEncryptedAccount: no username provided.")
 	}
 	if password == "" {
-		return errors.New("DoRegister: no password provided.")
+		return nil, errors.New("GetEncryptedAccount: no password provided.")
 	}
 
 	u1, err := url.Parse(authEp)
 	if err != nil {
-		return errors.New("DoRegister: error parsing EP url.")
+		return nil, errors.New("GetEncryptedAccount: error parsing EP url.")
 	}
 
-	accountsEp := u1.String() + PhAccountsEp
+	accountsEp := u1.Scheme + "://" + u1.Hostname() + ":" + u1.Port() + PhAccountsEp
 
-	m := map[string]string{
-		"email":    email,
-		"nick":     username,
-		"password": password,
+	m := Account{
+		Email:    email,
+		Nick:     username,
+		Password: password,
 	}
 
 	response, err := resty.R().SetBody(m).
@@ -77,24 +110,22 @@ func DoRegister(authEp, email, username, password string) error {
 
 	if err != nil {
 		log.Fatal("Error calling POST for registration: " + err.Error())
-		return err
+		return nil, err
 	}
 
-	m1 := map[string]interface{}{}
+	m1 := EncryptedAccountData{}
 	err = json.Unmarshal(response.Body(), &m1)
 
 	if err != nil {
 		log.Fatal("Error parsing Register body(" + err.Error() + ") for " + accountsEp + ": " + string(response.Body()))
-		return err
+		return nil, err
 	}
 
 	if response.StatusCode() != 200 {
-		return errors.New("Failed to register: " + string(response.Body()))
+		return nil, errors.New("Failed to register: " + string(response.Body()))
 	}
 
-	fmt.Println("Registration Response: " + string(response.Body()))
-
-	return nil
+	return &m1, nil
 }
 
 type PantahubDevice struct {
@@ -176,7 +207,20 @@ func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*log
 	return resultPage.Entries, resultPage.NextCursor, nil
 }
 
-func (p *Session) DoLogs(baseurl string, deviceIds []string, startTime *time.Time, cursor bool) (logEntries []*logs.LogsEntry, cursorID string, err error) {
+// LogFilter : Log Filter
+type LogFilter struct {
+	Devices string
+	Sources string
+	Levels  string
+}
+
+func (p *Session) DoLogs(
+	baseurl string,
+	deviceIds []string,
+	startTime *time.Time,
+	cursor bool,
+	logFilter LogFilter,
+) (logEntries []*logs.LogsEntry, cursorID string, err error) {
 	res, err := p.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		burl, err := url.Parse(baseurl)
 		if err != nil {
@@ -199,7 +243,17 @@ func (p *Session) DoLogs(baseurl string, deviceIds []string, startTime *time.Tim
 		}
 
 		if startTime != nil {
-			q.Add("after", startTime.UTC().Format(time.RFC3339))
+			loc, _ := time.LoadLocation("UTC")
+			q.Add("after", startTime.In(loc).Format(time.RFC3339))
+		}
+		if logFilter.Devices != "" {
+			q.Add("dev", logFilter.Devices)
+		}
+		if logFilter.Sources != "" {
+			q.Add("src", logFilter.Sources)
+		}
+		if logFilter.Levels != "" {
+			q.Add("lvl", logFilter.Levels)
 		}
 
 		fullURL.RawQuery = q.Encode()

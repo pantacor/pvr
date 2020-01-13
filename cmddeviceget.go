@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2019  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,48 +17,42 @@ package main
 
 import (
 	"errors"
-	"os"
+
+	"gitlab.com/pantacor/pvr/libpvr"
 
 	"github.com/urfave/cli"
-	"gitlab.com/pantacor/pvr/libpvr"
 )
 
-func CommandExport() cli.Command {
-	return cli.Command{
-		Name:        "export",
-		Aliases:     []string{"g"},
-		ArgsUsage:   "<export-file>",
-		Usage:       "export repo into single file (tarball)",
-		Description: "if export file ends with .gz or .tgz it will create a zipped tarball. Otherwise plain",
+func CommandDeviceGet() cli.Command {
+	cmd := cli.Command{
+		Name:        "get",
+		Aliases:     []string{"get"},
+		ArgsUsage:   "<NICK|ID>",
+		Usage:       "pvr device get <NICK|ID>",
+		Description: "Get Device details",
 		Action: func(c *cli.Context) error {
-			wd, err := os.Getwd()
-			if err != nil {
-				return cli.NewExitError(err, 1)
-			}
-
 			session, err := libpvr.NewSession(c.App)
-
 			if err != nil {
 				return cli.NewExitError(err, 4)
 			}
-
-			pvr, err := libpvr.NewPvr(session, wd)
+			baseURL := c.App.Metadata["PVR_BASEURL"].(string)
+			deviceNick := ""
+			if c.NArg() > 1 {
+				return cli.NewExitError(errors.New("Device get command can have at most 1 argument. See --help"), 1)
+			} else if c.NArg() == 1 {
+				deviceNick = c.Args()[0]
+			} else {
+				return cli.NewExitError(errors.New("Device ID or Nick is required. See --help"), 2)
+			}
+			// Get Device Details
+			deviceResponse, err := session.GetDevice(baseURL, deviceNick)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
-
-			if c.NArg() > 1 {
-				return errors.New("export can have at most 1 argument. See --help")
-			}
-			if c.NArg() < 1 {
-				return errors.New("export-file name is required. See --help")
-			}
-			err = pvr.Export(c.Args()[0])
-			if err != nil {
-				return cli.NewExitError(err, 3)
-			}
-
+			libpvr.LogPrettyJSON(deviceResponse.Body())
 			return nil
 		},
 	}
+
+	return cmd
 }

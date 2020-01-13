@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2019  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,47 +17,42 @@ package main
 
 import (
 	"errors"
-	"os"
+	"fmt"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
 )
 
-func CommandExport() cli.Command {
+func CommandLogin() cli.Command {
 	return cli.Command{
-		Name:        "export",
-		Aliases:     []string{"g"},
-		ArgsUsage:   "<export-file>",
-		Usage:       "export repo into single file (tarball)",
-		Description: "if export file ends with .gz or .tgz it will create a zipped tarball. Otherwise plain",
+		Name:        "login",
+		Aliases:     []string{"lo"},
+		ArgsUsage:   "[auth-endpoint]",
+		Usage:       "pvr login https://api.pantahub.com/auth/auth_status",
+		Description: "Login to pantahub with your username & password with an optional end point",
 		Action: func(c *cli.Context) error {
-			wd, err := os.Getwd()
-			if err != nil {
-				return cli.NewExitError(err, 1)
+			APIURL := ""
+			if c.NArg() > 1 {
+				return errors.New("post can have at most 1 argument. See --help.")
+			} else if c.NArg() == 0 {
+				APIURL = c.App.Metadata["PVR_BASEURL"].(string) + "/auth/auth_status"
+			} else {
+				APIURL = c.Args()[0]
 			}
-
 			session, err := libpvr.NewSession(c.App)
 
 			if err != nil {
 				return cli.NewExitError(err, 4)
 			}
-
-			pvr, err := libpvr.NewPvr(session, wd)
-			if err != nil {
-				return cli.NewExitError(err, 2)
+			response, err := session.Login(APIURL)
+			if response != nil {
+				fmt.Println("Response of GET " + APIURL)
+				err = libpvr.LogPrettyJSON(response.Body())
+				if err != nil {
+					return cli.NewExitError(err, 2)
+				}
 			}
-
-			if c.NArg() > 1 {
-				return errors.New("export can have at most 1 argument. See --help")
-			}
-			if c.NArg() < 1 {
-				return errors.New("export-file name is required. See --help")
-			}
-			err = pvr.Export(c.Args()[0])
-			if err != nil {
-				return cli.NewExitError(err, 3)
-			}
-
+			fmt.Println("LoggedIn Successfully!")
 			return nil
 		},
 	}

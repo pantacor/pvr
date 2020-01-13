@@ -44,10 +44,12 @@ lxc.init.cmd =
 		{{- end }}
 	{{- end }}
 {{- end }}
-{{- if and (.Docker.WorkingDir) (ne .Docker.WorkingDir "") }}
-lxc.init.cwd = {{ .Docker.WorkingDir }}
-{{- end }}
 {{- if and (not .Docker.Cmd) (not .Docker.Entrypoint) }} /sbin/init{{- end }}
+{{- if .Docker.WorkingDir }}
+	{{- if ne .Docker.WorkingDir "" }}
+lxc.init.cwd = {{ .Docker.WorkingDir }}
+	{{- end }}
+{{- end }}
 {{- if .Docker.Env }}
 	{{- range .Docker.Env }}
 lxc.environment = {{ . }}
@@ -62,32 +64,45 @@ lxc.namespace.keep = user
 {{ " " }} net
 {{- end -}}
 {{ " " }} ipc
+{{- if .Source.args.PV_LXC_DISABLE_CONSOLE }}
 lxc.console.path = none
+{{- end }}
 lxc.mount.auto = {{ .Source.args.LXC_MOUNT_AUTO_PROC | pvr_ifNull "proc" }}
 	{{- " " }} {{ .Source.args.LXC_MOUNT_AUTO_SYS | pvr_ifNull "sys:rw" }}
 	{{- " " }} {{ .Source.args.LXC_MOUNT_AUTO_GROUP | pvr_ifNull "cgroup" }}
 {{- if .Source.args.PV_SECURITY_FULLDEV }}
 lxc.mount.entry = /dev/ dev none bind,rw,create=dir 0 0
 {{- end }}
+{{- if .Source.args.PV_SECURITY_WITH_HOST }}
+lxc.mount.entry = / host none bind,rw,create=dir 0 0
+{{- end }}
+{{- if .Source.args.PV_SECURITY_WITH_HOSTPROC }}
+lxc.mount.entry = /proc/ host/proc none bind,rw,create=dir 0 0
+{{- end }}
 {{- if .Source.args.PV_SECURITY_WITH_STORAGE }}
 lxc.mount.entry = /storage storage none bind,rw,create=dir 0 0
 {{- end }}
-lxc.mount.entry = /etc/resolv.conf etc/resolv.conf none bind,rw,create=file 0 0
-lxc.mount.entry = tmpfs run tmpfs rw,nodev,relatime,mode=755 0 0
-{{- with $src := .Source -}}
-{{- range $key, $value := $src.persistence -}}
+{{- if (not .Source.args.PV_RESOLV_CONF_DISABLE) }}
+lxc.mount.entry = /etc/resolv.conf {{ .Source.args.PV_RESOLV_CONF_PATH | pvr_ifNull "etc/resolv.conf" }} none bind,rw,create=file 0 0
+{{- end }}
+{{- if (not .Source.args.PV_RUN_TMPFS_DISABLE) }}
+lxc.mount.entry = tmpfs {{ .Source.args.PV_RUN_TMPFS_PATH | pvr_ifNull "run" }} tmpfs rw,nodev,relatime,mode=755 0 0
+{{- end }}
+{{- $src := .Source -}}
+{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes $src.persistence -}}
 {{- if ne $key "lxc-overlay" }}
 lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | replace "/" "-" }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
-{{- end -}}
 {{- end -}}
 {{- end }}
 {{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
 {{- if eq .Source.args.PV_LXC_NETWORK_TYPE "veth" }}
 lxc.net.0.type = veth
 lxc.net.0.link = lxcbr0
+{{- end -}}
 {{- end }}
+{{- if .Source.args.PV_LXC_EXTRA_CONF }}
+{{ .Source.args.PV_LXC_EXTRA_CONF }}
 {{- end }}
-
 `
 
 	RUN_JSON = `{{ "" -}}
@@ -96,7 +111,7 @@ lxc.net.0.link = lxcbr0
 	"config": "lxc.container.conf",
 	"name":"{{- .Source.name -}}",
 	"storage":{
-		{{- range $key, $value := .Source.persistence -}}
+		{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes .Source.persistence -}}
 		{{- if ne $key "lxc-overlay" }}
 		"docker-{{ $key | trimSuffix "/" | replace "/" "-" -}}": {
 			"persistence": "{{ $value }}"

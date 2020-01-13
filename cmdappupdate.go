@@ -58,16 +58,16 @@ func CommandAppUpdate() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
+			err = libpvr.ValidateSourceFlag(c.String("source"))
+			if err != nil {
+				return cli.NewExitError(err, 3)
+			}
 			app := libpvr.AppData{
 				Appname:  appname,
 				From:     trackURL,
 				Source:   c.String("source"),
 				Username: c.String("username"),
 				Password: c.String("password"),
-			}
-			err = pvr.FindDockerImage(&app)
-			if err != nil {
-				return cli.NewExitError(err, 3)
 			}
 			err = pvr.UpdateApplication(app)
 			if err != nil {
@@ -95,7 +95,7 @@ func CommandAppUpdate() cli.Command {
 			Name:   "source",
 			Usage:  SourceFlagUsage,
 			EnvVar: "PVR_SOURCE",
-			Value:  "remote,local",
+			Value:  "",
 		},
 	}
 

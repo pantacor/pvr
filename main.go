@@ -121,12 +121,15 @@ func main() {
 		CommandExport(),
 		CommandImport(),
 		CommandRegister(),
-		CommandScan(),
-		CommandPs(),
-		CommandLogs(),
+		CommandScanDeprecated(),
+		CommandPsDeprecated(),
+		CommandLogsDeprecated(),
 		CommandApp(),
 		CommandSelfUpdate(),
 		CommandGlobalConfig(),
+		CommandWhoami(),
+		CommandLogin(),
+		CommandDevice(),
 	}
 	app.Run(os.Args)
 }

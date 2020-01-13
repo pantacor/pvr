@@ -38,7 +38,6 @@ func CommandPs() cli.Command {
 		Usage:       "Show Owned Devices",
 		Description: "Get a quick overview of devices you manage in Pantahub",
 		Action: func(c *cli.Context) error {
-
 			session, err := libpvr.NewSession(c.App)
 
 			if err != nil {

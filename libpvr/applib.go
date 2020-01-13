@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -34,9 +35,10 @@ const (
 )
 
 var (
-	ErrInvalidVolumeFormat = errors.New("invalid volume format")
-	ErrEmptyAppName        = errors.New("empty app name")
-	ErrEmptyFrom           = errors.New("empty from")
+	ErrInvalidVolumeFormat = errors.New("Invalid volume format")
+	ErrEmptyAppName        = errors.New("Empty app name")
+	ErrEmptyFrom           = errors.New("Empty from")
+	ErrNeedBeRoot          = errors.New("Please run this command as root or use fakeroot utility")
 )
 
 type Source struct {
@@ -48,7 +50,26 @@ type Source struct {
 	DockerName   string                 `json:"docker_name"`
 	DockerTag    string                 `json:"docker_tag"`
 	DockerDigest string                 `json:"docker_digest"`
+	DockerSource string                 `json:"docker_source"`
 	Persistence  map[string]string      `json:"persistence"`
+}
+
+func (p *Pvr) isRunningAsRoot() bool {
+	whoami := exec.Command("whoami")
+	out, err := whoami.Output()
+	if err != nil {
+		return false
+	}
+
+	return strings.Trim(string(out), "\n") == "root"
+}
+
+func (p *Pvr) checkIfIsRunningAsRoot() error {
+	if !p.isRunningAsRoot() {
+		return ErrNeedBeRoot
+	}
+
+	return nil
 }
 
 func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
@@ -61,6 +82,7 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 	result := Source{
 		TemplateArgs: map[string]interface{}{},
 		Config:       map[string]interface{}{},
+		DockerSource: "remote,local",
 	}
 
 	err = json.Unmarshal(js, &result)
@@ -146,6 +168,10 @@ func (p *Pvr) InstallApplication(app AppData) error {
 		return err
 	}
 
+	if err := p.checkIfIsRunningAsRoot(); err != nil {
+		return err
+	}
+
 	trackURL := appManifest.DockerName
 	if appManifest.DockerTag != "" {
 		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
@@ -161,13 +187,30 @@ func (p *Pvr) InstallApplication(app AppData) error {
 		dockerConfig = app.LocalImage.DockerConfig
 	} else if app.RemoteImage.Exists {
 		dockerConfig = app.RemoteImage.DockerConfig
-		app.Appmanifest = appManifest
 	}
-	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, appManifest)
+	app.Appmanifest = appManifest
+	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
 	if err != nil {
 		return err
 	}
 	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
+
+	dockerDigest := ""
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
+	if app.LocalImage.Exists {
+		dockerDigest = app.LocalImage.ImageID
+	} else if app.RemoteImage.Exists {
+		dockerDigest = app.RemoteImage.ImageID
+	}
+	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	if err != nil {
+		return err
+	}
+	if dockerDigest == squashFSDigest {
+		fmt.Println("Application already up to date.")
+		return nil
+	}
 
 	return p.GenerateApplicationSquashFS(app)
 }
@@ -175,6 +218,17 @@ func (p *Pvr) InstallApplication(app AppData) error {
 func (p *Pvr) UpdateApplication(app AppData) error {
 	appManifest, err := p.GetApplicationManifest(app.Appname)
 	if err != nil {
+		return err
+	}
+	if app.Source == "" {
+		app.Source = appManifest.DockerSource
+	}
+	err = p.FindDockerImage(&app)
+	if err != nil {
+		return err
+	}
+
+	if err := p.checkIfIsRunningAsRoot(); err != nil {
 		return err
 	}
 
@@ -192,16 +246,8 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 		dockerDigest = app.RemoteImage.ImageID
 	}
 
-	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
-	if err != nil {
-		return err
-	}
-
-	if dockerDigest == squashFSDigest {
-		return nil
-	}
-
 	appManifest.DockerDigest = dockerDigest
+	appManifest.DockerSource = app.Source
 
 	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
 	if err != nil {
@@ -214,12 +260,24 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 		return err
 	}
 
+	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	if err != nil {
+		return err
+	}
+	if dockerDigest == squashFSDigest {
+		fmt.Println("Application already up to date.")
+		return nil
+	}
 	return p.InstallApplication(app)
 }
 
 func (p *Pvr) AddApplication(app AppData) error {
 	if app.Appname == "" {
 		return ErrEmptyAppName
+	}
+
+	if err := p.checkIfIsRunningAsRoot(); err != nil {
+		return err
 	}
 
 	appPath := filepath.Join(p.Dir, app.Appname)
@@ -246,6 +304,7 @@ func (p *Pvr) AddApplication(app AppData) error {
 		TemplateArgs: app.TemplateArgs,
 		Config:       map[string]interface{}{},
 		Persistence:  persistence,
+		DockerSource: app.Source,
 	}
 	components := strings.Split(app.From, ":")
 	if len(components) < 2 {

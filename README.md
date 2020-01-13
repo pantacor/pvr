@@ -118,7 +118,7 @@ case to a device trails (replace device id with your device)
 example2: pvr post https://api.pantahub.com/trails/<DEVICEID>
 ```
 
-You can later clone that very repo to use it as a starting point or get 
+You can later clone that very repo to use it as a starting point or get
 its content to update another repo.
 
 ## Internals
@@ -158,7 +158,7 @@ cat json
 ### pvr init
 ```
 $ pvr init
-$ cat .pvr/json 
+$ cat .pvr/json
 
 {
 	"#spec": "pantavisor-multi-platform@1"
@@ -248,7 +248,7 @@ These commands are designed for developers that want to interface with devices
 in their own local network, but not does not replace a fleet management
 solution.
 
-## pvr scan
+## pvr device scan
 
 Scan for pantavisor enabled devices on local network.
 
@@ -256,7 +256,7 @@ Info about how to interface and claim devices that dont have an owner yet
 are printed on console.
 
 ```
-> .\pvr.exe scan
+example1: $ pvr device scan
 Scanning ...
         ID: 5b0aa4363c6f7200095b2566 (owned)
         Host: linux.local.
@@ -310,6 +310,142 @@ Scanning ...
 	}
 }
 ```
+## pvr claim -c <DEVICE_NICK> https://api.pantahub.com:443/devices/<DEVICE_ID>
+
+pvr claim: Claims a new device
+
+```
+example1$ pvr claim -c seemingly-rich-mastodon https://api.pantahub.com:443/devices/5d0a2b4e12734a0008363a9a
+
+Login (/type [R] to register) @ https://api.pantahub.com/auth (realm=pantahub services) ***
+Username: youremail@gmail.com
+Password: *****
+```
+
+
+## pvr device create [DEVICE_NICK]
+
+pvr device create creates a new device from an existing device diretory usings its same state values.
+```
+example1$ pvr device create mydevice1
+{
+    "device-meta": {},
+    "garbage": false,
+    "id": "5d7645019061a500098617bd",
+    "nick": "mydevice1",
+    "owner": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
+    "prn": "prn:::devices:/5d7645019061a500098617bd",
+    "public": false,
+    "secret": "mznzxle72fjf6w2",
+    "time-created": "2019-09-09T12:26:41.289253663Z",
+    "time-modified": "2019-09-09T12:26:41.289253663Z",
+    "user-meta": {}
+}
+Device Created Successfully
+```
+
+## pvr device get <DEVICE_NICK|ID>
+
+pvr device get : Get Device details
+
+```
+example1$ pvr device get 5db2f6878b693e0009f1b29f
+{
+    "device-meta": {},
+    "garbage": false,
+    "id": "5db2f6878b693e0009f1b29f",
+    "nick": "heavily_strong_pika",
+    "owner": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
+    "owner-nick": "sirinibin",
+    "prn": "prn:::devices:/5db2f6878b693e0009f1b29f",
+    "public": false,
+    "secret": "mznzxle72fjf6w2",
+    "time-created": "2019-10-25T13:20:07.842Z",
+    "time-modified": "2019-10-25T13:20:07.842Z",
+    "user-meta": {}
+}
+example2$ pvr device get heavily_strong_pika
+{
+    "device-meta": {},
+    "garbage": false,
+    "id": "5db2f6878b693e0009f1b29f",
+    "nick": "heavily_strong_pika",
+    "owner": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
+    "owner-nick": "sirinibin",
+    "prn": "prn:::devices:/5db2f6878b693e0009f1b29f",
+    "public": false,
+    "secret": "mznzxle72fjf6w2",
+    "time-created": "2019-10-25T13:20:07.842Z",
+    "time-modified": "2019-10-25T13:20:07.842Z",
+    "user-meta": {}
+}
+```
+
+## pvr device set <DEVICE_NICK|ID>  <KEY1>=<VALUE1> [KEY2]=[VALUE2]...[KEY-N]=[VALUE-N]
+
+pvr device set : Set or Update device user-meta & device-meta fields (Note:If you are logged in as USER then you can update user-meta field but if you are logged in as DEVICE then you can update device-meta field)
+
+```
+example1$ pvr device set 5df243ff0be81900099855e6 a=1 b=2
+{
+    "a": "1",
+    "b": "2"
+}
+user-meta field Updated Successfully
+
+```
+
+```
+example2$ pvr device set 5df243ff0be81900099855e6 a=1 b=2
+{
+    "a": "1",
+    "b": "2"
+}
+device-meta field Updated Successfully
+
+```
+## pvr device logs <deviceid|devicenick>[/source][@Level]
+
+pvr device logs list the logs with filter options of device,source & level
+
+```
+example1$ pvr device logs 5d555d5e80123b31faa3cff2/pantavisor.log@INFO
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+
+```
+pvr device logs list the logs with filter options of multiple device,source & level
+
+```
+example2$ pvr device logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:03Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:17Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:43Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:53Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+```
+
+## pvr export <FILENAME.tar.gz>
+
+pvr export : Exports repo into single file (tarball)
+```
+example1$ pvr export device.tar.gz
+$ ls
+alpine-hotspot  bsp            download-layer        nginx-app  pvr-sdk
+app2            device.tar.gz  network-mapping.json  pv-avahi   storage-mapping.json
+```
+## pvr import <FILENAME.tar.gz>
+
+pvr import : import repo tarball (like the one produced by 'pvr export') into pvr in current working dir.It can import files with.gz or .tgz extension as well as plain .tar. Will not do pvr checkout, so working directory stays untouched.
+
+```
+example1$ pvr import device.tar.gz
+```
+
 
 # PVR Pantahub Commands
 
@@ -317,6 +453,8 @@ Since version 006 PVR also provides convenience commands for interacting with pa
 regardless beyond publishing pvr repositories to pantahub trails.
 
 ## pvr ps
+
+```WARNING:```This command is DEPRECATED, please use ```pvr device ps``` instead
 
 ```pvr ps``` gets a list of devices like below:
 
@@ -331,3 +469,283 @@ $ pvr ps
   5b08464f   helped_aphid                3   NEW      xxxx    about 23 hours ago   message....
 ```
 
+## pvr logs <deviceid|devicenick>[/source][@Level]
+
+```WARNING:```This command is DEPRECATED, please use ```pvr device logs``` instead
+
+pvr logs list the logs with filter options of device,source & level
+
+```
+example1$ pvr logs 5d555d5e80123b31faa3cff2/pantavisor.log@INFO
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+```
+pvr logs list the logs with filter options of multiple device,source & level
+
+```
+example2$ pvr logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:03Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:17Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:43Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:53Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+```
+
+## pvr login [END_POINT]
+
+Login to pantahub with your username & password with an optional end point
+Note:Default endpoint is https://api.pantahub.com/auth/auth_status
+
+
+```
+example1$  pvr login
+*** Login (/type [R] to register) @ https://api.pantahub.com/auth (realm=pantahub services) ***
+Username: sirinibin2006@gmail.com
+Password: *****
+Response of GET https://api.pantahub.com/auth/auth_status
+{
+    "exp": 1568206179,
+    "id": "sirinibin2006@gmail.com",
+    "nick": "sirinibin",
+    "orig_iat": 1568205279,
+    "prn": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
+    "roles": "user",
+    "scopes": "prn:pantahub.com:apis:/base/all",
+    "type": "USER"
+}
+LoggedIn Successfully!
+```
+
+```
+example2$  pvr login https://api2.pantahub.com/auth
+*** Login (/type [R] to register) @ https://api2.pantahub.com/auth (realm=pantahub services) ***
+Username: sirinibin2006@gmail.com
+Password: *****
+Response of GET https://api2.pantahub.com/auth/auth_status
+{
+    "exp": 1568206179,
+    "id": "sirinibin2006@gmail.com",
+    "nick": "sirinibin",
+    "orig_iat": 1568205279,
+    "prn": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
+    "roles": "user",
+    "scopes": "prn:pantahub.com:apis:/base/all",
+    "type": "USER"
+}
+LoggedIn Successfully!
+```
+## pvr whoami
+
+pvr whoami : List the loggedin details with pantahub instances
+```
+example1$ pvr whoami
+sirinibin(prn:::accounts:/5bf2ac9e41b2dd0009a96c97) at https://api.pantahub.com/auth
+```
+
+## pvr get
+
+pvr get :Get update target-repository from repository
+```
+example1$ $ pvr get
+33aefd8dbf46f05 [OK]
+686a026cd606613 [OK]
+ff2a85a62cd09f1 [OK]
+76d1d085d44fd3f [OK]
+b30e6b64d3e1ecb [OK]
+66ae7cac57d6d05 [OK]
+e8305714eaadc57 [OK]
+989647b3d5b7fde [OK]
+612408620229de6 [OK]
+f1b441cb2721355 [OK]
+d49d56059ba219c [OK]
+3f4889e5eed2252 [OK]
+b56390fbeb5e46f [OK]
+70075ca4496451e [OK]
+```
+
+## pvr global-config
+
+pvr global-config :Get Global Configuration details of the repo.
+```
+example1$ pvr global-config
+{
+    "Spec": "1",
+    "AutoUpgrade": false,
+    "DistributionTag": "develop"
+}
+```
+## pvr merge
+
+pvr merge : Merge content of repository into target-directory.Default target-repository is the local .pvr one. If not <repository> is provided the last one is used.
+```
+example1$ pvr merge
+e8305714eaadc57 [OK]
+3f4889e5eed2252 [OK]
+76d1d085d44fd3f [OK]
+b56390fbeb5e46f [OK]
+d49d56059ba219c [OK]
+686a026cd606613 [OK]
+70075ca4496451e [OK]
+66ae7cac57d6d05 [OK]
+989647b3d5b7fde [OK]
+33aefd8dbf46f05 [OK]
+612408620229de6 [OK]
+f1b441cb2721355 [OK]
+b30e6b64d3e1ecb [OK]
+ff2a85a62cd09f1 [OK]
+```
+## pvr putobjects <OBJECTS_ENDPOINT>
+
+pvr putobjects : put objects from local repository to objects-endpoint
+```
+example1$ pvr putobjects https://api.pantahub.com/objects
+alpine-hotsp [OK]
+bsp/kernel.i [OK]
+pvr-sdk/root [OK]
+bsp/firmware [OK]
+pvr-sdk/root [OK]
+alpine-hotsp [OK]
+bsp/pantavis [OK]
+pv-avahi/roo [OK]
+bsp/pantavis [OK]
+alpine-hotsp [OK]
+pv-avahi/lxc [OK]
+bsp/modules. [OK]
+pvr-sdk/lxc. [OK]
+```
+
+## pvr self-upgrade
+
+pvr self-upgrade : Update pvr command to the latest version
+```
+example1$ $ sudo pvr self-upgrade
+[sudo] password for nintriva:
+Starting update PVR using Docker latest tag (sha256:0d6e747e75758535bdee89657902a1499e449db9510d688e0ef16d3171203975)
+
+Downloading layers 8 ...
+Done with [3/8] from repository
+Done with [2/8] from repository
+Done with [7/8] from repository
+Done with [8/8] from repository
+Done with [5/8] from repository
+Done with [6/8] from repository
+Done with [1/8] from repository
+Done with [4/8] from repository
+
+Extracting layers 8 ...
+
+Pvr installed on /bin/pvr
+
+Docker layers are going to be cache on: /root/.pvr/cache
+
+PVR has been updated!
+```
+
+## pvr checkout|reset
+
+pvr checkout|reset : checkout/reset working directory to match the repo stat.reset/checkout also forgets about added files; pvr status and diff will yield empty
+```
+example1$ pvr checkout
+```
+
+## pvr register [API_URL] -u \<USERNAME\> -p \<PASSWORD\> -e \<EMAIL\>
+
+pvr register : register new user account with pantahub
+```
+example1$ $ pvr register https://api.pantahub.com -e jogn123@gmail.com -u john123 -p 123
+
+
+Your registration process needs to be complete two steps
+1.- Confirm you aren't a bot
+2.- Confirm your email address
+
+
+Follow this link to continue and after that come back and continue
+
+
+```
+
+# PVR App Commands
+
+## fakeroot pvr app add <APP_NAME> --from=<DOCKER_IMAGE> --source=[remote|local],[remote|local]
+
+pvr app add creates a new application and generates files by pulling layers from a given docker image in either remote or local docker repo's.
+By default it will first look in remote repo. when not found it will pull from local docker repo,the priority can be changed using the --source flag(default:remote,local).
+
+```
+example1$ fakeroot pvr app add nginx-app --from=nginx --source=remote,local
+Generating squashfs...
+Downloading layers...
+Layer 0 downloaded(cache)
+Layer 1 downloaded(cache)
+Layer 2 downloaded(cache)
+Extracting layers...
+Extracting layer 0
+Extracting layer 1
+Extracting layer 2
+Stripping qemu files...
+Deleted /home/nintriva/work/gitlab.com/pantacor/devices/10/nginx-app/download-layer/rootfs/usr/bin/qemu-arm-static file
+Generating squashfs file
+Generating squashfs digest
+Application added
+```
+
+## pvr app info <APP_NAME>
+
+pvr app info <appname> :output info and state of appname
+
+```
+example1$ $ pvr app info nginx-app
+{
+    "#spec": "service-manifest-src@1",
+    "args": {},
+    "config": {},
+    "docker_digest": "sha256:231d40e811cd970168fb0c4770f2161aa30b9ba6fe8e68527504df69643aa145",
+    "docker_name": "nginx",
+    "docker_source": "remote,local",
+    "docker_tag": "latest",
+    "persistence": {},
+    "template": "builtin-lxc-docker"
+}
+```
+
+## pvr app ls
+
+pvr app ls :list applications in pvr checkout
+
+```
+example1$ $ pvr app ls
+alpine-hotspot
+app1
+app2
+nginx-app
+pv-avahi
+pvr-sdk
+```
+
+## pvr app rm <APP_NAME>
+
+pvr app rm <appname> : remove app from pvr checkout
+
+```
+example1$ $ pvr app rm app1
+$ pvr app ls
+alpine-hotspot
+app2
+nginx-app
+pv-avahi
+pvr-sdk
+```
+
+## fakeroot pvr app update <APP_NAME>
+
+fakeroot pvr app update :update an existing application.
+
+```
+example1$ $ fakeroot pvr app update nginx-app
+Application updated
+```

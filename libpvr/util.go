@@ -24,13 +24,31 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/go-resty/resty"
 )
+
+// RemoveAll remove a path, could be a file or a folder
+func RemoveAll(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		return errors.New(path + "' doesn't exist")
+	}
+	err := os.RemoveAll(path)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func Copy(dst, src string) error {
 	in, err := os.Open(src)
@@ -277,4 +295,286 @@ func StructToMap(s interface{}) (map[string]interface{}, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+// CreateDevice : Create Device
+func (s *Session) CreateDevice(baseURL string, deviceNick string) (
+	*resty.Response,
+	error,
+) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, err
+	}
+	//Get User Access token
+	host := u.Scheme + "://" + u.Host
+	authHeader := "JWT realm=\"pantahub services\", ph-aeps=\"" + host + "/auth\""
+	accessToken, err := s.auth.getCachedAccessToken(authHeader)
+	if err != nil {
+		return nil, err
+	}
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		body := map[string]interface{}{}
+		if deviceNick != "" {
+			body["nick"] = deviceNick
+		}
+		return req.
+			SetBody(body).
+			SetAuthToken(accessToken).
+			Post(baseURL + "/devices/")
+	})
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error creating device")
+}
+
+// LoginDevice : Login Device
+func LoginDevice(
+	baseURL string,
+	prn string,
+	secret string,
+) (
+	string,
+	error,
+) {
+
+	body := map[string]interface{}{}
+	body["username"] = prn
+	body["password"] = secret
+	req := resty.R().SetBody(body)
+	response, err := req.Post(baseURL + "/auth/login")
+	if err != nil {
+		return "", err
+	}
+	if response.StatusCode() == http.StatusOK {
+		responseData := map[string]interface{}{}
+		err = json.Unmarshal(response.Body(), &responseData)
+		if err != nil {
+			return "", err
+		}
+		return responseData["token"].(string), nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return "", err
+	}
+	return "", errors.New("Error login device")
+}
+
+// CreateTrail : Create Trail
+func CreateTrail(baseURL string,
+	deviceAccessToken string,
+	state map[string]interface{},
+) (
+	*resty.Response,
+	error,
+) {
+	req := resty.R().SetAuthToken(deviceAccessToken).SetBody(state)
+	response, err := req.Post(baseURL + "/trails/")
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error creating trail")
+}
+
+// LogPrettyJSON : Pretty print Json content
+func LogPrettyJSON(content []byte) error {
+	var data interface{}
+	err := json.Unmarshal(content, &data)
+	if err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(data, "", "    ")
+	if err != nil {
+		return err
+	}
+	fmt.Print(string(b))
+	fmt.Print("\n")
+	return nil
+}
+
+// SetTempFilesInterrupHandler : Set Temp Files Interrup Handler
+/*
+This function will capture Interrupt signals and delete all temp files
+*/
+func SetTempFilesInterrupHandler(tempdir string) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(
+		sigs,
+		os.Interrupt,
+	)
+	go func() {
+		<-sigs
+		fileExist, err := IsFileExists(tempdir)
+		if err != nil {
+			log.Fatal(err.Error())
+			os.Exit(1)
+		}
+		if fileExist {
+			err := os.RemoveAll(tempdir)
+			if err != nil {
+				log.Fatal(err.Error())
+				os.Exit(1)
+			}
+		}
+		os.Exit(0)
+	}()
+}
+
+// GetDevices : Get Devices
+func (s *Session) GetDevices(baseURL string,
+	deviceNick string,
+) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(baseURL + "/devices/?nick=^" + deviceNick)
+	})
+
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error getting device details")
+}
+
+// GetDevice : Get Device
+func (s *Session) GetDevice(baseURL string,
+	deviceNick string,
+) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(baseURL + "/devices/" + deviceNick)
+	})
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error getting device details")
+}
+
+// SliceContainsItem : checks if an item exists in a string array or not
+func SliceContainsItem(slice []string, item string) bool {
+    set := make(map[string]struct{}, len(slice))
+    for _, s := range slice {
+        set[s] = struct{}{}
+    }
+
+    _, ok := set[item]
+    return ok
+}
+
+func RemoveDirContents(dir string) error {
+    d, err := os.Open(dir)
+    if err != nil {
+        return err
+    }
+    defer d.Close()
+    names, err := d.Readdirnames(-1)
+    if err != nil {
+        return err
+    }
+    for _, name := range names {
+        err = os.RemoveAll(filepath.Join(dir, name))
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+// UpdateDevice : Update  user-meta or device-meta field of a device
+func (s *Session) UpdateDevice(
+	baseURL string,
+	deviceNick string,
+	data map[string]interface{},
+	updateField string,
+) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.SetBody(data).Patch(baseURL + "/devices/" + deviceNick + "/" + updateField)
+	})
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error Updating " + updateField + " field")
+}
+
+// GetAuthStatus : Get Auth Status, GET /auth/auth_status
+func (s *Session) GetAuthStatus(baseURL string) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(baseURL + "/auth/auth_status")
+	})
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error getting auth status")
+}
+//ValidateSourceFlag : Validate Source Flag
+func ValidateSourceFlag(source string) error {
+	if source == "" {
+		return nil
+	}
+	splits := strings.Split(source, ",")
+	for _, v := range splits {
+		if v != "remote" && v != "local" {
+			return errors.New("Source flag only accepts remote / local, (e.g. --source=remote,local)")
+		}
+	}
+	return nil
 }

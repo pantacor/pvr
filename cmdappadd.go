@@ -16,6 +16,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -71,6 +72,13 @@ func CommandAppAdd() cli.Command {
 				}
 			}
 
+			err = libpvr.ValidateSourceFlag(c.String("source"))
+			if err != nil {
+				return cli.NewExitError(err, 3)
+			}
+			if c.String("from") == "" {
+				return cli.NewExitError(errors.New(" --from flag is required (e.g. --from=nginx)"), 4)
+			}
 			app := libpvr.AppData{
 				Appname:      appname,
 				Username:     c.String("username"),

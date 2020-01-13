@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 
 	"github.com/go-resty/resty"
@@ -37,7 +38,6 @@ type Session struct {
 }
 
 func NewSession(app *cli.App) (*Session, error) {
-
 	configDir := app.Metadata["PVR_CONFIG_DIR"].(string)
 	authConfigPath := filepath.Join(configDir, "auth.json")
 	generalConfigPath := filepath.Join(configDir, ConfigurationFile)
@@ -66,6 +66,28 @@ func (s *Session) GetConfigDir() string {
 
 func (s *Session) GetApp() *cli.App {
 	return s.app
+}
+
+// Login : Login to a given URL
+func (s *Session) Login(APIURL string) (*resty.Response, error) {
+	//clear token
+	u, err := url.Parse(APIURL)
+	if err != nil {
+		return nil, err
+	}
+	host := u.Scheme + "://" + u.Host
+	authHeader := "JWT realm=\"pantahub services\", ph-aeps=\"" + host + "/auth\""
+	err = s.auth.resetCachedAccessToken(authHeader)
+	if err != nil {
+		return nil, err
+	}
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(APIURL)
+	})
+	if err != nil {
+		return response, err
+	}
+	return response, nil
 }
 
 func (s *Session) DoAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error) {

@@ -25,6 +25,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -839,8 +840,22 @@ func worker(jobs chan FilePut, done chan FilePut) {
 			continue
 		}
 
-		res, err := http.DefaultClient.Do(req)
+		transport := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   60 * time.Minute,
+				KeepAlive: 30 * time.Second,
+				DualStack: true,
+			}).DialContext,
+			ForceAttemptHTTP2:     false,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   30 * time.Second,
+			ExpectContinueTimeout: 15 * time.Second,
+		}
+		httpClient := &http.Client{Transport: transport}
 
+		res, err := httpClient.Do(req)
 		j.bar.ShowFinalTime = true
 		j.bar.ShowPercent = false
 		j.bar.ShowCounters = false
@@ -1540,7 +1555,6 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool) error {
 	}
 
 	remotePvr, err := p.initializeRemote(url)
-
 	if err != nil {
 		return err
 	}
@@ -1579,7 +1593,6 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool) error {
 }
 
 func (p *Pvr) GetRepo(uri string, merge bool) error {
-
 	if uri == "" {
 		uri = p.Pvrconfig.DefaultPutUrl
 	}

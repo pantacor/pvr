@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2019  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,26 +16,24 @@
 package main
 
 import (
-	"errors"
 	"os"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
 )
 
-func CommandImport() cli.Command {
+func CommandWhoami() cli.Command {
 	return cli.Command{
-		Name:        "import",
-		Aliases:     []string{"i"},
-		ArgsUsage:   "<repo-tarball>",
-		Usage:       "import repo tarball (like the one produced by 'pvr export') into pvr in current working dir",
-		Description: "can import files with.gz or .tgz extension as well as plain .tar. Will not do pvr checkout, so working directory stays untouched.",
+		Name:        "whoami",
+		Aliases:     []string{"wai"},
+		ArgsUsage:   "[auth-endpoint]",
+		Usage:       "pvr whoami",
+		Description: "List the loggedin details with pantahub instances",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
 				return cli.NewExitError(err, 1)
 			}
-
 			session, err := libpvr.NewSession(c.App)
 
 			if err != nil {
@@ -46,18 +44,10 @@ func CommandImport() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
-
-			if c.NArg() > 1 {
-				return errors.New("import can have at most 1 argument. See --help")
-			}
-			if c.NArg() < 1 {
-				return errors.New("repo-tarball name is required. See --help")
-			}
-			err = pvr.Import(c.Args()[0])
+			err = pvr.Session.Whoami()
 			if err != nil {
-				return cli.NewExitError(err, 3)
+				return cli.NewExitError(err, 2)
 			}
-
 			return nil
 		},
 	}

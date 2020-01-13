@@ -15,9 +15,33 @@
 //
 package templates
 
-import "reflect"
+import (
+	"reflect"
+	"strings"
+)
 
 var pvrFuncMap = map[string]interface{}{
+	"mergePersistentMaps": func(m1 interface{}, m2 interface{}) interface{} {
+		mapR := map[string]interface{}{}
+		map1 := map[string]interface{}{}
+		if m1 != nil {
+			map1 = m1.(map[string]interface{})
+			for k := range map1 {
+				k1 := strings.TrimSuffix(k, "/")
+				mapR[k1] = "permanent"
+			}
+		}
+		map2 := map[string]interface{}{}
+		if m2 != nil {
+			map2 = m2.(map[string]interface{})
+			for k, v := range map2 {
+				k1 := strings.TrimSuffix(k, "/")
+				mapR[k1] = v
+			}
+		}
+
+		return mapR
+	},
 	"sliceIndex": func(content []interface{}, i int) interface{} {
 		if len(content) > i {
 			return content[i]
