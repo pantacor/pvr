@@ -23,7 +23,7 @@ Sumodules:
 ## Install
 
 1. From gitlab:
-  ```
+```
 $ go get gitlab.com/pantacor/pvr
 $ go build -o ~/bin/pvr gitlab.com/pantacor/pvr
 ```
@@ -42,14 +42,14 @@ getting stored in a flat objects directory.
 To start a pvr from scratch you use the pvr init command which sets you up.
 
 ```
-example1$ pvr init
+$ pvr init
 ```
 
 However, more likely is that you want to consume an existing pvr made by you
 or someone else and maybe change things against it:
 
 ```
-pvr clone /path/to/pvr/repo example2
+$ pvr clone /path/to/pvr/repo example2
  -> mkdir example2
  -> pvr init
  -> pvr get /path/to/pvr/repo
@@ -60,7 +60,7 @@ While working on changes to your local checkout, you can use `status` and `diff`
 to observe your current changes:
 
 ```
-example2$ pvr status
+$ pvr status
 A newfile.txt
 D deleted.txt
 C some.json
@@ -73,7 +73,7 @@ This means that `newfile.txt` is new, working.txt and some.json changed and
 You can introspect the changes through the `diff` command:
 
 ```
-example2$ pvr diff
+$ pvr diff
 {
 	"deleted.txt": null,
 	"newfile.txt": "dc460da4ad72c482231e28e688e01f2778a88ce31a08826899d54ef7183998b5",
@@ -88,7 +88,7 @@ Being happy with what you see, you can checkpoint your working state using the
 `commit` command:
 
 ```
-example2$ pvr commit
+$ pvr commit
 Committing some.json
 Committing working.txt
 Adding newfile.txt
@@ -101,13 +101,13 @@ After committing your changes you might want to store your current repository
 state for reuse or archiving purpose. You can do so using the `push` command:
 
 ```
-example2$ pvr push /tmp/myrepo
+$ pvr push /tmp/myrepo
 ```
 
 You can always get a birds view on things in your repo by dumping the complete
 current json:
 ```
-example2$ pvr json
+$ pvr json
 {...}
 ```
 
@@ -115,7 +115,7 @@ You can also push your repository to a pvr compliant REST backend. In this
 case to a device trails (replace device id with your device)
 
 ```
-example2: pvr post https://api.pantahub.com/trails/<DEVICEID>
+$ pvr post https://api.pantahub.com/trails/<DEVICEID>
 ```
 
 You can later clone that very repo to use it as a starting point or get
@@ -125,18 +125,10 @@ its content to update another repo.
 
 The pvr repository has the following structure in v1:
 
-objects/:
-```
-ls objects/
-8862f6feea4f6d01e28adc674285640874da19d7594dd80ed42ff7fb4dc0eea3
-ad6da30bb62fae51c770574a5ca33c5e8e4bbc67fd6c5e7c094c34ad52a28e4d
-d0365cf6153143a414cccaca9260bc614593feba9fe0379d0ffb7a1178470499
-d9206603679fcf0a10bf4e88bf880222b05b828749ea1e2874559016ff0f5230
-```
 
-json:
+### The state json
 ```
-cat json
+$ cat json
 {
   "spec": "pantavisor-multi-platform@1",
   "brcm.tar.gz": "8862f6feea4f6d01e28adc674285640874da19d7594dd80ed42ff7fb4dc0eea3",
@@ -153,19 +145,39 @@ cat json
 }
 ```
 
+### The Objects Repository
+
+Every PVR Repo is backed by an object repository which has for each
+file a hashed file in it. These will be used on device as hardlink or on a checkout as a source to copy the files referenced from the state json file above.
+
+By default the objects are kept centrally so you they get reused across potentially many projects you might checkout as a developer, but on device or in special cases you can use the --objects-dir parameter to use a different location.
+
+
+```
+$ ls objects/
+8862f6feea4f6d01e28adc674285640874da19d7594dd80ed42ff7fb4dc0eea3
+ad6da30bb62fae51c770574a5ca33c5e8e4bbc67fd6c5e7c094c34ad52a28e4d
+d0365cf6153143a414cccaca9260bc614593feba9fe0379d0ffb7a1178470499
+d9206603679fcf0a10bf4e88bf880222b05b828749ea1e2874559016ff0f5230
+```
+
+
 ## Commands
 
 ### pvr init
 ```
 $ pvr init
-$ cat .pvr/json
+```
 
+Observe how the repo json got created in a subdirectory:
+```
+$ cat .pvr/json
 {
 	"#spec": "pantavisor-multi-platform@1"
 }
 ```
 
-You would now continue editing this directory as it pleases you. and you can refer to any file you put here in your configs just using the absolute path (e.g. /systemc.json).
+You would now continue editing this directory as it pleases you and you can refer to any file you put here in your configs just using the path as key (e.g. ```systemc.json": {}``` would create a systemc.json file on checkout).
 
 ### pvr add [file1 file2 ...]
 
