@@ -30,6 +30,9 @@ lxc.init.cmd =
 		{{- if pvr_sliceIndex .Docker.Entrypoint 0 }}
 			{{- "" }} {{ pvr_sliceIndex .Docker.Entrypoint 0}}{{ range pvr_sliceFrom .Docker.Entrypoint 1 }} "{{ . }}"{{ end }}
 		{{- end }}
+		{{- if and (.Docker.Cmd) (pvr_isSlice .Docker.Cmd) }}
+			{{- "" }} {{ range pvr_sliceFrom .Docker.Cmd 0 }} "{{ . }}"{{ end }}
+		{{- end }}
 	{{- else }}
 		{{- "" }} {{ .Docker.Entrypoint }}
 	{{- end }}
