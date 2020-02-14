@@ -101,7 +101,16 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | rep
 {{- if eq .Source.args.PV_LXC_NETWORK_TYPE "veth" }}
 lxc.net.0.type = veth
 lxc.net.0.link = lxcbr0
-{{- end -}}
+lxc.net.0.flags = up
+{{- if .Source.args.PV_LXC_NETWORK_IPV4_ADDRESS }}
+lxc.net.0.ipv4.address = {{ .Source.args.PV_LXC_NETWORK_IPV4_ADDRESS }}
+{{- if .Source.args.PV_LXC_NETWORK_IPV4_GATEWAY }}
+lxc.net.0.ipv4.gateway = {{ .Source.args.PV_LXC_NETWORK_IPV4_GATEWAY }}
+{{- else }}
+lxc.net.0.ipv4.gateway = auto
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- if .Source.args.PV_LXC_EXTRA_CONF }}
 {{ .Source.args.PV_LXC_EXTRA_CONF }}
