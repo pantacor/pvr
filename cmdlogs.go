@@ -40,6 +40,13 @@ func CommandLogs() cli.Command {
 			}
 
 			from := time.Now().Add(time.Duration(-1 * time.Minute))
+			if c.String("from") != "" {
+				from, err = time.Parse("2006-01-02", c.String("from"))
+				if err != nil {
+					return cli.NewExitError(err, 5)
+				}
+				from = from.Local()
+			}
 			splits := []string{}
 			devices := []string{}
 			source := ""
@@ -122,6 +129,13 @@ func CommandLogs() cli.Command {
 			}
 
 			return nil
+		},
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:   "from,f",
+				Usage:  "--from=Y-m-d",
+				EnvVar: "PVR_LOGS_FROM_DATE",
+			},
 		},
 	}
 }
