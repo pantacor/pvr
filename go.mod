@@ -3,6 +3,7 @@ module gitlab.com/pantacor/pvr
 go 1.12
 
 require (
+	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
 	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/Masterminds/semver v1.4.2 // indirect
 	github.com/Masterminds/sprig v2.20.0+incompatible

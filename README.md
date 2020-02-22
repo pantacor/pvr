@@ -1,28 +1,30 @@
 PVR operates on two types of entities:
 
 Sumodules:
- * PVR Repository
- * PVR Pantahub
- * PVR Devel
+
+- PVR Repository
+- PVR Pantahub
+- PVR Devel
 
 # PVR Repository
 
 ## Features
 
- * simple repository in json format with object store
- * checkout and commit any working directory to repository
- * look at working tree diffs with `status` and `diff` commands
- * get, push and apply patches as incremental updates
- * all repo operations are atomic and can be recovered
- * object store can be local or in cloud/CDN
+- simple repository in json format with object store
+- checkout and commit any working directory to repository
+- look at working tree diffs with `status` and `diff` commands
+- get, push and apply patches as incremental updates
+- all repo operations are atomic and can be recovered
+- object store can be local or in cloud/CDN
 
 ## Requirement
 
- * a server backend implementing state CRUD primitives like offered by pantahub "trails"
+- a server backend implementing state CRUD primitives like offered by pantahub "trails"
 
 ## Install
 
 1. From gitlab:
+
 ```
 $ go get gitlab.com/pantacor/pvr
 $ go build -o ~/bin/pvr gitlab.com/pantacor/pvr
@@ -94,6 +96,7 @@ Committing working.txt
 Adding newfile.txt
 Removing deleted.txt
 ```
+
 This will atomically update the json file in your repo after ensuring all the
 right objects have been synched into the objects store of that pvr repo.
 
@@ -106,6 +109,7 @@ $ pvr push /tmp/myrepo
 
 You can always get a birds view on things in your repo by dumping the complete
 current json:
+
 ```
 $ pvr json
 {...}
@@ -125,8 +129,8 @@ its content to update another repo.
 
 The pvr repository has the following structure in v1:
 
-
 ### The state json
+
 ```
 $ cat json
 {
@@ -152,7 +156,6 @@ file a hashed file in it. These will be used on device as hardlink or on a check
 
 By default the objects are kept centrally so you they get reused across potentially many projects you might checkout as a developer, but on device or in special cases you can use the --objects-dir parameter to use a different location.
 
-
 ```
 $ ls objects/
 8862f6feea4f6d01e28adc674285640874da19d7594dd80ed42ff7fb4dc0eea3
@@ -161,15 +164,16 @@ d0365cf6153143a414cccaca9260bc614593feba9fe0379d0ffb7a1178470499
 d9206603679fcf0a10bf4e88bf880222b05b828749ea1e2874559016ff0f5230
 ```
 
-
 ## Commands
 
 ### pvr init
+
 ```
 $ pvr init
 ```
 
 Observe how the repo json got created in a subdirectory:
+
 ```
 $ cat .pvr/json
 {
@@ -177,7 +181,7 @@ $ cat .pvr/json
 }
 ```
 
-You would now continue editing this directory as it pleases you and you can refer to any file you put here in your configs just using the path as key (e.g. ```systemc.json": {}``` would create a systemc.json file on checkout).
+You would now continue editing this directory as it pleases you and you can refer to any file you put here in your configs just using the path as key (e.g. `systemc.json": {}` would create a systemc.json file on checkout).
 
 ### pvr add [file1 file2 ...]
 
@@ -194,6 +198,7 @@ $ pvr add lxc-platform.json pxc-platform.conf
 These files will then be part of the next commit.
 
 ### pvr diff
+
 You can look at your current changes to working directory using the diff command to get RFCXXXX json patch format:
 
 ```
@@ -205,6 +210,7 @@ $ pvr diff
 ```
 
 ### pvr commit
+
 Committing your pvr will update the .pvr directory so it can be pushed to pantahub.
 
 ```
@@ -219,6 +225,7 @@ You can then continue editing and see your changes compared to the committed bas
 ### pvr put <destination>
 
 Put local:
+
 ```
 $ pvr put /some/local/repopath
 
@@ -231,6 +238,7 @@ $ find /some/local/repopath
 ### pvr post <remote-device-ep>
 
 Post local pvr as a new revision to your device endpoint:
+
 ```
 $ pvr post https://api.pantahub.com/trails/<YOURDEVICE>
 ...
@@ -246,6 +254,7 @@ $ pvr clone https://api.pantahub.com/trails/<YOURDEVICE>
 ```
 
 Alternatively you can get a specific revision:
+
 ```
 $ pvr clone https://api.pantahub.com/trails/<YOURDEVICE>/steps/<REV>
 ...
@@ -322,6 +331,7 @@ Scanning ...
 	}
 }
 ```
+
 ## pvr claim -c <DEVICE_NICK> https://api.pantahub.com:443/devices/<DEVICE_ID>
 
 pvr claim: Claims a new device
@@ -334,10 +344,10 @@ Username: youremail@gmail.com
 Password: *****
 ```
 
-
 ## pvr device create [DEVICE_NICK]
 
 pvr device create creates a new device from an existing device diretory usings its same state values.
+
 ```
 example1$ pvr device create mydevice1
 {
@@ -393,7 +403,7 @@ example2$ pvr device get heavily_strong_pika
 }
 ```
 
-## pvr device set <DEVICE_NICK|ID>  <KEY1>=<VALUE1> [KEY2]=[VALUE2]...[KEY-N]=[VALUE-N]
+## pvr device set <DEVICE_NICK|ID> <KEY1>=<VALUE1> [KEY2]=[VALUE2]...[KEY-N]=[VALUE-N]
 
 pvr device set : Set or Update device user-meta & device-meta fields (Note:If you are logged in as USER then you can update user-meta field but if you are logged in as DEVICE then you can update device-meta field)
 
@@ -416,7 +426,8 @@ example2$ pvr device set 5df243ff0be81900099855e6 a=1 b=2
 device-meta field Updated Successfully
 
 ```
-## pvr device logs <deviceid|devicenick>[/source][@Level]
+
+## pvr device logs <deviceid|devicenick>[/source][@level]
 
 pvr device logs list the logs with filter options of device,source & level
 
@@ -427,6 +438,7 @@ example1$ pvr device logs 5d555d5e80123b31faa3cff2/pantavisor.log@INFO
 2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
 
 ```
+
 pvr device logs list the logs with filter options of multiple device,source & level
 
 ```
@@ -441,23 +453,97 @@ example2$ pvr device logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pant
 2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff5
 ```
 
+```
+pvr device logs --from=2020-01-06 --to=2020-01-07 list the logs within a given date range
+
+```
+
+```
+example3\$ pvr device logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-07T12:55:03Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-07T12:55:17Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-07T12:55:43Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-07T12:55:53Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+```
+
+```
+pvr device logs --from=2020-01-06T12:54:10--to=2020-01-06T12:54:20 list the logs within a given date time range
+```
+
+```
+example4\$ pvr device logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
+2020-01-06T12:54:10Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:10Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:10Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-07T12:55:15Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-07T12:55:15Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-07T12:55:20Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-07T12:55:20Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:20Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+
+```
+
+```
+
+pvr device logs --from=2020-01-06T12:54:10+05:30 --to=2020-01-06T12:54:20+05:30 list the logs within a given date time range having timezone: +05:30(IST) ,Note:Timezone is optional
+
+```
+
+```
+example5\$ pvr device logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
+2020-01-06T12:54:10Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:10Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:10Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-07T12:55:15Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-07T12:55:15Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-07T12:55:20Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-07T12:55:20Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:20Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+```
+
+```
+pvr device logs --from=P10D --to=P5D list the logs from last 10 days to last 5 days
+Note: --from & --too flags support the ISO 8601 Duration strings
+```
+
+```
+example6\$ pvr device logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
+2020-01-06T12:54:10Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:10Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:10Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-07T12:55:15Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-07T12:55:15Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-07T12:55:20Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-07T12:55:20Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:20Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+```
+
 ## pvr export <FILENAME.tar.gz>
 
 pvr export : Exports repo into single file (tarball)
+
 ```
+
 example1$ pvr export device.tar.gz
 $ ls
-alpine-hotspot  bsp            download-layer        nginx-app  pvr-sdk
-app2            device.tar.gz  network-mapping.json  pv-avahi   storage-mapping.json
+alpine-hotspot bsp download-layer nginx-app pvr-sdk
+app2 device.tar.gz network-mapping.json pv-avahi storage-mapping.json
+
 ```
+
 ## pvr import <FILENAME.tar.gz>
 
 pvr import : import repo tarball (like the one produced by 'pvr export') into pvr in current working dir.It can import files with.gz or .tgz extension as well as plain .tar. Will not do pvr checkout, so working directory stays untouched.
 
 ```
-example1$ pvr import device.tar.gz
-```
 
+example1\$ pvr import device.tar.gz
+
+```
 
 # PVR Pantahub Commands
 
@@ -466,45 +552,52 @@ regardless beyond publishing pvr repositories to pantahub trails.
 
 ## pvr ps
 
-```WARNING:```This command is DEPRECATED, please use ```pvr device ps``` instead
+`WARNING:`This command is DEPRECATED, please use `pvr device ps` instead
 
-```pvr ps``` gets a list of devices like below:
+`pvr ps` gets a list of devices like below:
 
 ```
-$ pvr ps
-     ID               NICK             REV   STATUS   STATE          SEEN            MESSAGE
-  5a21cefc   tops_urchin                20   NEW      xxxx    7 months ago         message....
-  5af32b42   verified_cicada             5   NEW      xxxx    5 months ago         message....
-  5af4ca2c   classic_crappie             0   DONE     xxxx    5 months ago         message....
-  5b07f476   resolved_mule               0   DONE     xxxx    4 months ago         message....
-  5b07ff81   right_vervet                0   DONE     xxxx    4 months ago         message....
-  5b08464f   helped_aphid                3   NEW      xxxx    about 23 hours ago   message....
+
+\$ pvr ps
+ID NICK REV STATUS STATE SEEN MESSAGE
+5a21cefc tops_urchin 20 NEW xxxx 7 months ago message....
+5af32b42 verified_cicada 5 NEW xxxx 5 months ago message....
+5af4ca2c classic_crappie 0 DONE xxxx 5 months ago message....
+5b07f476 resolved_mule 0 DONE xxxx 4 months ago message....
+5b07ff81 right_vervet 0 DONE xxxx 4 months ago message....
+5b08464f helped_aphid 3 NEW xxxx about 23 hours ago message....
+
 ```
 
-## pvr logs <deviceid|devicenick>[/source][@Level]
+## pvr logs <deviceid|devicenick>[/source][@level]
 
-```WARNING:```This command is DEPRECATED, please use ```pvr device logs``` instead
+`WARNING:`This command is DEPRECATED, please use `pvr device logs` instead
 
 pvr logs list the logs with filter options of device,source & level
 
 ```
-example1$ pvr logs 5d555d5e80123b31faa3cff2/pantavisor.log@INFO
-2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+
+example1\$ pvr logs 5d555d5e80123b31faa3cff2/pantavisor.log@INFO
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+
 ```
+
 pvr logs list the logs with filter options of multiple device,source & level
 
 ```
-example2$ pvr logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
-2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff5
-2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:55:03Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff5
-2020-01-06T12:55:17Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:55:43Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff5
-2020-01-06T12:55:53Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+
+example2\$ pvr logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
+2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:03Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:17Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:43Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:53Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+
 ```
 
 ## pvr login [END_POINT]
@@ -512,56 +605,65 @@ example2$ pvr logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.
 Login to pantahub with your username & password with an optional end point
 Note:Default endpoint is https://api.pantahub.com/auth/auth_status
 
-
 ```
-example1$  pvr login
-*** Login (/type [R] to register) @ https://api.pantahub.com/auth (realm=pantahub services) ***
+
+example1\$ pvr login
+**_ Login (/type [R] to register) @ https://api.pantahub.com/auth (realm=pantahub services) _**
 Username: sirinibin2006@gmail.com
-Password: *****
+Password: **\***
 Response of GET https://api.pantahub.com/auth/auth_status
 {
-    "exp": 1568206179,
-    "id": "sirinibin2006@gmail.com",
-    "nick": "sirinibin",
-    "orig_iat": 1568205279,
-    "prn": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
-    "roles": "user",
-    "scopes": "prn:pantahub.com:apis:/base/all",
-    "type": "USER"
+"exp": 1568206179,
+"id": "sirinibin2006@gmail.com",
+"nick": "sirinibin",
+"orig_iat": 1568205279,
+"prn": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
+"roles": "user",
+"scopes": "prn:pantahub.com:apis:/base/all",
+"type": "USER"
 }
 LoggedIn Successfully!
+
 ```
 
 ```
-example2$  pvr login https://api2.pantahub.com/auth
-*** Login (/type [R] to register) @ https://api2.pantahub.com/auth (realm=pantahub services) ***
+
+example2\$ pvr login https://api2.pantahub.com/auth
+**_ Login (/type [R] to register) @ https://api2.pantahub.com/auth (realm=pantahub services) _**
 Username: sirinibin2006@gmail.com
-Password: *****
+Password: **\***
 Response of GET https://api2.pantahub.com/auth/auth_status
 {
-    "exp": 1568206179,
-    "id": "sirinibin2006@gmail.com",
-    "nick": "sirinibin",
-    "orig_iat": 1568205279,
-    "prn": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
-    "roles": "user",
-    "scopes": "prn:pantahub.com:apis:/base/all",
-    "type": "USER"
+"exp": 1568206179,
+"id": "sirinibin2006@gmail.com",
+"nick": "sirinibin",
+"orig_iat": 1568205279,
+"prn": "prn:::accounts:/5bf2ac9e41b2dd0009a96c97",
+"roles": "user",
+"scopes": "prn:pantahub.com:apis:/base/all",
+"type": "USER"
 }
 LoggedIn Successfully!
+
 ```
+
 ## pvr whoami
 
 pvr whoami : List the loggedin details with pantahub instances
+
 ```
-example1$ pvr whoami
+
+example1\$ pvr whoami
 sirinibin(prn:::accounts:/5bf2ac9e41b2dd0009a96c97) at https://api.pantahub.com/auth
+
 ```
 
 ## pvr get
 
 pvr get :Get update target-repository from repository
+
 ```
+
 example1$ $ pvr get
 33aefd8dbf46f05 [OK]
 686a026cd606613 [OK]
@@ -577,24 +679,31 @@ d49d56059ba219c [OK]
 3f4889e5eed2252 [OK]
 b56390fbeb5e46f [OK]
 70075ca4496451e [OK]
+
 ```
 
 ## pvr global-config
 
 pvr global-config :Get Global Configuration details of the repo.
+
 ```
-example1$ pvr global-config
+
+example1\$ pvr global-config
 {
-    "Spec": "1",
-    "AutoUpgrade": false,
-    "DistributionTag": "develop"
+"Spec": "1",
+"AutoUpgrade": false,
+"DistributionTag": "develop"
 }
+
 ```
+
 ## pvr merge
 
 pvr merge : Merge content of repository into target-directory.Default target-repository is the local .pvr one. If not <repository> is provided the last one is used.
+
 ```
-example1$ pvr merge
+
+example1\$ pvr merge
 e8305714eaadc57 [OK]
 3f4889e5eed2252 [OK]
 76d1d085d44fd3f [OK]
@@ -609,12 +718,16 @@ d49d56059ba219c [OK]
 f1b441cb2721355 [OK]
 b30e6b64d3e1ecb [OK]
 ff2a85a62cd09f1 [OK]
+
 ```
+
 ## pvr putobjects <OBJECTS_ENDPOINT>
 
 pvr putobjects : put objects from local repository to objects-endpoint
+
 ```
-example1$ pvr putobjects https://api.pantahub.com/objects
+
+example1\$ pvr putobjects https://api.pantahub.com/objects
 alpine-hotsp [OK]
 bsp/kernel.i [OK]
 pvr-sdk/root [OK]
@@ -628,12 +741,15 @@ alpine-hotsp [OK]
 pv-avahi/lxc [OK]
 bsp/modules. [OK]
 pvr-sdk/lxc. [OK]
+
 ```
 
 ## pvr self-upgrade
 
 pvr self-upgrade : Update pvr command to the latest version
+
 ```
+
 example1$ $ sudo pvr self-upgrade
 [sudo] password for nintriva:
 Starting update PVR using Docker latest tag (sha256:0d6e747e75758535bdee89657902a1499e449db9510d688e0ef16d3171203975)
@@ -655,29 +771,32 @@ Pvr installed on /bin/pvr
 Docker layers are going to be cache on: /root/.pvr/cache
 
 PVR has been updated!
+
 ```
 
 ## pvr checkout|reset
 
 pvr checkout|reset : checkout/reset working directory to match the repo stat.reset/checkout also forgets about added files; pvr status and diff will yield empty
+
 ```
-example1$ pvr checkout
+
+example1\$ pvr checkout
+
 ```
 
 ## pvr register [API_URL] -u \<USERNAME\> -p \<PASSWORD\> -e \<EMAIL\>
 
 pvr register : register new user account with pantahub
-```
-example1$ $ pvr register https://api.pantahub.com -e jogn123@gmail.com -u john123 -p 123
 
+```
+
+example1$ $ pvr register https://api.pantahub.com -e jogn123@gmail.com -u john123 -p 123
 
 Your registration process needs to be complete two steps
 1.- Confirm you aren't a bot
 2.- Confirm your email address
 
-
 Follow this link to continue and after that come back and continue
-
 
 ```
 
@@ -689,7 +808,8 @@ pvr app add creates a new application and generates files by pulling layers from
 By default it will first look in remote repo. when not found it will pull from local docker repo,the priority can be changed using the --source flag(default:remote,local).
 
 ```
-example1$ fakeroot pvr app add nginx-app --from=nginx --source=remote,local
+
+example1\$ fakeroot pvr app add nginx-app --from=nginx --source=remote,local
 Generating squashfs...
 Downloading layers...
 Layer 0 downloaded(cache)
@@ -704,6 +824,7 @@ Deleted /home/nintriva/work/gitlab.com/pantacor/devices/10/nginx-app/download-la
 Generating squashfs file
 Generating squashfs digest
 Application added
+
 ```
 
 ## pvr app info <APP_NAME>
@@ -711,18 +832,20 @@ Application added
 pvr app info <appname> :output info and state of appname
 
 ```
+
 example1$ $ pvr app info nginx-app
 {
-    "#spec": "service-manifest-src@1",
-    "args": {},
-    "config": {},
-    "docker_digest": "sha256:231d40e811cd970168fb0c4770f2161aa30b9ba6fe8e68527504df69643aa145",
-    "docker_name": "nginx",
-    "docker_source": "remote,local",
-    "docker_tag": "latest",
-    "persistence": {},
-    "template": "builtin-lxc-docker"
+"#spec": "service-manifest-src@1",
+"args": {},
+"config": {},
+"docker_digest": "sha256:231d40e811cd970168fb0c4770f2161aa30b9ba6fe8e68527504df69643aa145",
+"docker_name": "nginx",
+"docker_source": "remote,local",
+"docker_tag": "latest",
+"persistence": {},
+"template": "builtin-lxc-docker"
 }
+
 ```
 
 ## pvr app ls
@@ -730,6 +853,7 @@ example1$ $ pvr app info nginx-app
 pvr app ls :list applications in pvr checkout
 
 ```
+
 example1$ $ pvr app ls
 alpine-hotspot
 app1
@@ -737,6 +861,7 @@ app2
 nginx-app
 pv-avahi
 pvr-sdk
+
 ```
 
 ## pvr app rm <APP_NAME>
@@ -744,13 +869,15 @@ pvr-sdk
 pvr app rm <appname> : remove app from pvr checkout
 
 ```
+
 example1$ $ pvr app rm app1
-$ pvr app ls
+\$ pvr app ls
 alpine-hotspot
 app2
 nginx-app
 pv-avahi
 pvr-sdk
+
 ```
 
 ## fakeroot pvr app update <APP_NAME>
@@ -758,6 +885,24 @@ pvr-sdk
 fakeroot pvr app update :update an existing application.
 
 ```
+
 example1$ $ fakeroot pvr app update nginx-app
 Application updated
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
 ```
