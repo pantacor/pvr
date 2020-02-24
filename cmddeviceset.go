@@ -39,25 +39,20 @@ func CommandDeviceSet() cli.Command {
 			}
 			baseURL := c.App.Metadata["PVR_BASEURL"].(string)
 			deviceNick := ""
-			keyValues := ""
 			if c.NArg() >= 2 {
 				deviceNick = c.Args()[0]
-				for k, v := range c.Args() {
-					if k > 0 {
-						keyValues += " " + v
-					}
-				}
 			} else if c.NArg() == 1 {
 				return cli.NewExitError(errors.New("<KEY1>=<VALUE1> [KEY2]=[VALUE2].. is required. See --help"), 2)
 			} else {
 				return cli.NewExitError(errors.New("<NICK|ID> is required. See --help"), 2)
 			}
 			data := map[string]interface{}{}
-			splits := strings.Fields(keyValues)
-			for _, v := range splits {
-				splits := strings.Split(v, "=")
-				if len(splits) == 2 {
-					data[splits[0]] = splits[1]
+			for k, v := range c.Args() {
+				if k > 0 {
+					splits := strings.Split(v, "=")
+					if len(splits) == 2 {
+						data[splits[0]] = splits[1]
+					}
 				}
 			}
 			authResponse, err := session.GetAuthStatus(baseURL)
