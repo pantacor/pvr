@@ -157,6 +157,24 @@ func (p *Pvr) GetTrackURL(appname string) (string, error) {
 	return trackURL, nil
 }
 
+// GetAppDockerName : Get App Docker Name
+func (p *Pvr) GetAppDockerName(appname string) (string, error) {
+	appManifest, err := p.GetApplicationManifest(appname)
+	if err != nil {
+		return "", err
+	}
+	return appManifest.DockerName, nil
+}
+
+// GetAppDockerDigest : Get App Docker Digest
+func (p *Pvr) GetAppDockerDigest(appname string) (string, error) {
+	appManifest, err := p.GetApplicationManifest(appname)
+	if err != nil {
+		return "", err
+	}
+	return appManifest.DockerDigest, nil
+}
+
 // InstallApplication : Install Application
 func (p *Pvr) InstallApplication(app AppData) error {
 	appManifest, err := p.GetApplicationManifest(app.Appname)
@@ -199,9 +217,9 @@ func (p *Pvr) InstallApplication(app AppData) error {
 	//	Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
-		dockerDigest = app.LocalImage.ImageID
+		dockerDigest = app.LocalImage.DockerDigest
 	} else if app.RemoteImage.Exists {
-		dockerDigest = app.RemoteImage.ImageID
+		dockerDigest = app.RemoteImage.DockerDigest
 	}
 	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
 	if err != nil {
@@ -241,9 +259,9 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 	//	Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
-		dockerDigest = app.LocalImage.ImageID
+		dockerDigest = app.LocalImage.DockerDigest
 	} else if app.RemoteImage.Exists {
-		dockerDigest = app.RemoteImage.ImageID
+		dockerDigest = app.RemoteImage.DockerDigest
 	}
 
 	appManifest.DockerDigest = dockerDigest
@@ -319,11 +337,11 @@ func (p *Pvr) AddApplication(app AppData) error {
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
 		//docker config
-		src.DockerDigest = app.LocalImage.ImageID
+		src.DockerDigest = app.LocalImage.DockerDigest
 		dockerConfig = app.LocalImage.DockerConfig
 	} else if app.RemoteImage.Exists {
 		// Remote repo.
-		src.DockerDigest = app.RemoteImage.ImageID
+		src.DockerDigest = app.RemoteImage.DockerDigest
 		dockerConfig = app.RemoteImage.DockerConfig
 	}
 

@@ -91,6 +91,19 @@ func (p *Pvr) GetDockerManifest(image registry.Image, auth types.AuthConfig) (*s
 	return &manifestV2, nil
 }
 
+// GetDockerImageRepoDigest : Get Docker Image Repo Digest
+func (p *Pvr) GetDockerImageRepoDigest(image registry.Image, auth types.AuthConfig) (string, error) {
+	r, err := p.GetDockerRegistry(image, auth)
+	if err != nil {
+		return "", err
+	}
+	repoDigest, err := r.Digest(context.Background(), image)
+	if err != nil {
+		return "", err
+	}
+	return string(repoDigest), nil
+}
+
 func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image, auth types.AuthConfig) (map[string]interface{}, error) {
 	r, err := p.GetDockerRegistry(image, auth)
 	if err != nil {
@@ -180,12 +193,12 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 }
 
 // DownloadLayersFromLocalDocker : Download Layers From Local Docker
-func DownloadLayersFromLocalDocker(imageID string) (io.ReadCloser, error) {
+func DownloadLayersFromLocalDocker(imageName string, digest string) (io.ReadCloser, error) {
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	cli.NegotiateAPIVersion(ctx)
 	httpClient := cli.HTTPClient()
-	url := "http://v" + cli.ClientVersion() + "/images/" + imageID + "/get"
+	url := "http://v" + cli.ClientVersion() + "/images/" + imageName + "@" + digest + "/get"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -200,7 +213,7 @@ func DownloadLayersFromLocalDocker(imageID string) (io.ReadCloser, error) {
 // DockerImage : return type of ImageExistsInLocalDocker()
 type DockerImage struct {
 	Exists         bool
-	ImageID        string
+	DockerDigest   string
 	DockerConfig   map[string]interface{}
 	DockerManifest *schema2.Manifest
 	DockerRegistry *registry.Registry
@@ -241,8 +254,7 @@ func (p *Pvr) FindDockerImage(app *AppData) error {
 // LoadRemoteImage : To check whether Image Exist In Remote Docker Or Not
 func (p *Pvr) LoadRemoteImage(app *AppData) error {
 	app.RemoteImage = DockerImage{
-		Exists:  false,
-		ImageID: "",
+		Exists: false,
 	}
 	image, err := registry.ParseImage(app.From)
 	if err != nil {
@@ -270,11 +282,15 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 	if err != nil {
 		return err
 	}
+	repoDigest, err := p.GetDockerImageRepoDigest(image, auth)
+	if err != nil {
+		return err
+	}
 	app.Username = auth.Username
 	app.Password = auth.Password
 
 	app.RemoteImage.Exists = true
-	app.RemoteImage.ImageID = string(dockerManifest.Config.Digest)
+	app.RemoteImage.DockerDigest = repoDigest
 	app.RemoteImage.DockerConfig = dockerConfig
 	app.RemoteImage.DockerManifest = dockerManifest
 	app.RemoteImage.DockerRegistry = dockerRegistry
@@ -286,8 +302,7 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 // LoadLocalImage : To check whether Image Exist In Local Docker Or Not
 func LoadLocalImage(app *AppData) error {
 	app.LocalImage = DockerImage{
-		Exists:  false,
-		ImageID: "",
+		Exists: false,
 	}
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
@@ -306,7 +321,8 @@ func LoadLocalImage(app *AppData) error {
 	}
 	fmt.Printf("Repo exists in local docker\n")
 	app.LocalImage.Exists = true
-	app.LocalImage.ImageID = inspect.ID
+	splits := strings.Split(inspect.RepoDigests[0], "@")
+	app.LocalImage.DockerDigest = splits[1]
 	//Setting Docker Config values
 	configData, err := json.Marshal(inspect.Config)
 	if err != nil {
@@ -384,9 +400,9 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	//	Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
-		digest = app.LocalImage.ImageID
+		digest = app.LocalImage.DockerDigest
 	} else if app.RemoteImage.Exists {
-		digest = app.RemoteImage.ImageID
+		digest = app.RemoteImage.DockerDigest
 	}
 
 	currentDigest, err := os.Open(digestFile)
@@ -415,7 +431,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	//	Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
-		filename := filepath.Join(cacheDir, app.LocalImage.ImageID) + ".tar.gz"
+		filename := filepath.Join(cacheDir, app.LocalImage.DockerDigest) + ".tar.gz"
 		fileExistInCache, err := IsFileExists(filename)
 		if err != nil {
 			return err
@@ -426,7 +442,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		} else {
 			fmt.Println("Layers Not Found in Cache")
 			fmt.Println("Downloading layers from local docker")
-			imageReader, err := DownloadLayersFromLocalDocker(app.LocalImage.ImageID)
+			imageReader, err := DownloadLayersFromLocalDocker(app.From, app.LocalImage.DockerDigest)
 			if err != nil {
 				return err
 			}
@@ -469,7 +485,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		//Download from remote repo.
 		for i, layer := range app.RemoteImage.DockerManifest.Layers {
 			filename := filepath.Join(cacheDir, string(layer.Digest)) + ".tar.gz"
-			shaValid,err := FileHasSameSha(filename,string(layer.Digest))
+			shaValid, err := FileHasSameSha(filename, string(layer.Digest))
 			if err != nil {
 				return err
 			}
@@ -478,7 +494,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 				files = append(files, filename)
 				continue
 			}
-			
+
 			layerReader, err := app.RemoteImage.DockerRegistry.DownloadLayer(context.Background(), app.RemoteImage.ImagePath, layer.Digest)
 			if err != nil {
 				return err
