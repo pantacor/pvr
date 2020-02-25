@@ -112,6 +112,10 @@ func GetEncryptedAccount(authEp, email, username, password string) (*EncryptedAc
 		log.Fatal("Error calling POST for registration: " + err.Error())
 		return nil, err
 	}
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return nil, err
+	}
 
 	m1 := EncryptedAccountData{}
 	err = json.Unmarshal(response.Body(), &m1)

@@ -617,6 +617,10 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 	if err != nil {
 		return res, err
 	}
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return res, err
+	}
 
 	if response.StatusCode() != 200 {
 		return res, errors.New("REST call failed. " +
@@ -766,6 +770,10 @@ func (p *Pvr) DoClaim(deviceEp, challenge string) error {
 	if err != nil {
 		return errors.New("Claiming device failed with err=" + err.Error())
 	}
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return err
+	}
 
 	if response.StatusCode() != http.StatusOK {
 		return errors.New("Claiming device failed (code=" + string(response.StatusCode()) + "): " + string(response.Body()))
@@ -864,6 +872,7 @@ func worker(jobs chan FilePut, done chan FilePut) {
 		j.bar.ShowBar = true
 		j.bar.Set64(j.bar.Total)
 		j.bar.UnitsWidth = 25
+		err = HandleNilHttpResponse(res, err)
 		if err != nil {
 			j.bar.Postfix(" [ERROR]")
 		} else {
@@ -1032,6 +1041,10 @@ func (p *Pvr) PutRemote(repoPath *url.URL, force bool) error {
 		return req.SetBody(body).Put(uri)
 	})
 
+	if err != nil {
+		return err
+	}
+	err = HandleNilRestResponse(response, err)
 	if err != nil {
 		return err
 	}
@@ -1231,6 +1244,10 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 		return req.SetBody(data).SetContentLength(true).Post(remotePvr.PostUrl)
 	})
 
+	if err != nil {
+		return err
+	}
+	err = HandleNilRestResponse(response, err)
 	if err != nil {
 		return err
 	}
@@ -1502,6 +1519,10 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 			return req.Get(uri)
 		})
 
+		if err != nil {
+			return err
+		}
+		err = HandleNilRestResponse(response, err)
 		if err != nil {
 			return err
 		}

@@ -59,6 +59,10 @@ func CommandDeviceSet() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
+			err = libpvr.HandleNilRestResponse(authResponse, err)
+			if err != nil {
+				return cli.NewExitError(err, 2)
+			}
 			authResponseData := map[string]interface{}{}
 			err = json.Unmarshal(authResponse.Body(), &authResponseData)
 			if err != nil {
@@ -70,10 +74,18 @@ func CommandDeviceSet() cli.Command {
 				if err != nil {
 					return cli.NewExitError(err, 2)
 				}
+				err = libpvr.HandleNilRestResponse(updateResponse, err)
+				if err != nil {
+					return cli.NewExitError(err, 2)
+				}
 				libpvr.LogPrettyJSON(updateResponse.Body())
 				fmt.Println("user-meta field Updated Successfully")
 			} else if authResponseData["type"] == "DEVICE" {
 				updateResponse, err := session.UpdateDevice(baseURL, deviceNick, data, "device-meta")
+				if err != nil {
+					return cli.NewExitError(err, 2)
+				}
+				err = libpvr.HandleNilRestResponse(updateResponse, err)
 				if err != nil {
 					return cli.NewExitError(err, 2)
 				}

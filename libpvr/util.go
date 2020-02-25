@@ -326,6 +326,10 @@ func (s *Session) CreateDevice(baseURL string, deviceNick string) (
 	if err != nil {
 		return response, err
 	}
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return nil, err
+	}
 	if response.StatusCode() == http.StatusOK {
 		return response, nil
 	}
@@ -352,6 +356,10 @@ func LoginDevice(
 	body["password"] = secret
 	req := resty.R().SetBody(body)
 	response, err := req.Post(baseURL + "/auth/login")
+	if err != nil {
+		return "", err
+	}
+	err = HandleNilRestResponse(response, err)
 	if err != nil {
 		return "", err
 	}
@@ -383,6 +391,10 @@ func CreateTrail(baseURL string,
 	response, err := req.Post(baseURL + "/trails/")
 	if err != nil {
 		return response, err
+	}
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return nil, err
 	}
 	if response.StatusCode() == http.StatusOK {
 		return response, nil
@@ -453,6 +465,10 @@ func (s *Session) GetDevices(baseURL string,
 	if err != nil {
 		return response, err
 	}
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return nil, err
+	}
 	if response.StatusCode() == http.StatusOK {
 		return response, nil
 	}
@@ -477,6 +493,10 @@ func (s *Session) GetDevice(baseURL string,
 	if err != nil {
 		return response, err
 	}
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return nil, err
+	}
 	if response.StatusCode() == http.StatusOK {
 		return response, nil
 	}
@@ -490,33 +510,34 @@ func (s *Session) GetDevice(baseURL string,
 
 // SliceContainsItem : checks if an item exists in a string array or not
 func SliceContainsItem(slice []string, item string) bool {
-    set := make(map[string]struct{}, len(slice))
-    for _, s := range slice {
-        set[s] = struct{}{}
-    }
+	set := make(map[string]struct{}, len(slice))
+	for _, s := range slice {
+		set[s] = struct{}{}
+	}
 
-    _, ok := set[item]
-    return ok
+	_, ok := set[item]
+	return ok
 }
 
 func RemoveDirContents(dir string) error {
-    d, err := os.Open(dir)
-    if err != nil {
-        return err
-    }
-    defer d.Close()
-    names, err := d.Readdirnames(-1)
-    if err != nil {
-        return err
-    }
-    for _, name := range names {
-        err = os.RemoveAll(filepath.Join(dir, name))
-        if err != nil {
-            return err
-        }
-    }
-    return nil
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
+
 // UpdateDevice : Update  user-meta or device-meta field of a device
 func (s *Session) UpdateDevice(
 	baseURL string,
@@ -532,6 +553,10 @@ func (s *Session) UpdateDevice(
 	})
 	if err != nil {
 		return response, err
+	}
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return nil, err
 	}
 	if response.StatusCode() == http.StatusOK {
 		return response, nil
@@ -555,6 +580,10 @@ func (s *Session) GetAuthStatus(baseURL string) (
 	if err != nil {
 		return response, err
 	}
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return nil, err
+	}
 	if response.StatusCode() == http.StatusOK {
 		return response, nil
 	}
@@ -565,6 +594,7 @@ func (s *Session) GetAuthStatus(baseURL string) (
 	}
 	return response, errors.New("Error getting auth status")
 }
+
 //ValidateSourceFlag : Validate Source Flag
 func ValidateSourceFlag(source string) error {
 	if source == "" {
@@ -577,4 +607,26 @@ func ValidateSourceFlag(source string) error {
 		}
 	}
 	return nil
+}
+
+// HandleNilRestResponse : Handle Nil Resty Response
+func HandleNilRestResponse(response *resty.Response, err error) error {
+	if response == nil {
+		if err != nil {
+			return errors.New("Error:Nil Response(" + err.Error() + ")")
+		}
+		return errors.New("Error:Nil Response")
+	}
+	return err
+}
+
+// HandleNilHttpResponse : Handle Nil Http Response
+func HandleNilHttpResponse(response *http.Response, err error) error {
+	if response == nil {
+		if err != nil {
+			return errors.New("Error:Nil Response(" + err.Error() + ")")
+		}
+		return errors.New("Error:Nil Response")
+	}
+	return err
 }

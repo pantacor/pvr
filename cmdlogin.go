@@ -52,6 +52,10 @@ func CommandLogin() cli.Command {
 					return cli.NewExitError(err, 2)
 				}
 			}
+			err = libpvr.HandleNilRestResponse(response, err)
+			if err != nil {
+				return cli.NewExitError(err, 2)
+			}
 			fmt.Println("LoggedIn Successfully!")
 			return nil
 		},

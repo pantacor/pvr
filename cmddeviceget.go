@@ -49,6 +49,10 @@ func CommandDeviceGet() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
+			err = libpvr.HandleNilRestResponse(deviceResponse, err)
+			if err != nil {
+				return cli.NewExitError(err, 2)
+			}
 			libpvr.LogPrettyJSON(deviceResponse.Body())
 			return nil
 		},

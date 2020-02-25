@@ -68,6 +68,10 @@ func CommandDeviceCreate() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
+			err = libpvr.HandleNilRestResponse(deviceResponse, err)
+			if err != nil {
+				return cli.NewExitError(err, 2)
+			}
 			responseData := map[string]interface{}{}
 			err = json.Unmarshal(deviceResponse.Body(), &responseData)
 			if err != nil {

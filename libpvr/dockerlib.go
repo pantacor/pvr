@@ -103,6 +103,10 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 	if err != nil {
 		return nil, err
 	}
+	err = HandleNilHttpResponse(resp, err)
+	if err != nil {
+		return nil, err
+	}
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		wwwHeaders := resp.Header["Www-Authenticate"][0]
@@ -135,6 +139,10 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 		if err != nil {
 			return nil, err
 		}
+		err = HandleNilHttpResponse(resp, err)
+		if err != nil {
+			return nil, err
+		}
 
 		content, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
@@ -156,6 +164,11 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 		req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 		req.Header.Add("Authorization", "Bearer "+token)
 		resp, err = http.DefaultClient.Do(req)
+
+		err = HandleNilHttpResponse(resp, err)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -191,6 +204,10 @@ func DownloadLayersFromLocalDocker(imageID string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	err = HandleNilHttpResponse(res, err)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +486,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		//Download from remote repo.
 		for i, layer := range app.RemoteImage.DockerManifest.Layers {
 			filename := filepath.Join(cacheDir, string(layer.Digest)) + ".tar.gz"
-			shaValid,err := FileHasSameSha(filename,string(layer.Digest))
+			shaValid, err := FileHasSameSha(filename, string(layer.Digest))
 			if err != nil {
 				return err
 			}
@@ -478,7 +495,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 				files = append(files, filename)
 				continue
 			}
-			
+
 			layerReader, err := app.RemoteImage.DockerRegistry.DownloadLayer(context.Background(), app.RemoteImage.ImagePath, layer.Digest)
 			if err != nil {
 				return err

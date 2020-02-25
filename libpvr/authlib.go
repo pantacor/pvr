@@ -98,6 +98,10 @@ func (p *PvrAuthConfig) DoRefresh(authEp, token string) (string, string, error) 
 		SetAuthToken(token).
 		Get(authEp + "/login")
 
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return "", "", err
+	}
 	m1 := map[string]interface{}{}
 	err = json.Unmarshal(response.Body(), &m1)
 
@@ -176,7 +180,10 @@ func doAuthenticate(authEp, username, password string) (string, string, error) {
 
 	response, err := resty.R().SetBody(m).
 		Post(authEp + "/login")
-
+	err = HandleNilRestResponse(response, err)
+	if err != nil {
+		return "", "", err
+	}
 	m1 := map[string]interface{}{}
 	err = json.Unmarshal(response.Body(), &m1)
 
@@ -313,6 +320,10 @@ func (s *Session) Whoami() error {
 		response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 			return req.Get(authEndPoint + "/auth_status")
 		})
+		if err != nil {
+			return err
+		}
+		err = HandleNilRestResponse(response, err)
 		if err != nil {
 			return err
 		}
