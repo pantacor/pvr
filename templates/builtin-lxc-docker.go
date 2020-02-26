@@ -73,6 +73,9 @@ lxc.console.path = none
 lxc.mount.auto = {{ .Source.args.LXC_MOUNT_AUTO_PROC | pvr_ifNull "proc" }}
 	{{- " " }} {{ .Source.args.LXC_MOUNT_AUTO_SYS | pvr_ifNull "sys:rw" }}
 	{{- " " }} {{ .Source.args.LXC_MOUNT_AUTO_GROUP | pvr_ifNull "cgroup" }}
+{{- if .Source.args.PV_DISABLE_AUTODEV }}
+lxc.autodev = 0
+{{- end }}
 {{- if .Source.args.PV_SECURITY_FULLDEV }}
 lxc.mount.entry = /dev/ dev none bind,rw,create=dir 0 0
 {{- end }}
