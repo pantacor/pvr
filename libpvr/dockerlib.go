@@ -156,6 +156,9 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 		req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 		req.Header.Add("Authorization", "Bearer "+token)
 		resp, err = http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -469,7 +472,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		//Download from remote repo.
 		for i, layer := range app.RemoteImage.DockerManifest.Layers {
 			filename := filepath.Join(cacheDir, string(layer.Digest)) + ".tar.gz"
-			shaValid,err := FileHasSameSha(filename,string(layer.Digest))
+			shaValid, err := FileHasSameSha(filename, string(layer.Digest))
 			if err != nil {
 				return err
 			}
@@ -478,7 +481,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 				files = append(files, filename)
 				continue
 			}
-			
+
 			layerReader, err := app.RemoteImage.DockerRegistry.DownloadLayer(context.Background(), app.RemoteImage.ImagePath, layer.Digest)
 			if err != nil {
 				return err
