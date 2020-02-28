@@ -34,6 +34,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/go-resty/resty"
 )
@@ -490,33 +491,34 @@ func (s *Session) GetDevice(baseURL string,
 
 // SliceContainsItem : checks if an item exists in a string array or not
 func SliceContainsItem(slice []string, item string) bool {
-    set := make(map[string]struct{}, len(slice))
-    for _, s := range slice {
-        set[s] = struct{}{}
-    }
+	set := make(map[string]struct{}, len(slice))
+	for _, s := range slice {
+		set[s] = struct{}{}
+	}
 
-    _, ok := set[item]
-    return ok
+	_, ok := set[item]
+	return ok
 }
 
 func RemoveDirContents(dir string) error {
-    d, err := os.Open(dir)
-    if err != nil {
-        return err
-    }
-    defer d.Close()
-    names, err := d.Readdirnames(-1)
-    if err != nil {
-        return err
-    }
-    for _, name := range names {
-        err = os.RemoveAll(filepath.Join(dir, name))
-        if err != nil {
-            return err
-        }
-    }
-    return nil
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
+
 // UpdateDevice : Update  user-meta or device-meta field of a device
 func (s *Session) UpdateDevice(
 	baseURL string,
@@ -565,6 +567,7 @@ func (s *Session) GetAuthStatus(baseURL string) (
 	}
 	return response, errors.New("Error getting auth status")
 }
+
 //ValidateSourceFlag : Validate Source Flag
 func ValidateSourceFlag(source string) error {
 	if source == "" {
@@ -577,4 +580,17 @@ func ValidateSourceFlag(source string) error {
 		}
 	}
 	return nil
+}
+
+// ParseRFC3339 : Parse RFC3339 string : 2006-01-02T15:04:05+07:00
+func ParseRFC3339(date string) (time.Time, error) {
+	from, err := time.Parse("2006-01-02", date) //Date part only
+	if err != nil {
+		from, err = time.Parse("2006-01-02T15:04:05", date) //Date with time
+		if err != nil {
+			return time.Parse(time.RFC3339, date) //Date with time & timezone
+		}
+	}
+	from = from.Local()
+	return from, err
 }

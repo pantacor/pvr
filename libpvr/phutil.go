@@ -218,6 +218,7 @@ func (p *Session) DoLogs(
 	baseurl string,
 	deviceIds []string,
 	startTime *time.Time,
+	endTime *time.Time,
 	cursor bool,
 	logFilter LogFilter,
 ) (logEntries []*logs.LogsEntry, cursorID string, err error) {
@@ -242,9 +243,13 @@ func (p *Session) DoLogs(
 			q.Add("page", "3000")
 		}
 
+		loc, _ := time.LoadLocation("UTC")
+
 		if startTime != nil {
-			loc, _ := time.LoadLocation("UTC")
 			q.Add("after", startTime.In(loc).Format(time.RFC3339))
+		}
+		if !endTime.IsZero() {
+			q.Add("before", endTime.In(loc).Format(time.RFC3339))
 		}
 		if logFilter.Devices != "" {
 			q.Add("dev", logFilter.Devices)

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	duration "github.com/ChannelMeter/iso8601duration"
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
 )
@@ -41,12 +42,27 @@ func CommandLogs() cli.Command {
 
 			from := time.Now().Add(time.Duration(-1 * time.Minute))
 			if c.String("from") != "" {
-				from, err = time.Parse("2006-01-02", c.String("from"))
+				from, err = libpvr.ParseRFC3339(c.String("from"))
 				if err != nil {
-					return cli.NewExitError(err, 5)
+					parsedDuration, err := duration.FromString(c.String("from"))
+					if err != nil {
+						return cli.NewExitError(err, 5)
+					}
+					from = time.Now().Local().Add(-parsedDuration.ToDuration())
 				}
-				from = from.Local()
 			}
+			var to time.Time
+			if c.String("to") != "" {
+				to, err = libpvr.ParseRFC3339(c.String("to"))
+				if err != nil {
+					parsedDuration, err := duration.FromString(c.String("to"))
+					if err != nil {
+						return cli.NewExitError(err, 5)
+					}
+					to = from.Add(parsedDuration.ToDuration())
+				}
+			}
+
 			splits := []string{}
 			devices := []string{}
 			source := ""
@@ -74,7 +90,7 @@ func CommandLogs() cli.Command {
 			}
 
 			for {
-				logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, &from, true, logFilter)
+				logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, &from, &to, true, logFilter)
 
 				if err != nil {
 					return cli.NewExitError("Error getting device list: "+err.Error(), 4)
@@ -133,8 +149,13 @@ func CommandLogs() cli.Command {
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:   "from,f",
-				Usage:  "--from=Y-m-d",
+				Usage:  "Date eg:--from=2020-02-22 Datetime eg:--from=2006-01-02T15:04:05, Datetime + timezone(+06:00) eg:--from=2006-01-02T15:04:05+06:00,ISO 8601 Duration eg:P1Y2M10DT2H30M",
 				EnvVar: "PVR_LOGS_FROM_DATE",
+			},
+			cli.StringFlag{
+				Name:   "to,t",
+				Usage:  "Date eg:--to=2020-02-22, Datetime eg:--to=2006-01-02T15:04:05, Datetime + timezone(+06:00) eg:--to=2006-01-02T15:04:05+06:00,ISO 8601 Duration eg:P1Y2M10DT2H30M",
+				EnvVar: "PVR_LOGS_TO_DATE",
 			},
 		},
 	}
