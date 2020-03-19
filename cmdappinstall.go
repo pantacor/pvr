@@ -60,7 +60,12 @@ func CommandAppInstall() cli.Command {
 			// fix up trailing/leading / from appnames
 			appname = strings.Trim(appname, "/")
 
-			trackURL, err := pvr.GetTrackURL(appname)
+			dockerName, err := pvr.GetAppDockerName(appname)
+			if err != nil {
+				return cli.NewExitError(err, 2)
+			}
+
+			digest, err := pvr.GetAppDockerDigest(appname)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
@@ -71,13 +76,15 @@ func CommandAppInstall() cli.Command {
 			}
 			app := libpvr.AppData{
 				Appname:  appname,
-				From:     trackURL,
+				From:     dockerName + "@" + digest,
 				Source:   c.String("source"),
 				Username: username,
 				Password: password,
 			}
 			err = pvr.FindDockerImage(&app)
 			if err != nil {
+				fmt.Println("\nSeems like you have an invalid docker digest value in your " + appname + "/src.json file\n")
+				fmt.Println("\nPlease run \"fakeroot pvr app update " + appname + " --source=" + c.String("source") + "\" to auto fix it or update docker_digest field by editing " + appname + "/src.json  to fix it manually\n")
 				return cli.NewExitError(err, 3)
 			}
 			err = pvr.InstallApplication(app)
