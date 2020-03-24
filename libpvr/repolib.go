@@ -730,6 +730,13 @@ func readRegistration(targetPrompt string) (string, string, string) {
 
 func getWwwAuthenticateInfo(header string) (string, map[string]string) {
 	parts := strings.SplitN(header, " ", 2)
+
+	if len(parts) == 0 {
+		return "", map[string]string{}
+	} else if len(parts) == 1 {
+		return parts[0], map[string]string{}
+	}
+
 	authType := parts[0]
 	parts = strings.Split(parts[1], ", ")
 	opts := make(map[string]string)

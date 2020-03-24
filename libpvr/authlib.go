@@ -227,8 +227,15 @@ func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh bool) (s
 		return "", errors.New("Invalid www-authenticate header retrieved")
 	}
 
-	realm := opts["realm"]
-	authEpString := opts["ph-aeps"]
+	realm, ok := opts["realm"]
+	if !ok {
+		return "", errors.New("Field  \"realm\" is missing in Authentication info")
+	}
+	authEpString, ok := opts["ph-aeps"]
+	if !ok {
+		return "", errors.New("Field  \"ph-aeps\" is missing in Authentication info")
+	}
+
 	authEps := strings.Split(authEpString, ",")
 
 	if len(authEps) == 0 {
