@@ -16,6 +16,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -91,6 +92,17 @@ func CommandClone() cli.Command {
 			if c.NArg() == 2 {
 				base = c.Args().Get(1)
 			}
+			folderExists, err := libpvr.Exists(base)
+			if err != nil {
+				return cli.NewExitError(err, 4)
+			}
+			replace := false
+			if folderExists {
+				replace = libpvr.AskForConfirmation("\nWARNING: Folder having name \"" + path.Base(base) + "\" already exists, Do you want to replace it ?(yes/no)")
+				if !replace {
+					return nil
+				}
+			}
 
 			tempdir, err := ioutil.TempDir(wd, "pvr-clone-")
 			if err != nil {
@@ -132,6 +144,10 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 8)
 			}
 
+			if replace {
+				fmt.Println("Replacing " + base)
+				libpvr.RemoveAll(base)
+			}
 			err = os.Rename(tempdir, base)
 			if err != nil {
 				return cli.NewExitError(err, 9)
