@@ -25,12 +25,25 @@ func CommandLogsDeprecated() cli.Command {
 	return cli.Command{
 		Name:        "logs",
 		Aliases:     []string{"log"},
-		Usage:       "Get logs for your devices (early preview)",
+		ArgsUsage:   "<deviceid|devicenick>[/source][@Level]",
+		Usage:       "pvr logs <deviceid|devicenick>[/source][@Level]",
 		Description: "Get streaming logs of devices you own from pantahub",
 		Before: func(c *cli.Context) error {
 			fmt.Print("\nDEPRECATED: the pvr logs command is deprecated and will go away in some future release. It can now be found as a device subcommand:pvr device logs\n")
 			return nil
 		},
 		Action: CommandLogs().Action,
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:   "from,f",
+				Usage:  "Datetime in RFC3339 format, e.g.: --from=2006-01-02T15:04:05+06:00",
+				EnvVar: "PVR_LOGS_FROM_DATE",
+			},
+			cli.StringFlag{
+				Name:   "to,t",
+				Usage:  "Datetime in RFC3339 format, e.g.:--to=2006-01-02T15:04:05+06:00",
+				EnvVar: "PVR_LOGS_TO_DATE",
+			},
+		},
 	}
 }
