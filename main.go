@@ -131,6 +131,7 @@ func main() {
 		CommandWhoami(),
 		CommandLogin(),
 		CommandDevice(),
+		CommandCompletion(),
 	}
 	app.Run(os.Args)
 }
