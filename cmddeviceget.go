@@ -17,6 +17,7 @@ package main
 
 import (
 	"errors"
+	"log"
 
 	"gitlab.com/pantacor/pvr/libpvr"
 
@@ -30,6 +31,22 @@ func CommandDeviceGet() cli.Command {
 		ArgsUsage:   "<NICK|ID>",
 		Usage:       "pvr device get <NICK|ID>",
 		Description: "Get Device details",
+		BashComplete: func(c *cli.Context) {
+			if c.GlobalString("baseurl") != "" {
+				c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
+			}
+			session, err := libpvr.NewSession(c.App)
+			if err != nil {
+				log.Fatal(err.Error())
+				return
+			}
+			if c.NArg() == 0 {
+				return
+			}
+			searchTerm := c.Args()[c.NArg()-1]
+			baseURL := c.App.Metadata["PVR_BASEURL"].(string)
+			session.SuggestDeviceNicks("", searchTerm, baseURL)
+		},
 		Action: func(c *cli.Context) error {
 			session, err := libpvr.NewSession(c.App)
 			if err != nil {

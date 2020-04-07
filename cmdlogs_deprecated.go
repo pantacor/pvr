@@ -17,8 +17,11 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"strings"
 
 	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandLogsDeprecated() cli.Command {
@@ -28,6 +31,25 @@ func CommandLogsDeprecated() cli.Command {
 		ArgsUsage:   "<deviceid|devicenick>[/source][@Level]",
 		Usage:       "pvr logs <deviceid|devicenick>[/source][@Level]",
 		Description: "Get streaming logs of devices you own from pantahub",
+		BashComplete: func(c *cli.Context) {
+			if c.GlobalString("baseurl") != "" {
+				c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
+			}
+			session, err := libpvr.NewSession(c.App)
+			if err != nil {
+				log.Fatal(err.Error())
+				return
+			}
+			if c.NArg() == 0 {
+				return
+			}
+			filter := c.Args().Get(c.NArg() - 1)
+			splits := strings.Split(filter, "/")
+			deviceSearchTerm := splits[0]
+
+			baseURL := c.App.Metadata["PVR_BASEURL"].(string)
+			session.SuggestDeviceNicks("", deviceSearchTerm, baseURL)
+		},
 		Before: func(c *cli.Context) error {
 			fmt.Print("\nDEPRECATED: the pvr logs command is deprecated and will go away in some future release. It can now be found as a device subcommand:pvr device logs\n")
 			return nil

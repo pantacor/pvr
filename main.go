@@ -29,6 +29,7 @@ import (
 func main() {
 
 	app := cli.NewApp()
+	app.EnableBashCompletion = true
 	app.Name = "pvr"
 	app.Usage = "PantaVisor Repo"
 	app.Version = VERSION
@@ -130,6 +131,7 @@ func main() {
 		CommandWhoami(),
 		CommandLogin(),
 		CommandDevice(),
+		CommandCompletion(),
 	}
 	app.Run(os.Args)
 }

@@ -17,7 +17,9 @@ package main
 
 import (
 	"errors"
+	"log"
 	"os"
+	"strings"
 
 	"fmt"
 
@@ -29,13 +31,34 @@ func CommandPost() cli.Command {
 	return cli.Command{
 		Name:        "post",
 		Aliases:     []string{"po"},
-		ArgsUsage:   "[target-log]",
+		ArgsUsage:   "[target-log] | [<USER_NICK>/<DEVICE_NICK>]",
 		Usage:       "Post local repository to a target log",
 		Description: "Suitable for POSTNIG this repo to a remote storage that can hold more than one REPO. If not target log is specified the last use remote repo is used",
+		BashComplete: func(c *cli.Context) {
+			if c.GlobalString("baseurl") != "" {
+				c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
+			}
+			session, err := libpvr.NewSession(c.App)
+			if err != nil {
+				log.Fatal(err.Error())
+				return
+			}
+			if c.NArg() == 0 {
+				return
+			}
+			searchTerm := c.Args()[c.NArg()-1]
+			baseURL := c.App.Metadata["PVR_BASEURL"].(string)
+			session.SuggestNicks(searchTerm, baseURL)
+		},
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
 				return cli.NewExitError(err, 1)
+			}
+			session, err := libpvr.NewSession(c.App)
+
+			if err != nil {
+				return cli.NewExitError(err, 4)
 			}
 
 			var repoPath string
@@ -48,10 +71,18 @@ func CommandPost() cli.Command {
 				repoPath = c.Args()[0]
 			}
 
-			session, err := libpvr.NewSession(c.App)
-
-			if err != nil {
-				return cli.NewExitError(err, 4)
+			if repoPath != "" && !libpvr.IsValidUrl(repoPath) {
+				//Get owner nick & Device nick & make device repo URL
+				userNick := ""
+				deviceNick := ""
+				splits := strings.Split(repoPath, "/")
+				if len(splits) == 1 {
+					return cli.NewExitError("Device nick is missing. (syntax:pvr get <USER_NICK>/<DEVICE_NICK>). See --help. ", 2)
+				} else if len(splits) == 2 {
+					userNick = splits[0]
+					deviceNick = splits[1]
+				}
+				repoPath = "https://pvr.pantahub.com/" + userNick + "/" + deviceNick
 			}
 
 			pvr, err := libpvr.NewPvr(session, wd)

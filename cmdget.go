@@ -17,7 +17,9 @@ package main
 
 import (
 	"errors"
+	"log"
 	"os"
+	"strings"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -27,9 +29,25 @@ func CommandGet() cli.Command {
 	return cli.Command{
 		Name:        "get",
 		Aliases:     []string{"g"},
-		ArgsUsage:   "[repository [target-repository]]",
+		ArgsUsage:   "[repository [target-repository]] | [<USER_NICK>/<DEVICE_NICK>]",
 		Usage:       "get update target-repository from repository",
 		Description: "default target-repository is the local .pvr one. If not <repository> is provided the last one is used.",
+		BashComplete: func(c *cli.Context) {
+			if c.GlobalString("baseurl") != "" {
+				c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
+			}
+			session, err := libpvr.NewSession(c.App)
+			if err != nil {
+				log.Fatal(err.Error())
+				return
+			}
+			if c.NArg() == 0 {
+				return
+			}
+			searchTerm := c.Args()[c.NArg()-1]
+			baseURL := c.App.Metadata["PVR_BASEURL"].(string)
+			session.SuggestNicks(searchTerm, baseURL)
+		},
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -55,6 +73,19 @@ func CommandGet() cli.Command {
 				repoPath = ""
 			} else {
 				repoPath = c.Args()[0]
+				if !libpvr.IsValidUrl(repoPath) {
+					//Get owner nick & Device nick & make device repo URL
+					userNick := ""
+					deviceNick := ""
+					splits := strings.Split(repoPath, "/")
+					if len(splits) == 1 {
+						return cli.NewExitError("Device nick is missing. (syntax:pvr get <USER_NICK>/<DEVICE_NICK>). See --help", 2)
+					} else if len(splits) == 2 {
+						userNick = splits[0]
+						deviceNick = splits[1]
+					}
+					repoPath = "https://pvr.pantahub.com/" + userNick + "/" + deviceNick
+				}
 			}
 
 			err = pvr.GetRepo(repoPath, false)

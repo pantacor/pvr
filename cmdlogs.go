@@ -17,6 +17,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -32,6 +33,25 @@ func CommandLogs() cli.Command {
 		ArgsUsage:   "<deviceid|devicenick>[/source][@Level]",
 		Usage:       "pvr device logs <deviceid|devicenick>[/source][@Level]",
 		Description: "Get streaming logs of devices you own from pantahub",
+		BashComplete: func(c *cli.Context) {
+			if c.GlobalString("baseurl") != "" {
+				c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
+			}
+			session, err := libpvr.NewSession(c.App)
+			if err != nil {
+				log.Fatal(err.Error())
+				return
+			}
+			if c.NArg() == 0 {
+				return
+			}
+			filter := c.Args().Get(c.NArg() - 1)
+			splits := strings.Split(filter, "/")
+			deviceSearchTerm := splits[0]
+
+			baseURL := c.App.Metadata["PVR_BASEURL"].(string)
+			session.SuggestDeviceNicks("", deviceSearchTerm, baseURL)
+		},
 		Action: func(c *cli.Context) error {
 
 			session, err := libpvr.NewSession(c.App)
