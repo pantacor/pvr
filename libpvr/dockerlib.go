@@ -400,6 +400,11 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	}
 	configDir := p.Session.configDir
 	cacheDir := filepath.Join(configDir, cacheFolder)
+	err = CreateFolder(cacheDir)
+
+	if err != nil {
+		return fmt.Errorf("Couldnt create cache folder %v", err)
+	}
 
 	fmt.Println("Generating squashfs...")
 
