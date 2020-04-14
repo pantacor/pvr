@@ -60,24 +60,33 @@ func CommandAppInstall() cli.Command {
 			// fix up trailing/leading / from appnames
 			appname = strings.Trim(appname, "/")
 
-			dockerName, err := pvr.GetAppDockerName(appname)
+			appManifest, err := pvr.GetApplicationManifest(appname)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
 
-			digest, err := pvr.GetAppDockerDigest(appname)
-			if err != nil {
-				return cli.NewExitError(err, 2)
+			source := c.String("source")
+			if source == "" {
+				source = appManifest.DockerSource
 			}
 
-			err = libpvr.ValidateSourceFlag(c.String("source"))
+			err = libpvr.ValidateSourceFlag(source)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
+
+			dockerName := appManifest.DockerName
+			repoDigest := appManifest.DockerDigest
+			from := repoDigest
+
+			if source == "remote" && !strings.Contains(repoDigest, "@") {
+				from = dockerName + "@" + repoDigest
+			}
+
 			app := libpvr.AppData{
 				Appname:  appname,
-				From:     dockerName + "@" + digest,
-				Source:   c.String("source"),
+				From:     from,
+				Source:   source,
 				Username: username,
 				Password: password,
 			}
@@ -113,7 +122,7 @@ func CommandAppInstall() cli.Command {
 			Name:   "source",
 			Usage:  SourceFlagUsage,
 			EnvVar: "PVR_SOURCE",
-			Value:  "local,remote",
+			Value:  "",
 		},
 	}
 

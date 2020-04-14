@@ -196,12 +196,12 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 }
 
 // DownloadLayersFromLocalDocker : Download Layers From Local Docker
-func DownloadLayersFromLocalDocker(imageName string, digest string) (io.ReadCloser, error) {
+func DownloadLayersFromLocalDocker(digest string) (io.ReadCloser, error) {
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	cli.NegotiateAPIVersion(ctx)
 	httpClient := cli.HTTPClient()
-	url := "http://v" + cli.ClientVersion() + "/images/" + imageName + "@" + digest + "/get"
+	url := "http://v" + cli.ClientVersion() + "/images/" +digest + "/get"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -289,9 +289,23 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 	if err != nil {
 		return err
 	}
+	
+	splits := strings.Split(app.From,":")
+	imageName := splits[0]
+
+	//Extract image name from repo digest.eg: Extract "busybox" from "busybox@sha256:afe605d272837ce1732f390966166c2afff5391208ddd57de10942748694049d"
+	if strings.Contains(imageName, "@sha256") {
+		splits := strings.Split(imageName,"@")
+		imageName = splits[0]
+	}
+
+	if !strings.Contains(repoDigest, "@") {
+		repoDigest = imageName + "@" + repoDigest
+	}
+
 	app.Username = auth.Username
 	app.Password = auth.Password
-
+	
 	app.RemoteImage.Exists = true
 	app.RemoteImage.DockerDigest = repoDigest
 	app.RemoteImage.DockerConfig = dockerConfig
@@ -324,8 +338,8 @@ func LoadLocalImage(app *AppData) error {
 	}
 	fmt.Printf("Repo exists in local docker\n")
 	app.LocalImage.Exists = true
-	splits := strings.Split(inspect.RepoDigests[0], "@")
-	app.LocalImage.DockerDigest = splits[1]
+	app.LocalImage.DockerDigest = inspect.RepoDigests[0]
+
 	//Setting Docker Config values
 	configData, err := json.Marshal(inspect.Config)
 	if err != nil {
@@ -450,7 +464,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		} else {
 			fmt.Println("Layers Not Found in Cache")
 			fmt.Println("Downloading layers from local docker")
-			imageReader, err := DownloadLayersFromLocalDocker(app.From, app.LocalImage.DockerDigest)
+			imageReader, err := DownloadLayersFromLocalDocker(app.LocalImage.DockerDigest)
 			if err != nil {
 				return err
 			}
