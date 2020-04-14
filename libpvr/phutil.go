@@ -171,7 +171,7 @@ func (p *Session) DoPs(baseurl string) ([]PantahubDevice, error) {
 	return resultSet, nil
 }
 
-func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*logs.LogsEntry, cursorID string, err error) {
+func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*logs.Entry, cursorID string, err error) {
 
 	res, err := p.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		burl, err := url.Parse(baseurl)
@@ -197,7 +197,7 @@ func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*log
 		return nil, "", errors.New("ERROR: authenticated call to " + baseurl + " failed with: " + err.Error())
 	}
 
-	var resultPage logs.LogsPager
+	var resultPage logs.Pager
 	err = json.Unmarshal(res.Body(), &resultPage)
 
 	if err != nil {
@@ -221,7 +221,7 @@ func (p *Session) DoLogs(
 	endTime *time.Time,
 	cursor bool,
 	logFilter LogFilter,
-) (logEntries []*logs.LogsEntry, cursorID string, err error) {
+) (logEntries []*logs.Entry, cursorID string, err error) {
 	res, err := p.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		burl, err := url.Parse(baseurl)
 		if err != nil {
@@ -270,7 +270,7 @@ func (p *Session) DoLogs(
 		return nil, "", errors.New("ERROR: authenticated call to " + baseurl + " failed with: " + err.Error())
 	}
 
-	var resultPage logs.LogsPager
+	var resultPage logs.Pager
 	err = json.Unmarshal(res.Body(), &resultPage)
 
 	if err != nil {
