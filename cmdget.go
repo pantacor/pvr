@@ -73,7 +73,11 @@ func CommandGet() cli.Command {
 				repoPath = ""
 			} else {
 				repoPath = c.Args()[0]
-				if !libpvr.IsValidUrl(repoPath) {
+				pathExists,err := libpvr.IsFileExists(repoPath)
+				if err != nil {
+					return cli.NewExitError(err, 1)
+				}
+				if !libpvr.IsValidUrl(repoPath) && !pathExists {
 					//Get owner nick & Device nick & make device repo URL
 					userNick := ""
 					deviceNick := ""
