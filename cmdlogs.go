@@ -1,5 +1,5 @@
 //
-// Copyright 2018  Pantacor Ltd.
+// Copyright 2018-2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -109,6 +108,24 @@ func CommandLogs() cli.Command {
 				Sources: source,
 			}
 
+			var logFormatter libpvr.LogFormatter
+			logFormat := c.String("template")
+			switch logFormat {
+			case "json":
+				logFormatter = &libpvr.LogFormatterJson{}
+				break
+			default:
+				logFormatter = &libpvr.LogFormatterTemplate{}
+				logFormatter.Init("{{ .Device | prn2id " +
+					"| sprintf \"%10.10s\" }}" +
+					"({{ .LogRev | sprintf \"%3s\" }}) " +
+					"{{ .TimeCreated | timeformat \"Stamp\" }}" +
+					"{{ .LogPlat | sprintf \"%12s\" }}(" +
+					"{{ .LogSource |  basename | sprintf \"%-15.15s\"}})" +
+					": {{ .LogText }}")
+				break
+			}
+
 			for {
 				logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, &from, &to, true, logFilter)
 
@@ -123,11 +140,7 @@ func CommandLogs() cli.Command {
 					} else {
 						cutDeviceStart++
 					}
-
-					fmt.Printf("%s %s\t%s\n", v.TimeCreated.Format(time.RFC3339),
-						v.Device[cutDeviceStart:cutDeviceStart+8]+":"+v.LogSource+":"+v.LogLevel,
-						v.LogText)
-
+					logFormatter.DoLog(v)
 					// advance "from" cursor
 					from = v.TimeCreated
 				}
@@ -140,20 +153,9 @@ func CommandLogs() cli.Command {
 					}
 
 					for _, v := range logEntries {
-						cutDeviceStart := strings.LastIndex(v.Device, "/")
-						if cutDeviceStart < 0 {
-							cutDeviceStart = 0
-						} else {
-							cutDeviceStart++
-						}
-
-						fmt.Printf("%s %s\t%s\n", v.TimeCreated.Format(time.RFC822Z),
-							v.Device[cutDeviceStart:cutDeviceStart+8]+":"+v.LogSource+":"+v.LogLevel,
-							v.LogText)
-
+						logFormatter.DoLog(v)
 						// advance "from" cursor
 						from = v.TimeCreated
-
 					}
 					// if we reach end of cursor we have exhausted it and will sleep
 					// before trying to get new logs starting from last timestamp
@@ -163,7 +165,6 @@ func CommandLogs() cli.Command {
 					}
 				}
 			}
-
 			return nil
 		},
 		Flags: []cli.Flag{
@@ -176,6 +177,11 @@ func CommandLogs() cli.Command {
 				Name:   "to,t",
 				Usage:  "Datetime in RFC3339 format, e.g.:--to=2006-01-02T15:04:05+06:00",
 				EnvVar: "PVR_LOGS_TO_DATE",
+			},
+			cli.StringFlag{
+				Name:   "template,s",
+				Usage:  "template for log output formatting: short(default), json, <golang-time-format>",
+				EnvVar: "PVR_LOGS_TEMPLATE",
 			},
 		},
 	}

@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2017-2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,12 +30,15 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+	"text/template"
 	"time"
 
+	"github.com/Masterminds/sprig"
 	"github.com/go-resty/resty"
 )
 
@@ -662,7 +665,7 @@ func (s *Session) SuggestDeviceNicks(userNick, searchTerm string, baseURL string
 		return
 	}
 	if len(responseData) == 0 {
-		fmt.Println("No results\n")
+		fmt.Println("No results")
 	} else {
 		for _, device := range responseData {
 			if userNick != "" {
@@ -698,7 +701,7 @@ func (s *Session) SuggestUserNicks(searchTerm string, baseURL string) {
 		return
 	}
 	if len(responseData) == 0 {
-		fmt.Println("No results\n")
+		fmt.Println("No results")
 	} else {
 		for _, profile := range responseData {
 			if len(responseData) == 1 {
@@ -723,4 +726,88 @@ func IsValidUrl(value string) bool {
 	}
 
 	return true
+}
+
+var tmplMap = map[string]interface{}{
+	"basename": func(a string) string {
+		return path.Base(a)
+	},
+	"sprintf": func(a, b string) string {
+		return fmt.Sprintf(a, b)
+	},
+	"timeformat": func(a string, b time.Time) string {
+		var r string
+		switch a {
+		case "ANSIC":
+			r = b.Format(time.ANSIC)
+			break
+		case "UnixDate":
+			r = b.Format(time.UnixDate)
+			break
+		case "RubyDate":
+			r = b.Format(time.RubyDate)
+			break
+		case "RFC822":
+			r = b.Format(time.RFC822)
+			break
+		case "RFC850":
+			r = b.Format(time.RFC850)
+			break
+		case "RFC1123":
+			r = b.Format(time.RFC1123)
+			break
+		case "RFC1123Z":
+			r = b.Format(time.RFC1123Z)
+			break
+		case "RFC3339":
+			r = b.Format(time.RFC3339)
+			break
+		case "RFC3339Nano":
+			r = b.Format(time.RFC3339Nano)
+			break
+		case "Kitchen":
+			r = b.Format(time.Kitchen)
+			break
+		case "Stamp":
+			r = b.Format(time.Stamp)
+			break
+		case "StampMilli":
+			r = b.Format(time.StampMilli)
+			break
+		case "StampMicro":
+			r = b.Format(time.StampMicro)
+			break
+		case "StampNano":
+			r = b.Format(time.StampNano)
+			break
+		default:
+			r = b.Format(time.Stamp)
+		}
+		return r
+	},
+	"prn2id": func(a string) string {
+		i := strings.LastIndex(a, "/")
+		if i < 0 {
+			return "INVALID_PRN(" + a + ")"
+		}
+		i += 1
+		return a[i:]
+	},
+}
+
+func SprintTmpl(format string, obj interface{}) (string, error) {
+	var buf bytes.Buffer
+
+	tmpl, err := template.New("template").
+		Funcs(tmplMap).Funcs(sprig.GenericFuncMap()).
+		Parse(format)
+	if err != nil {
+		return "", err
+	}
+	err = tmpl.Execute(&buf, obj)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
