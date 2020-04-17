@@ -59,27 +59,35 @@ func CommandLogs() cli.Command {
 				return cli.NewExitError(err, 4)
 			}
 
-			from := time.Now().Add(time.Duration(-1 * time.Minute))
+			rev := c.Int("rev")
+
+			var from *time.Time
+			if rev < 0 {
+				_t := time.Now().Add(time.Duration(-1 * time.Minute))
+				from = &_t
+			}
 			if c.String("from") != "" {
-				from, err = libpvr.ParseRFC3339(c.String("from"))
+				_t, err := libpvr.ParseRFC3339(c.String("from"))
 				if err != nil {
 					parsedDuration, err := duration.FromString(c.String("from"))
 					if err != nil {
 						return cli.NewExitError(err, 5)
 					}
-					from = time.Now().Local().Add(-parsedDuration.ToDuration())
+					_t = time.Now().Local().Add(-parsedDuration.ToDuration())
 				}
+				from = &_t
 			}
-			var to time.Time
+			var to *time.Time
 			if c.String("to") != "" {
-				to, err = libpvr.ParseRFC3339(c.String("to"))
+				_t, err := libpvr.ParseRFC3339(c.String("to"))
 				if err != nil {
 					parsedDuration, err := duration.FromString(c.String("to"))
 					if err != nil {
 						return cli.NewExitError(err, 5)
 					}
-					to = from.Add(parsedDuration.ToDuration())
+					_t = from.Add(parsedDuration.ToDuration())
 				}
+				to = &_t
 			}
 
 			splits := []string{}
@@ -127,7 +135,7 @@ func CommandLogs() cli.Command {
 			}
 
 			for {
-				logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, &from, &to, true, logFilter)
+				logEntries, cursorID, err := session.DoLogs(c.App.Metadata["PVR_BASEURL"].(string), nil, rev, from, to, true, logFilter)
 
 				if err != nil {
 					return cli.NewExitError("Error getting device list: "+err.Error(), 4)
@@ -142,7 +150,7 @@ func CommandLogs() cli.Command {
 					}
 					logFormatter.DoLog(v)
 					// advance "from" cursor
-					from = v.TimeCreated
+					from = &v.TimeCreated
 				}
 
 				for {
@@ -155,7 +163,7 @@ func CommandLogs() cli.Command {
 					for _, v := range logEntries {
 						logFormatter.DoLog(v)
 						// advance "from" cursor
-						from = v.TimeCreated
+						from = &v.TimeCreated
 					}
 					// if we reach end of cursor we have exhausted it and will sleep
 					// before trying to get new logs starting from last timestamp
@@ -173,15 +181,21 @@ func CommandLogs() cli.Command {
 				Usage:  "Datetime in RFC3339 format, e.g.: --from=2006-01-02T15:04:05+06:00",
 				EnvVar: "PVR_LOGS_FROM_DATE",
 			},
-			cli.StringFlag{
-				Name:   "to,t",
-				Usage:  "Datetime in RFC3339 format, e.g.:--to=2006-01-02T15:04:05+06:00",
-				EnvVar: "PVR_LOGS_TO_DATE",
+			cli.IntFlag{
+				Name:   "rev,r",
+				Usage:  "Get logs for specific revision (rev) number, e.g. --rev=1 or -rev=-1 (disabled), with this flag --from will not be defaulting to NOW",
+				EnvVar: "PVR_LOGS_REV",
+				Value:  -1,
 			},
 			cli.StringFlag{
 				Name:   "template,s",
 				Usage:  "template for log output formatting: short(default), json, <golang-time-format>",
 				EnvVar: "PVR_LOGS_TEMPLATE",
+			},
+			cli.StringFlag{
+				Name:   "to,t",
+				Usage:  "Datetime in RFC3339 format, e.g.:--to=2006-01-02T15:04:05+06:00",
+				EnvVar: "PVR_LOGS_TO_DATE",
 			},
 		},
 	}

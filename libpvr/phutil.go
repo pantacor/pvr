@@ -217,6 +217,7 @@ type LogFilter struct {
 func (p *Session) DoLogs(
 	baseurl string,
 	deviceIds []string,
+	rev int,
 	startTime *time.Time,
 	endTime *time.Time,
 	cursor bool,
@@ -239,16 +240,20 @@ func (p *Session) DoLogs(
 		// if cursor we enable in backend request too...
 		if cursor {
 			q.Add("cursor", "true")
-			q.Add("sort", "time-created")
 			q.Add("page", "3000")
 		}
 
+		q.Add("sort", "time-created")
+
 		loc, _ := time.LoadLocation("UTC")
 
+		if rev >= 0 {
+			q.Add("rev", fmt.Sprintf("%d", rev))
+		}
 		if startTime != nil {
 			q.Add("after", startTime.In(loc).Format(time.RFC3339))
 		}
-		if !endTime.IsZero() {
+		if endTime != nil && !endTime.IsZero() {
 			q.Add("before", endTime.In(loc).Format(time.RFC3339))
 		}
 		if logFilter.Devices != "" {
