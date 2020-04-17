@@ -427,7 +427,7 @@ device-meta field Updated Successfully
 
 ```
 
-## pvr device logs <deviceid|devicenick>[/source][@level]
+## pvr device logs [--template=<short|json|<gotemplate>] <deviceid|devicenick>[/source][@level]
 
 pvr device logs list the logs with filter options of device,source & level
 
@@ -599,6 +599,44 @@ example2\$ pvr logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor
 2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff5
 
 ```
+
+### pvr logs --template=<json|short|TEMPLATE>
+
+Log output can be formatted using `--template` flag.
+
+Valid values are:
+ * `json`: json format (all fields)
+ * `short`: short format (default)
+ * `TEMPLATE`: golang template (see below)
+
+Golang template syntax is documented in official golang docs: https://golang.org/pkg/text/template/
+
+The object passed to the parse is the entire LogsEntry struct. Hence you can refer to any field
+inside your template:
+
+```
+type Entry struct {
+	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Device      string             `json:"dev,omitempty" bson:"dev"`
+	Owner       string             `json:"own,omitempty" bson:"own"`
+	TimeCreated time.Time          `json:"time-created,omitempty" bson:"time-created"`
+	LogTSec     int64              `json:"tsec,omitempty" bson:"tsec"`
+	LogTNano    int64              `json:"tnano,omitempty" bson:"tnano"`
+	LogRev      string             `json:"rev,omitempty" bson:"rev"`
+	LogPlat     string             `json:"plat,omitempty" bson:"plat"`
+	LogSource   string             `json:"src,omitempty" bson:"src"`
+	LogLevel    string             `json:"lvl,omitempty" bson:"lvl"`
+	LogText     string             `json:"msg,omitempty" bson:"msg"`
+}
+```
+
+Also we offer the following template functions:
+  * sprig funcs: https://github.com/Masterminds/sprig
+  * `sprint FORMAT VALUE`: single value string formatter using strformat syntax (e.g. {{ "test1234" | sprintf "%4s" }} => test)
+  * `basename PATH`: basename of a given path (e.g. `{{ "/path/one" | basename }} => one` )
+  * `timeformat TIME`: time format for a time field like TimeCreated (e.g. `{{ .TimeCreated | timeformat "Stamp" }} => one` )
+    * Any golang time constant is supported, see https://golang.org/pkg/time/#pkg-constants (e.g. ANSIC, UnixDate, ... )
+
 
 ## pvr login [END_POINT]
 

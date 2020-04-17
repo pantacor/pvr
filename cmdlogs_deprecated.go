@@ -1,5 +1,5 @@
 //
-// Copyright 2018  Pantacor Ltd.
+// Copyright 2018-2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,17 +55,6 @@ func CommandLogsDeprecated() cli.Command {
 			return nil
 		},
 		Action: CommandLogs().Action,
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:   "from,f",
-				Usage:  "Datetime in RFC3339 format, e.g.: --from=2006-01-02T15:04:05+06:00",
-				EnvVar: "PVR_LOGS_FROM_DATE",
-			},
-			cli.StringFlag{
-				Name:   "to,t",
-				Usage:  "Datetime in RFC3339 format, e.g.:--to=2006-01-02T15:04:05+06:00",
-				EnvVar: "PVR_LOGS_TO_DATE",
-			},
-		},
+		Flags:  CommandLogs().Flags,
 	}
 }
