@@ -840,14 +840,14 @@ Follow this link to continue and after that come back and continue
 
 # PVR App Commands
 
-## fakeroot pvr app add <APP_NAME> --from=<DOCKER_IMAGE> --source=[remote|local],[remote|local]
+## pvr app add <APP_NAME> --from=<DOCKER_IMAGE> --source=[remote|local],[remote|local]
 
 pvr app add creates a new application and generates files by pulling layers from a given docker image in either remote or local docker repo's.
 By default it will first look in remote repo. when not found it will pull from local docker repo,the priority can be changed using the --source flag(default:remote,local).
 
 ```
 
-example1\$ fakeroot pvr app add nginx-app --from=nginx --source=remote,local
+example1\$ pvr app add nginx-app --from=nginx --source=remote,local
 Generating squashfs...
 Downloading layers...
 Layer 0 downloaded(cache)
@@ -918,13 +918,13 @@ pvr-sdk
 
 ```
 
-## fakeroot pvr app update <APP_NAME>
+## pvr app update <APP_NAME>
 
-fakeroot pvr app update :update an existing application.
+pvr app update :update an existing application.
 
 ```
 
-example1$ $ fakeroot pvr app update nginx-app
+example1$ $ pvr app update nginx-app
 Application updated
 
 ```
