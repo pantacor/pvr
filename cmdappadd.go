@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"syscall"
 
 	"gitlab.com/pantacor/pvr/libpvr"
 
@@ -94,6 +95,10 @@ func CommandAppAdd() cli.Command {
 				return cli.NewExitError(err, 3)
 			}
 			err = pvr.AddApplication(app)
+			if err == libpvr.ErrNeedBeRoot {
+				fmt.Println("applying `fakeroot` command.")
+				err = syscall.Exec("fakeroot", os.Args, os.Environ())
+			}
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
