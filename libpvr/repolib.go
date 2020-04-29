@@ -1268,9 +1268,18 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	return nil
 }
 
-func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
+func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
 
 	rs := map[string]interface{}{}
+
+	repoUri, err := url.Parse(getPath)
+
+	if err != nil {
+		return err
+	}
+
+	repoPath := repoUri.Path
+	partname := repoUri.Fragment
 
 	// first copy new json, but only rename at the very end after all else succeed
 	jsonRepo := filepath.Join(repoPath, "json")
@@ -1283,6 +1292,17 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 	err = json.Unmarshal(jsonData, &rs)
 	if err != nil {
 		return errors.New("JSON Unmarshal (json.new):" + err.Error())
+	}
+
+	partPrefix := partname
+	if partname != "" {
+		partPrefix = partname + "/"
+	}
+
+	for k := range rs {
+		if !strings.HasPrefix(k, partPrefix) {
+			delete(rs, k)
+		}
 	}
 
 	// first copy new json, but only rename at the very end after all else succeed
@@ -1332,11 +1352,30 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 	}
 
 	var jsonMerged []byte
-
 	if merge {
-		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonData)
+		jsonDataSelect, err := json.Marshal(rs)
+
+		if err != nil {
+			return err
+		}
+		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
 	} else {
-		jsonMerged = jsonData
+		// manually remove everything not matching the part from fragement ...
+		pJSONMap := p.PristineJsonMap
+		// remove all files for name "${part}/"
+		for k := range pJSONMap {
+			if strings.HasPrefix(k, partPrefix) {
+				delete(pJSONMap, k)
+			}
+		}
+
+		// add back all from new map
+		for k, v := range rs {
+			if strings.HasPrefix(k, partPrefix) {
+				pJSONMap[k] = v
+			}
+		}
+		jsonMerged, err = json.MarshalIndent(pJSONMap, "", "    ")
 	}
 
 	if err != nil {
@@ -1467,14 +1506,7 @@ err:
 	return nil
 }
 
-func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
-
-	jsonMap := map[string]interface{}{}
-
-	err := json.Unmarshal(jsonData, &jsonMap)
-	if err != nil {
-		return err
-	}
+func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonMap map[string]interface{}) error {
 
 	grabs := make([]*grab.Request, 0)
 	shaMap := map[string]interface{}{}
@@ -1565,18 +1597,55 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool) error {
 		return err
 	}
 
-	err = p.getObjects(remotePvr, jsonData)
+	jsonMap := map[string]interface{}{}
+
+	err = json.Unmarshal(jsonData, &jsonMap)
+	if err != nil {
+		return err
+	}
+
+	// lets keep only those matching prefix
+	partPrefix := url.Fragment
+	if partPrefix != "" {
+		partPrefix = partPrefix + "/"
+	}
+	for k := range jsonMap {
+		if !strings.HasPrefix(k, partPrefix) {
+			delete(jsonMap, k)
+		}
+	}
+
+	err = p.getObjects(remotePvr, jsonMap)
 
 	if err != nil {
 		return err
 	}
 
 	var jsonMerged []byte
-
 	if merge {
-		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonData)
+		jsonDataSelect, err := json.Marshal(jsonMap)
+		if err != nil {
+			return err
+		}
+
+		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
 	} else {
-		jsonMerged = jsonData
+		// manually remove everything not matching the part from fragement ...
+		pJSONMap := p.PristineJsonMap
+		// remove all files for name "app/"
+		for k := range pJSONMap {
+			if strings.HasPrefix(k, partPrefix) {
+				delete(pJSONMap, k)
+			}
+		}
+		// add back all from new map
+		for k, v := range jsonMap {
+			if strings.HasPrefix(k, partPrefix) {
+				pJSONMap[k] = v
+			}
+		}
+
+		jsonMerged, err = json.MarshalIndent(pJSONMap, "", "    ")
 	}
 
 	if err != nil {
@@ -1610,7 +1679,7 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 	//  2. if a path with one or two elements -> Prepend https://pvr.pantahub.com
 	//  3. if a first dir of path is resolvable host -> Prepend https://
 	if url.Scheme == "" {
-		_, err := os.Stat(filepath.Join(uri, "json"))
+		_, err := os.Stat(filepath.Join(url.Path, "json"))
 
 		// if we get pointed at a pvr repo on disk, go local
 		if err == nil {
@@ -1625,16 +1694,11 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
 		}
 
-		if !path.IsAbs(uri) {
+		if !path.IsAbs(url.Path) {
 			uri = "/" + uri
 		}
 
-		refURL, err := url.Parse(uri)
-		if err != nil {
-			return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
-		}
-
-		url = repoBaseURL.ResolveReference(refURL)
+		url = repoBaseURL.ResolveReference(url)
 
 	}
 
