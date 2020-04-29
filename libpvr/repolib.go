@@ -1268,8 +1268,13 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	return nil
 }
 
-func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
+func (p *Pvr) UnpackRepo(repoPath string, outDir string) error {
 
+	err := Untar(outDir, repoPath)
+	return err
+}
+
+func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
 	rs := map[string]interface{}{}
 
 	repoUri, err := url.Parse(getPath)
@@ -1281,8 +1286,33 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
 	repoPath := repoUri.Path
 	partname := repoUri.Fragment
 
+	f, err := os.Stat(repoPath)
+
+	if err != nil {
+		return err
+	}
+
+	// if we dont have a dir for local we might have a tarball export
+	if !f.IsDir() {
+		repoPath, err = ioutil.TempDir(os.TempDir(), "pvr-tmprepo-")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(repoPath)
+
+		err = p.UnpackRepo(repoUri.Path, repoPath)
+		if err != nil {
+			return err
+		}
+	}
+
 	// first copy new json, but only rename at the very end after all else succeed
 	jsonRepo := filepath.Join(repoPath, "json")
+
+	_, err = os.Stat(jsonRepo)
+	if err != nil {
+		return err
+	}
 
 	jsonData, err := ioutil.ReadFile(jsonRepo)
 	if err != nil {
@@ -1679,14 +1709,13 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 	//  2. if a path with one or two elements -> Prepend https://pvr.pantahub.com
 	//  3. if a first dir of path is resolvable host -> Prepend https://
 	if url.Scheme == "" {
-		_, err := os.Stat(filepath.Join(url.Path, "json"))
+		err = p.GetRepoLocal(uri, merge)
 
 		// if we get pointed at a pvr repo on disk, go local
 		if err == nil {
-			err = p.GetRepoLocal(uri, merge)
 			goto save
 		} else if !os.IsNotExist(err) {
-			return errors.New("error testing existance of json file in provided path: " + err.Error())
+			return errors.New("error testing existance of local json file in provided path: " + err.Error())
 		}
 
 		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
