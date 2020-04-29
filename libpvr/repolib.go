@@ -1843,7 +1843,12 @@ func (p *Pvr) Import(src string) error {
 			continue
 		}
 
-		filePath := filepath.Join(p.Pvrdir, header.Name)
+		var filePath string
+		if filepath.Base(filepath.Dir(header.Name)) == "objects" {
+			filePath = filepath.Join(p.Objdir, filepath.Base(header.Name))
+		} else {
+			filePath = filepath.Join(p.Pvrdir, header.Name)
+		}
 		filePathNew := filePath + ".new"
 
 		file, err := os.OpenFile(filePathNew, os.O_CREATE|os.O_TRUNC|os.O_WRONLY,
