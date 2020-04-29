@@ -427,30 +427,30 @@ device-meta field Updated Successfully
 
 ```
 
-## pvr device logs [--template=<short|json|<gotemplate>] <deviceid|devicenick>[/source][@level]
+## pvr device logs [--template=<short|json|<gotemplate>] <deviceid|devicenick>[/source][@level][#platform]
 
-pvr device logs list the logs with filter options of device,source & level
-
-```
-example1$ pvr device logs 5d555d5e80123b31faa3cff2/pantavisor.log@INFO
-2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+pvr device logs list the logs with filter options of device,source,level & platform
 
 ```
-
-pvr device logs list the logs with filter options of multiple device,source & level
+example1$ pvr device logs 5d555d5e80123b31faa3cff2/pantavisor.log@INFO#windows
+2020-01-06T12:54:17Z 5e0f4ede:windows(pantavisor.log):INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:windows(pantavisor.log):INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:53Z 5e0f4ede:windows(pantavisor.log):INFO       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
 
 ```
-example2$ pvr device logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
-2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff5
-2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:55:03Z 5e0f4ede:pantavisor.log:INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff5
-2020-01-06T12:55:17Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:55:43Z 5e0f4ede:pantavisor2.log:INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff5
-2020-01-06T12:55:53Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+
+pvr device logs list the logs with filter options of multiple device,source,level &platform
+
+```
+example2$ pvr device logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2#windows,linux
+2020-01-06T12:54:17Z 5e0f4ede:windows(pantavisor.log):INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:windows(pantavisor.log):INFO       My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:53Z 5e0f4ede:windows(pantavisor.log):INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:03Z 5e0f4ede:windows(pantavisor.log):INFO       My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:17Z 5e0f4ede:linux(pantavisor2.log):INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:43Z 5e0f4ede:linux(pantavisor2.log):INFO2       My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:53Z 5e0f4ede:linux(pantavisor2.log):INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:03Z 5e0f4ede:linux(pantavisor2.log):INFO2       My log line 4 to remember from device:5d555d5e80123b31faa3cff5
 ```
 
 ```
@@ -522,6 +522,16 @@ example6\$ pvr device logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pan
 2020-01-06T12:56:20Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff5
 ```
 
+pvr device logs list the logs with filter options of multiple platforms
+
+```
+example7\$ pvr device logs --platform=linux,windows
+5ea97febfb( ) May 1 20:28:28 linux(pantavisor.log ): My log line to remember
+5ea97febfb( ) May 1 20:28:29 windows(pantavisor.log ): My log line to remember
+5ea97febfb( ) May 1 20:28:30 linux(pantavisor.log ): My log line to remember
+
+```
+
 ## pvr export <FILENAME.tar.gz>
 
 pvr export : Exports repo into single file (tarball)
@@ -569,7 +579,7 @@ ID NICK REV STATUS STATE SEEN MESSAGE
 
 ```
 
-## pvr logs <deviceid|devicenick>[/source][@level]
+## pvr logs <deviceid|devicenick>[/source][@level][#platform]
 
 `WARNING:`This command is DEPRECATED, please use `pvr device logs` instead
 
@@ -588,15 +598,25 @@ pvr logs list the logs with filter options of multiple device,source & level
 
 ```
 
-example2\$ pvr logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2
-2020-01-06T12:54:17Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:54:43Z 5e0f4ede:pantavisor.log:INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff5
-2020-01-06T12:54:53Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:55:03Z 5e0f4ede:pantavisor.log:INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff5
-2020-01-06T12:55:17Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:55:43Z 5e0f4ede:pantavisor2.log:INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff5
-2020-01-06T12:55:53Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff2
-2020-01-06T12:56:03Z 5e0f4ede:pantavisor2.log:INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+example2\$ pvr logs 5d555d5e80123b31faa3cff2,5d555d5e80123b31faa3cff5/pantavisor.log,pantavisor2.log@INFO,INFO2#linux,windows
+2020-01-06T12:54:17Z 5e0f4ede:windows(pantavisor.log):INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:54:43Z 5e0f4ede:windows(pantavisor.log):INFO My log line 1 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:54:53Z 5e0f4ede:windows(antavisor.log):INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:03Z 5e0f4ede:linux(pantavisor.log):INFO My log line 2 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:17Z 5e0f4ede:linux(pantavisor2.log):INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:55:43Z 5e0f4ede:linux(pantavisor2.log):INFO2 My log line 3 to remember from device:5d555d5e80123b31faa3cff5
+2020-01-06T12:55:53Z 5e0f4ede:linux(pantavisor2.log):INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff2
+2020-01-06T12:56:03Z 5e0f4ede:linux(pantavisor2.log):INFO2 My log line 4 to remember from device:5d555d5e80123b31faa3cff5
+
+```
+
+pvr logs list the logs with filter options of multiple platforms
+
+```
+example3\$ pvr logs --platform=linux,windows
+5ea97febfb( ) May 1 20:28:28 linux(pantavisor.log ): My log line to remember
+5ea97febfb( ) May 1 20:28:29 windows(pantavisor.log ): My log line to remember
+5ea97febfb( ) May 1 20:28:30 linux(pantavisor.log ): My log line to remember
 
 ```
 
