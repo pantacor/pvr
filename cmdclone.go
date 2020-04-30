@@ -121,6 +121,11 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 6)
 			}
 
+			pvr, err = libpvr.NewPvr(session, tempdir)
+			if err != nil {
+				return cli.NewExitError(err, 20)
+			}
+
 			err = pvr.GetRepo(newURL.String(), false)
 			if err != nil {
 				return cli.NewExitError(err, 7)

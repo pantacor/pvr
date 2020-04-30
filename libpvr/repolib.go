@@ -145,10 +145,19 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 		return &pvr, nil
 	}
 
-	byteJson, err := ioutil.ReadFile(filepath.Join(pvr.Pvrdir, "json"))
+	jPath := filepath.Join(pvr.Pvrdir, "json")
+	_, err = os.Stat(jPath)
 	// pristine json we keep as string as this will allow users load into
 	// convenient structs
-	pvr.PristineJson = byteJson
+	if err != nil {
+		byteJSON, err := ioutil.ReadFile(jPath)
+		if err != nil {
+			return nil, err
+		}
+		pvr.PristineJson = byteJSON
+	} else {
+		pvr.PristineJson = []byte("{}")
+	}
 
 	err = json.Unmarshal(pvr.PristineJson, &pvr.PristineJsonMap)
 	if err != nil {
