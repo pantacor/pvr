@@ -749,6 +749,16 @@ fe4d959c5541950 [OK]
 dee31a19ce47772 [OK]
 ```
 
+You can also get from a tarball produced with ```pvr export```:
+
+```
+pvr get /tmp/myexport.tar.gz#bsp
+pulling objects file /tmp/pvr-tmprepo-544439698/objects/dee31a19ce4777282e8f388ee174ec214d60d2682cd2c09537f5656b1106bf3f-> /home/asac/.pvr/objects/dee31a19ce4777282e8f388ee174ec214d60d2682cd2c09537f5656b1106bf3f.new
+pulling objects file /tmp/pvr-tmprepo-544439698/objects/018e41b74500fa7109390f0505180cfb612146e7c1dcac1669b4df226110aa90-> /home/asac/.pvr/objects/018e41b74500fa7109390f0505180cfb612146e7c1dcac1669b4df226110aa90.new
+pulling objects file /tmp/pvr-tmprepo-544439698/objects/fe4d959c5541950fe8fb10fd13eaeee0cfa2a9bf3fcae37c825daeb12a5366d2-> /home/asac/.pvr/objects/fe4d959c5541950fe8fb10fd13eaeee0cfa2a9bf3fcae37c825daeb12a5366d2.new
+pulling objects file /tmp/pvr-tmprepo-544439698/objects/67b1ce399971e304b02aa4ad11049ae78a7c7a44652d89ef44a60a04b2b541b6-> /home/asac/.pvr/objects/67b1ce399971e304b02aa4ad11049ae78a7c7a44652d89ef44a60a04b2b541b6.new
+``` 
+
 Rememember that ```pvr get``` will update the pristine state only, but not the working copy.
 
 You would usually introspect retrieved changes first using:
@@ -808,7 +818,6 @@ Same syntax for retrieving remote or local or just a part of a repository as for
 pvr putobjects : put objects from local repository to objects-endpoint
 
 ```
-
 example1\$ pvr putobjects https://api.pantahub.com/objects
 alpine-hotsp [OK]
 bsp/kernel.i [OK]
@@ -823,8 +832,8 @@ alpine-hotsp [OK]
 pv-avahi/lxc [OK]
 bsp/modules. [OK]
 pvr-sdk/lxc. [OK]
-
 ```
+
 
 ## pvr self-upgrade
 
