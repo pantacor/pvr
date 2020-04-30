@@ -696,12 +696,12 @@ sirinibin(prn:::accounts:/5bf2ac9e41b2dd0009a96c97) at https://api.pantahub.com/
 
 ```
 
-## pvr get
+## pvr get [remote-or-local-repository[#part]] [target-repository]
 
-pvr get :Get update target-repository from repository
+Update target-repository from remote or local repository
 
 ```
-
+# get latest from remembered repository
 example1$ $ pvr get
 33aefd8dbf46f05 [OK]
 686a026cd606613 [OK]
@@ -717,7 +717,50 @@ d49d56059ba219c [OK]
 3f4889e5eed2252 [OK]
 b56390fbeb5e46f [OK]
 70075ca4496451e [OK]
+```
 
+or
+
+```
+# get latest from remembered repository
+example1$ $ pvr get pantahub-ci/rpi3_initial_latest
+fe4d959c5541950 [OK]
+5a544d45a44cf3e [OK]
+834d31840a923e0 [OK]
+763030a2c49b8e8 [OK]
+5090f4922c2492e [OK]
+018e41b74500fa7 [OK]
+237277bb3586033 [OK]
+7bdd13f15773ab1 [OK]
+62f92986988541a [OK]
+13cef79b5098b82 [OK]
+dee31a19ce47772 [OK]
+67b1ce399971e30 [OK]
+12c8d468094e3d0 [OK]
+```
+
+You can also retrieve just one part (e.g. 'bsp' or $appname) using the fragment (#) notation:
+
+```
+pvr get pantahub-ci/rpi3_initial_latest#bsp
+67b1ce399971e30 [OK]
+018e41b74500fa7 [OK]
+fe4d959c5541950 [OK]
+dee31a19ce47772 [OK]
+```
+
+Rememember that ```pvr get``` will update the pristine state only, but not the working copy.
+
+You would usually introspect retrieved changes first using:
+
+```
+pvr status
+```
+
+and then replace working copy with pristine state using pvr checkout:
+
+```
+pvr checkout
 ```
 
 ## pvr global-config
@@ -735,7 +778,7 @@ example1\$ pvr global-config
 
 ```
 
-## pvr merge
+## pvr merge [remote-or-local-repository[#part]] [target-repository]
 
 pvr merge : Merge content of repository into target-directory.Default target-repository is the local .pvr one. If not <repository> is provided the last one is used.
 
@@ -756,8 +799,9 @@ d49d56059ba219c [OK]
 f1b441cb2721355 [OK]
 b30e6b64d3e1ecb [OK]
 ff2a85a62cd09f1 [OK]
-
 ```
+
+Same syntax for retrieving remote or local or just a part of a repository as for ```pvr get``` do apply.
 
 ## pvr putobjects <OBJECTS_ENDPOINT>
 

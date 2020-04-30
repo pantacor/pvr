@@ -18,6 +18,7 @@ package main
 import (
 	"errors"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 
@@ -29,9 +30,9 @@ func CommandGet() cli.Command {
 	return cli.Command{
 		Name:        "get",
 		Aliases:     []string{"g"},
-		ArgsUsage:   "[repository [target-repository]] | [<USER_NICK>/<DEVICE_NICK>]",
+		ArgsUsage:   "[<repository>[#<part>] [<target-repository>]] | [<USER_NICK>/<DEVICE_NICK>[#<part>]]",
 		Usage:       "get update target-repository from repository",
-		Description: "default target-repository is the local .pvr one. If not <repository> is provided the last one is used.",
+		Description: "default target-repository is the local .pvr one. If not <repository> is provided the last one is used. <part> can be one of 'bsp' or $appname.",
 		BashComplete: func(c *cli.Context) {
 			if c.GlobalString("baseurl") != "" {
 				c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
@@ -65,34 +66,39 @@ func CommandGet() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
-			var repoPath string
+			var repoUri string
 
 			if c.NArg() > 1 {
 				return errors.New("Get can have at most 1 argument. See --help.")
 			} else if c.NArg() == 0 {
-				repoPath = ""
+				repoUri = ""
 			} else {
-				repoPath = c.Args()[0]
-				pathExists,err := libpvr.IsFileExists(repoPath)
+				repoUri = c.Args()[0]
+				uri, err := url.Parse(repoUri)
+				if err != nil {
+					return cli.NewExitError(err, 3)
+				}
+
+				pathExists, err := libpvr.IsFileExists(uri.Path)
 				if err != nil {
 					return cli.NewExitError(err, 1)
 				}
-				if !libpvr.IsValidUrl(repoPath) && !pathExists {
+				if !libpvr.IsValidUrl(repoUri) && !pathExists {
 					//Get owner nick & Device nick & make device repo URL
 					userNick := ""
 					deviceNick := ""
-					splits := strings.Split(repoPath, "/")
+					splits := strings.Split(repoUri, "/")
 					if len(splits) == 1 {
-						return cli.NewExitError("Device nick is missing. (syntax:pvr get <USER_NICK>/<DEVICE_NICK>). See --help", 2)
+						return cli.NewExitError("Device nick is missing. (syntax:pvr get <USER_NICK>/<DEVICE_NICK>[#<part>]). See --help", 2)
 					} else if len(splits) == 2 {
 						userNick = splits[0]
 						deviceNick = splits[1]
 					}
-					repoPath = "https://pvr.pantahub.com/" + userNick + "/" + deviceNick
+					repoUri = "https://pvr.pantahub.com/" + userNick + "/" + deviceNick
 				}
 			}
 
-			err = pvr.GetRepo(repoPath, false)
+			err = pvr.GetRepo(repoUri, false)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
