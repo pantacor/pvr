@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"syscall"
 
@@ -96,8 +97,14 @@ func CommandAppAdd() cli.Command {
 			}
 			err = pvr.AddApplication(app)
 			if err == libpvr.ErrNeedBeRoot {
-				fmt.Println("applying `fakeroot` command.")
-				err = syscall.Exec("fakeroot", os.Args, os.Environ())
+				var fakerootPath string
+				fakerootPath, err = exec.LookPath("fakeroot")
+				if err == nil {
+					args := append([]string{fakerootPath}, os.Args...)
+					err = syscall.Exec(fakerootPath, args, os.Environ())
+				} else {
+					cli.NewExitError(errors.New("cannot find fakeroot in PATH. Install fakeroot or run ```pvr app``` as root: "+err.Error()), 5)
+				}
 			}
 			if err != nil {
 				return cli.NewExitError(err, 3)
