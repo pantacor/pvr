@@ -201,7 +201,7 @@ func DownloadLayersFromLocalDocker(digest string) (io.ReadCloser, error) {
 	cli, err := client.NewEnvClient()
 	cli.NegotiateAPIVersion(ctx)
 	httpClient := cli.HTTPClient()
-	url := "http://v" + cli.ClientVersion() + "/images/" +digest + "/get"
+	url := "http://v" + cli.ClientVersion() + "/images/" + digest + "/get"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -289,13 +289,13 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 	if err != nil {
 		return err
 	}
-	
-	splits := strings.Split(app.From,":")
+
+	splits := strings.Split(app.From, ":")
 	imageName := splits[0]
 
 	//Extract image name from repo digest.eg: Extract "busybox" from "busybox@sha256:afe605d272837ce1732f390966166c2afff5391208ddd57de10942748694049d"
 	if strings.Contains(imageName, "@sha256") {
-		splits := strings.Split(imageName,"@")
+		splits := strings.Split(imageName, "@")
 		imageName = splits[0]
 	}
 
@@ -305,7 +305,7 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 
 	app.Username = auth.Username
 	app.Password = auth.Password
-	
+
 	app.RemoteImage.Exists = true
 	app.RemoteImage.DockerDigest = repoDigest
 	app.RemoteImage.DockerConfig = dockerConfig
@@ -338,7 +338,11 @@ func LoadLocalImage(app *AppData) error {
 	}
 	fmt.Printf("Repo exists in local docker\n")
 	app.LocalImage.Exists = true
-	app.LocalImage.DockerDigest = inspect.RepoDigests[0]
+	if len(inspect.RepoDigests) > 0 {
+		app.LocalImage.DockerDigest = inspect.RepoDigests[0]
+	} else {
+		app.LocalImage.DockerDigest = inspect.ID
+	}
 
 	//Setting Docker Config values
 	configData, err := json.Marshal(inspect.Config)
