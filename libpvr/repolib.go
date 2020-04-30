@@ -149,7 +149,7 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 	_, err = os.Stat(jPath)
 	// pristine json we keep as string as this will allow users load into
 	// convenient structs
-	if err != nil {
+	if err == nil {
 		byteJSON, err := ioutil.ReadFile(jPath)
 		if err != nil {
 			return nil, err
