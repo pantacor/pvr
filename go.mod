@@ -57,7 +57,7 @@ require (
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/tinylib/msgp v1.1.2 // indirect
 	github.com/urfave/cli v1.22.4
-	gitlab.com/pantacor/pantahub-base v0.0.0-20200407102821-a44bfe3c2d8c
+	gitlab.com/pantacor/pantahub-base v0.0.0-20200517092730-d03429894e0c
 	go.mongodb.org/mongo-driver v1.3.2 // indirect
 	golang.org/x/crypto v0.0.0-20200406173513-056763e48d71
 	golang.org/x/exp v0.0.0-20190429183610-475c5042d3f1 // indirect
