@@ -39,6 +39,7 @@ import (
 	jsonpatch "github.com/asac/json-patch"
 	"github.com/cavaliercoder/grab"
 	"github.com/go-resty/resty"
+	"gitlab.com/pantacor/pantahub-base/objects"
 	pvrapi "gitlab.com/pantacor/pvr/api"
 	"golang.org/x/crypto/ssh/terminal"
 	"gopkg.in/cheggaaa/pb.v1"
@@ -787,6 +788,7 @@ type FilePut struct {
 	sourceFile string
 	putUrl     string
 	objName    string
+	objType    string
 	res        *http.Response
 	err        error
 	bar        *pb.ProgressBar
@@ -876,7 +878,13 @@ func worker(jobs chan FilePut, done chan FilePut) {
 		if err != nil {
 			j.bar.Postfix(" [ERROR]")
 		} else {
-			j.bar.Postfix(" [OK]")
+			if j.objType == objects.ObjectTypeLink {
+				j.bar.Postfix(" [LK]")
+			} else if j.objType == objects.ObjectTypeObject {
+				j.bar.Postfix(" [OK]")
+			} else {
+				j.bar.Postfix(" [OK]")
+			}
 		}
 
 		j.bar.Finish()
@@ -977,7 +985,16 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 		if response.StatusCode() == http.StatusConflict && !force {
 			_str := remoteObject.ObjectName[0:Min(len(remoteObject.ObjectName)-1, 12)] + " "
-			fmt.Println(_str + "[OK]")
+
+			objectType := response.Header().Get(objects.HttpHeaderPantahubObjectType)
+			if objectType == objects.ObjectTypeLink {
+				fmt.Println(_str + "[LK]")
+			} else if objectType == objects.ObjectTypeObject {
+				fmt.Println(_str + "[OK]")
+			} else {
+				fmt.Println(_str + "[OK]")
+			}
+
 			continue
 		}
 
@@ -987,11 +1004,25 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		}
 
 		fileName := filepath.Join(p.Objdir, v)
-		filePuts = append(filePuts, FilePut{
+		filePut := FilePut{
 			sourceFile: fileName,
 			objName:    remoteObject.ObjectName,
 			putUrl:     remoteObject.SignedPutUrl,
-		})
+		}
+
+		if response.StatusCode() == http.StatusConflict && force {
+			objectType := response.Header().Get(objects.HttpHeaderPantahubObjectType)
+
+			if objectType == objects.ObjectTypeLink {
+				_str := remoteObject.ObjectName[0:Min(len(remoteObject.ObjectName)-1, 12)] + " "
+				fmt.Println(_str + "[LK]")
+				continue
+			}
+			filePut.objType = objectType
+		} else {
+			filePut.objType = objects.ObjectTypeObject
+		}
+		filePuts = append(filePuts, filePut)
 	}
 
 	filePutResults := p.putFiles(filePuts...)
@@ -1509,7 +1540,21 @@ func (p *Pvr) grabObjects(requests ...*grab.Request) error {
 						progressBars[req].ShowCounters = false
 						progressBars[req].ShowTimeLeft = false
 						progressBars[req].ShowBar = false
-						progressBars[req].Postfix(" [OK]")
+						if grab.ErrFileExists == resp.Err() {
+							if req.Tag == objects.ObjectTypeLink {
+								progressBars[req].Postfix(" [LK cache]")
+							} else if req.Tag == objects.ObjectTypeObject {
+								progressBars[req].Postfix(" [OK cache]")
+							} else {
+								progressBars[req].Postfix(" [OK cache]")
+							}
+						} else if req.Tag == objects.ObjectTypeLink {
+							progressBars[req].Postfix(" [LK]")
+						} else if req.Tag == objects.ObjectTypeObject {
+							progressBars[req].Postfix(" [OK]")
+						} else {
+							progressBars[req].Postfix(" [OK]")
+						}
 						progressBars[req].Set64(progressBars[req].Total)
 					}
 
@@ -1610,6 +1655,7 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonMap map[string]interfac
 			return err
 		}
 		req.SkipExisting = true
+		req.Tag = response.Header().Get(objects.HttpHeaderPantahubObjectType)
 
 		grabs = append(grabs, req)
 	}
