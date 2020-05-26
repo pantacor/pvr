@@ -1492,8 +1492,11 @@ func (p *Pvr) grabObjects(requests ...*grab.Request) error {
 	progressBarSlice := make([]*pb.ProgressBar, 0)
 
 	for _, v := range requests {
-		shortFile := filepath.Base(v.Filename)[:15]
-		progressBars[v] = pb.New(0).Prefix(shortFile)
+		fileName := v.Label
+		if len(v.Label) >= 15 {
+			fileName = v.Label[:15]
+		}
+		progressBars[v] = pb.New(0).Prefix(fileName)
 		progressBars[v].ShowCounters = false
 		progressBars[v].SetUnits(pb.KB)
 		progressBarSlice = append(progressBarSlice, progressBars[v])
@@ -1587,6 +1590,9 @@ err:
 	}
 	t.Stop()
 
+	fmt.Println("\nImported " + strconv.Itoa(completed) + " objects to " + p.Objdir)
+	fmt.Println("\n\nRun pvr checkout to checkout the changed files into the workspace.")
+
 	return nil
 }
 
@@ -1656,6 +1662,7 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonMap map[string]interfac
 		}
 		req.SkipExisting = true
 		req.Tag = response.Header().Get(objects.HttpHeaderPantahubObjectType)
+		req.Label = remoteObject.ObjectName
 
 		grabs = append(grabs, req)
 	}
