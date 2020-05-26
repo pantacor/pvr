@@ -1314,13 +1314,17 @@ func (p *Pvr) UnpackRepo(repoPath string, outDir string) error {
 	return err
 }
 
-func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
+func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
+	objectsCount int,
+	err error) {
 	rs := map[string]interface{}{}
+
+	objectsCount = 0
 
 	repoUri, err := url.Parse(getPath)
 
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	repoPath := repoUri.Path
@@ -1329,20 +1333,20 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
 	f, err := os.Stat(repoPath)
 
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	// if we dont have a dir for local we might have a tarball export
 	if !f.IsDir() {
 		repoPath, err = ioutil.TempDir(os.TempDir(), "pvr-tmprepo-")
 		if err != nil {
-			return err
+			return objectsCount, err
 		}
 		defer os.RemoveAll(repoPath)
 
 		err = p.UnpackRepo(repoUri.Path, repoPath)
 		if err != nil {
-			return err
+			return objectsCount, err
 		}
 	}
 
@@ -1351,17 +1355,17 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
 
 	_, err = os.Stat(jsonRepo)
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	jsonData, err := ioutil.ReadFile(jsonRepo)
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	err = json.Unmarshal(jsonData, &rs)
 	if err != nil {
-		return errors.New("JSON Unmarshal (json.new):" + err.Error())
+		return objectsCount, errors.New("JSON Unmarshal (json.new):" + err.Error())
 	}
 
 	partPrefix := partname
@@ -1386,7 +1390,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
 	if configData != nil {
 		err = json.Unmarshal(configData, config)
 		if err != nil {
-			return errors.New("JSON Unmarshal (config.new):" + err.Error())
+			return objectsCount, errors.New("JSON Unmarshal (config.new):" + err.Error())
 		}
 	}
 
@@ -1410,15 +1414,36 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
 
 		objPathNew := filepath.Join(p.Objdir, v.(string)+".new")
 		objPath := filepath.Join(p.Objdir, v.(string))
-		fmt.Println("pulling objects file " + getPath + "-> " + objPathNew)
-		err := Copy(objPathNew, getPath)
+		fileExists, err := IsFileExists(objPath)
 		if err != nil {
-			return err
+			return objectsCount, err
+		}
+
+		if showFilenames {
+			cache := " cache"
+			if !fileExists {
+				cache = ""
+			}
+
+			if len(k) >= 15 {
+				fmt.Println(k[:15] + " [OK" + cache + "]")
+			} else {
+				fmt.Println(k + " [OK" + cache + "]")
+			}
+
+		} else {
+			fmt.Println("pulling objects file " + getPath + "-> " + objPathNew)
+		}
+
+		err = Copy(objPathNew, getPath)
+		if err != nil {
+			return objectsCount, err
 		}
 		err = os.Rename(objPathNew, objPath)
 		if err != nil {
-			return err
+			return objectsCount, err
 		}
+		objectsCount++
 	}
 
 	var jsonMerged []byte
@@ -1426,7 +1451,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
 		jsonDataSelect, err := json.Marshal(rs)
 
 		if err != nil {
-			return err
+			return objectsCount, err
 		}
 		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
 	} else {
@@ -1449,19 +1474,19 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool) error {
 	}
 
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
 
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	// all succeeded, atomically commiting the json
 	err = os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
 
-	return err
+	return objectsCount, err
 }
 
 func (p *Pvr) getJsonBuf(pvrRemote pvrapi.PvrRemote) ([]byte, error) {
@@ -1479,7 +1504,10 @@ func (p *Pvr) getJsonBuf(pvrRemote pvrapi.PvrRemote) ([]byte, error) {
 	return jsonData, nil
 }
 
-func (p *Pvr) grabObjects(requests ...*grab.Request) error {
+func (p *Pvr) grabObjects(showFilenames bool, requests ...*grab.Request) (
+	objectsCount int,
+	err error,
+) {
 	client := grab.NewClient()
 
 	client.UserAgent = "PVR client"
@@ -1492,8 +1520,16 @@ func (p *Pvr) grabObjects(requests ...*grab.Request) error {
 	progressBarSlice := make([]*pb.ProgressBar, 0)
 
 	for _, v := range requests {
-		shortFile := filepath.Base(v.Filename)[:15]
-		progressBars[v] = pb.New(0).Prefix(shortFile)
+		if showFilenames {
+			fileName := v.Label
+			if len(v.Label) >= 15 {
+				fileName = v.Label[:15]
+			}
+			progressBars[v] = pb.New(0).Prefix(fileName)
+		} else {
+			shortFile := filepath.Base(v.Filename)[:15]
+			progressBars[v] = pb.New(0).Prefix(shortFile)
+		}
 		progressBars[v].ShowCounters = false
 		progressBars[v].SetUnits(pb.KB)
 		progressBarSlice = append(progressBarSlice, progressBars[v])
@@ -1587,10 +1623,17 @@ err:
 	}
 	t.Stop()
 
-	return nil
+	objectsCount = completed
+
+	return objectsCount, nil
 }
 
-func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonMap map[string]interface{}) error {
+func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap map[string]interface{}) (
+	objectsCount int,
+	err error,
+) {
+
+	objectsCount = 0
 
 	grabs := make([]*grab.Request, 0)
 	shaMap := map[string]interface{}{}
@@ -1619,11 +1662,11 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonMap map[string]interfac
 		})
 
 		if err != nil {
-			return err
+			return objectsCount, err
 		}
 
 		if response.StatusCode() != 200 {
-			return errors.New("REST call failed. " +
+			return objectsCount, errors.New("REST call failed. " +
 				strconv.Itoa(response.StatusCode()) + "  " + response.Status())
 		}
 
@@ -1631,7 +1674,7 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonMap map[string]interfac
 		err = json.Unmarshal(response.Body(), &remoteObject)
 
 		if err != nil {
-			return err
+			return objectsCount, err
 		}
 
 		fullPathV := path.Join(p.Objdir, v)
@@ -1639,7 +1682,7 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonMap map[string]interfac
 		fSha, err := FiletoSha(fullPathV)
 		if err != nil && !os.IsNotExist(err) {
 			log.Println("ERROR: error calculating sha for existing file " + fullPathV + ": " + err.Error())
-			return err
+			return objectsCount, err
 		}
 
 		if err == nil && fSha != v {
@@ -1652,41 +1695,47 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonMap map[string]interfac
 		// we grab them to .new file ... and rename them when completed
 		req, err := grab.NewRequest(fullPathV, remoteObject.SignedGetUrl)
 		if err != nil {
-			return err
+			return objectsCount, err
 		}
 		req.SkipExisting = true
 		req.Tag = response.Header().Get(objects.HttpHeaderPantahubObjectType)
+		req.Label = remoteObject.ObjectName
 
 		grabs = append(grabs, req)
 	}
 
-	p.grabObjects(grabs...)
+	objectsCount, err = p.grabObjects(showFilenames, grabs...)
 
-	return nil
+	return objectsCount, err
 }
 
-func (p *Pvr) GetRepoRemote(url *url.URL, merge bool) error {
+func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
+	objectsCount int,
+	err error,
+) {
+
+	objectsCount = 0
 
 	if url.Scheme == "" {
-		return errors.New("Post must be a remote REST endpoint, not: " + url.String())
+		return objectsCount, errors.New("Post must be a remote REST endpoint, not: " + url.String())
 	}
 
 	remotePvr, err := p.initializeRemote(url)
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	jsonData, err := p.getJsonBuf(remotePvr)
 
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	jsonMap := map[string]interface{}{}
 
 	err = json.Unmarshal(jsonData, &jsonMap)
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	// lets keep only those matching prefix
@@ -1700,17 +1749,17 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool) error {
 		}
 	}
 
-	err = p.getObjects(remotePvr, jsonMap)
+	objectsCount, err = p.getObjects(showFilenames, remotePvr, jsonMap)
 
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	var jsonMerged []byte
 	if merge {
 		jsonDataSelect, err := json.Marshal(jsonMap)
 		if err != nil {
-			return err
+			return objectsCount, err
 		}
 
 		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
@@ -1734,19 +1783,24 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool) error {
 	}
 
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
 
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
-	return os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
+	return objectsCount, os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
 }
 
-func (p *Pvr) GetRepo(uri string, merge bool) error {
+func (p *Pvr) GetRepo(uri string, merge bool, showFilenames bool) (
+	objectsCount int,
+	err error,
+) {
+	objectsCount = 0
+
 	if uri == "" {
 		uri = p.Pvrconfig.DefaultPutUrl
 	}
@@ -1754,7 +1808,7 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 	url, err := url.Parse(uri)
 
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 	p.Pvrconfig.DefaultGetUrl = uri
@@ -1764,18 +1818,18 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 	//  2. if a path with one or two elements -> Prepend https://pvr.pantahub.com
 	//  3. if a first dir of path is resolvable host -> Prepend https://
 	if url.Scheme == "" {
-		err = p.GetRepoLocal(uri, merge)
+		objectsCount, err = p.GetRepoLocal(uri, merge, showFilenames)
 
 		// if we get pointed at a pvr repo on disk, go local
 		if err == nil {
 			goto save
 		} else if !os.IsNotExist(err) {
-			return errors.New("error testing existance of local json file in provided path: " + err.Error())
+			return objectsCount, errors.New("error testing existance of local json file in provided path: " + err.Error())
 		}
 
 		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
 		if err != nil {
-			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
+			return objectsCount, errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
 		}
 
 		if !path.IsAbs(url.Path) {
@@ -1794,16 +1848,16 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 		p.Pvrconfig.DefaultPostUrl = uri
 	}
 
-	err = p.GetRepoRemote(url, merge)
+	objectsCount, err = p.GetRepoRemote(url, merge, showFilenames)
 
 	if err != nil {
-		return err
+		return objectsCount, err
 	}
 
 save:
 	err = p.SaveConfig()
 
-	return err
+	return objectsCount, err
 }
 
 func (p *Pvr) Reset() error {

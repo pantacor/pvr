@@ -126,7 +126,7 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 20)
 			}
 
-			err = pvr.GetRepo(newURL.String(), false)
+			_, err = pvr.GetRepo(newURL.String(), false, false)
 			if err != nil {
 				return cli.NewExitError(err, 7)
 			}
