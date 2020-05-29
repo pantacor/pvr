@@ -501,11 +501,17 @@ func (s *Session) GetDevices(baseURL string,
 // GetDevice : Get Device
 func (s *Session) GetDevice(baseURL string,
 	deviceNick string,
+	ownerNick string,
 ) (
 	*resty.Response,
 	error,
 ) {
 	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+
+		if ownerNick != "" {
+			req.SetQueryParam("owner-nick", ownerNick)
+		}
+
 		return req.Get(baseURL + "/devices/" + deviceNick)
 	})
 	if err != nil {
