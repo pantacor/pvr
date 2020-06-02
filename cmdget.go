@@ -17,9 +17,11 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/urfave/cli"
@@ -98,10 +100,13 @@ func CommandGet() cli.Command {
 				}
 			}
 
-			err = pvr.GetRepo(repoUri, false)
+			objectsCount, err := pvr.GetRepo(repoUri, false, true)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
+
+			fmt.Println("\nImported " + strconv.Itoa(objectsCount) + " objects to " + pvr.Objdir)
+			fmt.Println("\n\nRun pvr checkout to checkout the changed files into the workspace.")
 
 			return nil
 		},
