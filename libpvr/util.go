@@ -42,10 +42,29 @@ import (
 	"github.com/go-resty/resty"
 )
 
+// Variable set in main() to enable/disable debug
+var IsDebugEnabled bool
+
+// PrintDebugf forwards to Printfs if IsDebugEnabled
+func PrintDebugf(format string, a ...interface{}) (n int, err error) {
+	if IsDebugEnabled {
+		return fmt.Printf(format, a...)
+	}
+	return 0, nil
+}
+
+// PrintDebugln forwards to Printfs if IsDebugEnabled
+func PrintDebugln(a ...interface{}) (n int, err error) {
+	if IsDebugEnabled {
+		return fmt.Println(a...)
+	}
+	return 0, nil
+}
+
 // RemoveAll remove a path, could be a file or a folder
 func RemoveAll(path string) error {
 	if _, err := os.Stat(path); err != nil {
-		return errors.New(path + "' doesn't exist")
+		return err
 	}
 	err := os.RemoveAll(path)
 	if err != nil {
