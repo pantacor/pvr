@@ -983,19 +983,25 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			return errors.New("Error posting object " + strconv.Itoa(response.StatusCode()))
 		}
 
-		if response.StatusCode() == http.StatusConflict && !force {
+		if response.StatusCode() == http.StatusConflict {
 			_str := remoteObject.ObjectName[0:Min(len(remoteObject.ObjectName)-1, 12)] + " "
-
 			objectType := response.Header().Get(objects.HttpHeaderPantahubObjectType)
-			if objectType == objects.ObjectTypeLink {
-				fmt.Println(_str + "[LK]")
-			} else if objectType == objects.ObjectTypeObject {
-				fmt.Println(_str + "[OK]")
-			} else {
-				fmt.Println(_str + "[OK]")
+			if !force {
+				if objectType == objects.ObjectTypeLink {
+					fmt.Println(_str + "[LK]")
+				} else if objectType == objects.ObjectTypeObject {
+					fmt.Println(_str + "[OK]")
+				} else {
+					fmt.Println(_str + "[OK]")
+				}
+				continue
 			}
 
-			continue
+			// if force
+			if objectType == objects.ObjectTypeLink {
+				fmt.Println(_str + "[LK]")
+				continue
+			}
 		}
 
 		err = json.Unmarshal(response.Body(), &remoteObject)
@@ -1013,11 +1019,8 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		if response.StatusCode() == http.StatusConflict && force {
 			objectType := response.Header().Get(objects.HttpHeaderPantahubObjectType)
 
-			if objectType == objects.ObjectTypeLink {
-				_str := remoteObject.ObjectName[0:Min(len(remoteObject.ObjectName)-1, 12)] + " "
-				fmt.Println(_str + "[LK]")
-				continue
-			}
+			// code in 'force' case will only get here if its not an ObjectTypeLink
+			// object type links are filtered and acked further above in this loop.
 			filePut.objType = objectType
 		} else {
 			filePut.objType = objects.ObjectTypeObject
