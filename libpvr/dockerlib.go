@@ -580,7 +580,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 			return err
 		}
 
-		fmt.Printf("Deleted %s file\n", fileToDelete)
+		PrintDebugf("Deleted %s file\n", fileToDelete)
 	}
 
 	makeSquashfsPath, err := exec.LookPath(MAKE_SQUASHFS_CMD)
@@ -634,7 +634,7 @@ func ProcessWhiteouts(extractPath string, layerPath string, layerNumber int) err
 	if len(whiteouts) == 0 {
 		return nil
 	}
-	fmt.Printf("Processing Whiteouts from layer %d:%s\n", layerNumber, layerPath)
+	PrintDebugf("Processing Whiteouts from layer %d:%s\n", layerNumber, layerPath)
 	for _, whiteoutFile := range whiteouts {
 
 		basename := filepath.Base(whiteoutFile)
@@ -642,19 +642,19 @@ func ProcessWhiteouts(extractPath string, layerPath string, layerNumber int) err
 
 		if strings.HasPrefix(basename, ".wh.") && strings.HasSuffix(basename, "opq") {
 			//Clear all contents of the folder from the extract path
-			fmt.Println("Removing all contents of :" + dir)
+			PrintDebugln("Processing 'opq' whiteout for:" + dir)
 			err := RemoveDirContents(dir)
-			if err != nil {
-				fmt.Printf("WARNING: cannot process whiteout %s (err=%s)\n", whiteoutFile, err.Error())
+			if err != nil && !os.IsNotExist(err) {
+				fmt.Printf("WARNING: cannot process 'opq' whiteout %s (err=%s)\n", whiteoutFile, err.Error())
 				continue
 			}
 
 		} else if strings.HasPrefix(basename, ".wh.") {
 			//Remove the indicated file from the extract path'
 			filePath := filepath.Join(dir, strings.TrimPrefix(basename, ".wh."))
-			fmt.Println("Removing:" + filePath)
+			PrintDebugln("Processing whiteout:" + filePath)
 			err := RemoveAll(filePath) //removr a file / dir
-			if err != nil {
+			if err != nil && !os.IsNotExist(err) {
 				fmt.Printf("WARNING: cannot process whiteout %s (err=%s)\n", whiteoutFile, err.Error())
 				continue
 			}
