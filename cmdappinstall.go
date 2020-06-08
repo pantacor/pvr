@@ -16,12 +16,9 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
-	"syscall"
 
 	"gitlab.com/pantacor/pvr/libpvr"
 
@@ -54,6 +51,16 @@ func CommandAppInstall() cli.Command {
 			pvr, err := libpvr.NewPvr(session, wd)
 			if err != nil {
 				return cli.NewExitError(err, 2)
+			}
+
+			err = pvr.CheckIfIsRunningAsRoot()
+			if err == libpvr.ErrNeedBeRoot {
+				err = pvr.RunAsRoot()
+				if err != nil {
+					return cli.NewExitError(err, 3)
+				}
+			} else if err != nil {
+				return cli.NewExitError(err, 3)
 			}
 
 			appname := c.Args().Get(0)
@@ -96,20 +103,10 @@ func CommandAppInstall() cli.Command {
 			err = pvr.FindDockerImage(&app)
 			if err != nil {
 				fmt.Println("\nSeems like you have an invalid docker digest value in your " + appname + "/src.json file\n")
-				fmt.Println("\nPlease run \"fakeroot pvr app update " + appname + " --source=" + c.String("source") + "\" to auto fix it or update docker_digest field by editing " + appname + "/src.json  to fix it manually\n")
+				fmt.Println("\nPlease run \"pvr app update " + appname + " --source=" + c.String("source") + "\" to auto fix it or update docker_digest field by editing " + appname + "/src.json  to fix it manually\n")
 				return cli.NewExitError(err, 3)
 			}
 			err = pvr.InstallApplication(app)
-			if err == libpvr.ErrNeedBeRoot {
-				var fakerootPath string
-				fakerootPath, err = exec.LookPath("fakeroot")
-				if err == nil {
-					args := append([]string{fakerootPath}, os.Args...)
-					err = syscall.Exec(fakerootPath, args, os.Environ())
-				} else {
-					cli.NewExitError(errors.New("cannot find fakeroot in PATH. Install fakeroot or run ```pvr app``` as root: "+err.Error()), 5)
-				}
-			}
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
