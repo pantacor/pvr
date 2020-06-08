@@ -209,9 +209,10 @@ func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*log
 
 // LogFilter : Log Filter
 type LogFilter struct {
-	Devices string
-	Sources string
-	Levels  string
+	Devices   string
+	Sources   string
+	Levels    string
+	Platforms string
 }
 
 func (p *Session) DoLogs(
@@ -264,6 +265,9 @@ func (p *Session) DoLogs(
 		}
 		if logFilter.Levels != "" {
 			q.Add("lvl", logFilter.Levels)
+		}
+		if logFilter.Platforms != "" {
+			q.Add("plat", logFilter.Platforms)
 		}
 
 		fullURL.RawQuery = q.Encode()

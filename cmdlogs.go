@@ -29,8 +29,8 @@ func CommandLogs() cli.Command {
 	return cli.Command{
 		Name:        "logs",
 		Aliases:     []string{"log"},
-		ArgsUsage:   "<deviceid|devicenick>[/source][@Level]",
-		Usage:       "pvr device logs <deviceid|devicenick>[/source][@Level]",
+		ArgsUsage:   "<deviceid|devicenick>[/source][@Level][#Platform]",
+		Usage:       "pvr device logs <deviceid|devicenick>[/source][@Level][#Platform]",
 		Description: "Get streaming logs of devices you own from pantahub",
 		BashComplete: func(c *cli.Context) {
 			if c.GlobalString("baseurl") != "" {
@@ -94,6 +94,7 @@ func CommandLogs() cli.Command {
 			devices := []string{}
 			source := ""
 			level := ""
+			platforms := ""
 			filter := c.Args().Get(0)
 
 			if filter != "" {
@@ -106,14 +107,26 @@ func CommandLogs() cli.Command {
 			if len(splits) > 1 {
 				splits2 := strings.Split(splits[1], "@")
 				source = splits2[0]
+
 				if len(splits2) > 1 {
-					level = splits2[1]
+					splits3 := strings.Split(splits2[1], "#")
+					level = splits3[0]
+					if len(splits3) > 1 {
+						platforms = splits3[1]
+					}
+
 				}
 			}
+
+			if c.String("platforms") != "" {
+				platforms = c.String("platforms")
+			}
+
 			logFilter := libpvr.LogFilter{
-				Devices: strings.Join(devices, ","),
-				Levels:  level,
-				Sources: source,
+				Devices:   strings.Join(devices, ","),
+				Levels:    level,
+				Sources:   source,
+				Platforms: platforms,
 			}
 
 			var logFormatter libpvr.LogFormatter
@@ -196,6 +209,11 @@ func CommandLogs() cli.Command {
 				Name:   "to,t",
 				Usage:  "Datetime in RFC3339 format, e.g.:--to=2006-01-02T15:04:05+06:00",
 				EnvVar: "PVR_LOGS_TO_DATE",
+			},
+			cli.StringFlag{
+				Name:   "platform,p",
+				Usage:  "Platform, e.g.: --platform=linux,windows",
+				EnvVar: "PVR_LOGS_PLATFORM",
 			},
 		},
 	}

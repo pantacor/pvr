@@ -28,8 +28,8 @@ func CommandLogsDeprecated() cli.Command {
 	return cli.Command{
 		Name:        "logs",
 		Aliases:     []string{"log"},
-		ArgsUsage:   "<deviceid|devicenick>[/source][@Level]",
-		Usage:       "pvr logs <deviceid|devicenick>[/source][@Level]",
+		ArgsUsage:   "<deviceid|devicenick>[/source][@Level][#Platform]",
+		Usage:       "pvr logs <deviceid|devicenick>[/source][@Level][#Platform]",
 		Description: "Get streaming logs of devices you own from pantahub",
 		BashComplete: func(c *cli.Context) {
 			if c.GlobalString("baseurl") != "" {
