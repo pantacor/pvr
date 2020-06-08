@@ -117,7 +117,7 @@ func (pvr *Pvr) SetConfiguration(arguments []string) (*PvrGlobalConfig, error) {
 func defaultConfiguration() PvrGlobalConfig {
 	return PvrGlobalConfig{
 		Spec:            defaultSpec,
-		AutoUpgrade:     false,
+		AutoUpgrade:     true,
 		DistributionTag: defaultDistributionTag,
 	}
 }
