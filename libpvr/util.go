@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2017-2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,18 +30,41 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+	"text/template"
+	"time"
 
+	"github.com/Masterminds/sprig"
 	"github.com/go-resty/resty"
 )
+
+// Variable set in main() to enable/disable debug
+var IsDebugEnabled bool
+
+// PrintDebugf forwards to Printfs if IsDebugEnabled
+func PrintDebugf(format string, a ...interface{}) (n int, err error) {
+	if IsDebugEnabled {
+		return fmt.Printf(format, a...)
+	}
+	return 0, nil
+}
+
+// PrintDebugln forwards to Printfs if IsDebugEnabled
+func PrintDebugln(a ...interface{}) (n int, err error) {
+	if IsDebugEnabled {
+		return fmt.Println(a...)
+	}
+	return 0, nil
+}
 
 // RemoveAll remove a path, could be a file or a folder
 func RemoveAll(path string) error {
 	if _, err := os.Stat(path); err != nil {
-		return errors.New(path + "' doesn't exist")
+		return err
 	}
 	err := os.RemoveAll(path)
 	if err != nil {
@@ -439,15 +462,45 @@ func SetTempFilesInterrupHandler(tempdir string) {
 	}()
 }
 
+// GetUserProfiles : Get User Profiles
+func (s *Session) GetUserProfiles(baseURL string,
+	userNick string,
+) (
+	*resty.Response,
+	error,
+) {
+	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		response, err := req.Get(baseURL + "/profiles/?nick=^" + userNick)
+		return response, err
+	})
+	if err != nil {
+		return response, err
+	}
+	if response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+	//Logging error response
+	err = LogPrettyJSON(response.Body())
+	if err != nil {
+		return response, err
+	}
+	return response, errors.New("Error getting user profile details")
+}
+
 // GetDevices : Get Devices
 func (s *Session) GetDevices(baseURL string,
+	ownerNick string,
 	deviceNick string,
 ) (
 	*resty.Response,
 	error,
 ) {
 	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
-		return req.Get(baseURL + "/devices/?nick=^" + deviceNick)
+		ownerNickParam := ""
+		if ownerNick != "" {
+			ownerNickParam = "&owner-nick=" + ownerNick
+		}
+		return req.Get(baseURL + "/devices/?nick=^" + deviceNick + ownerNickParam)
 	})
 
 	if err != nil {
@@ -467,11 +520,17 @@ func (s *Session) GetDevices(baseURL string,
 // GetDevice : Get Device
 func (s *Session) GetDevice(baseURL string,
 	deviceNick string,
+	ownerNick string,
 ) (
 	*resty.Response,
 	error,
 ) {
 	response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+
+		if ownerNick != "" {
+			req.SetQueryParam("owner-nick", ownerNick)
+		}
+
 		return req.Get(baseURL + "/devices/" + deviceNick)
 	})
 	if err != nil {
@@ -490,33 +549,34 @@ func (s *Session) GetDevice(baseURL string,
 
 // SliceContainsItem : checks if an item exists in a string array or not
 func SliceContainsItem(slice []string, item string) bool {
-    set := make(map[string]struct{}, len(slice))
-    for _, s := range slice {
-        set[s] = struct{}{}
-    }
+	set := make(map[string]struct{}, len(slice))
+	for _, s := range slice {
+		set[s] = struct{}{}
+	}
 
-    _, ok := set[item]
-    return ok
+	_, ok := set[item]
+	return ok
 }
 
 func RemoveDirContents(dir string) error {
-    d, err := os.Open(dir)
-    if err != nil {
-        return err
-    }
-    defer d.Close()
-    names, err := d.Readdirnames(-1)
-    if err != nil {
-        return err
-    }
-    for _, name := range names {
-        err = os.RemoveAll(filepath.Join(dir, name))
-        if err != nil {
-            return err
-        }
-    }
-    return nil
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
+
 // UpdateDevice : Update  user-meta or device-meta field of a device
 func (s *Session) UpdateDevice(
 	baseURL string,
@@ -565,6 +625,7 @@ func (s *Session) GetAuthStatus(baseURL string) (
 	}
 	return response, errors.New("Error getting auth status")
 }
+
 //ValidateSourceFlag : Validate Source Flag
 func ValidateSourceFlag(source string) error {
 	if source == "" {
@@ -577,4 +638,201 @@ func ValidateSourceFlag(source string) error {
 		}
 	}
 	return nil
+}
+
+// ParseRFC3339 : Parse RFC3339 string : 2006-01-02T15:04:05+07:00
+func ParseRFC3339(date string) (time.Time, error) {
+	from, err := time.Parse("2006-01-02", date) //Date part only
+	if err != nil {
+		from, err = time.Parse("2006-01-02T15:04:05", date) //Date with time
+		if err != nil {
+			return time.Parse(time.RFC3339, date) //Date with time & timezone
+		}
+	}
+	from = from.Local()
+	return from, err
+}
+
+// SuggestNicks : Suggest Nicks (Either user nicks or device nicks)
+func (s *Session) SuggestNicks(searchTerm string, baseURL string) {
+	splits := strings.Split(searchTerm, "/")
+	if len(splits) == 1 {
+		searchTerm = splits[0]
+		s.SuggestUserNicks(searchTerm, baseURL)
+	} else if len(splits) == 2 {
+		searchTerm = splits[1]
+		s.SuggestDeviceNicks(splits[0], searchTerm, baseURL)
+	}
+
+}
+
+// SuggestDeviceNicks : Suggest Device Nicks
+func (s *Session) SuggestDeviceNicks(userNick, searchTerm string, baseURL string) {
+	IsLoggedIn, err := s.IsUserLoggedIn(baseURL)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	if !IsLoggedIn {
+		fmt.Println("Not-Loggedin -")
+		return
+	}
+
+	devicesResponse, err := s.GetDevices(baseURL, userNick, searchTerm)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	responseData := []interface{}{}
+	err = json.Unmarshal(devicesResponse.Body(), &responseData)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	if len(responseData) == 0 {
+		fmt.Println("No results")
+	} else {
+		for _, device := range responseData {
+			if userNick != "" {
+				fmt.Println(userNick + "/" + device.(map[string]interface{})["nick"].(string) + "\n")
+			} else {
+				fmt.Println(device.(map[string]interface{})["nick"].(string) + "\n")
+			}
+
+		}
+	}
+}
+
+// SuggestUserNicks : Suggest User Nicks
+func (s *Session) SuggestUserNicks(searchTerm string, baseURL string) {
+	IsLoggedIn, err := s.IsUserLoggedIn(baseURL)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	if !IsLoggedIn {
+		fmt.Println("Not-Loggedin -")
+		return
+	}
+	profilesResponse, err := s.GetUserProfiles(baseURL, searchTerm)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	responseData := []interface{}{}
+	err = json.Unmarshal(profilesResponse.Body(), &responseData)
+	if err != nil {
+		fmt.Println(err.Error() + "\n")
+		return
+	}
+	if len(responseData) == 0 {
+		fmt.Println("No results")
+	} else {
+		for _, profile := range responseData {
+			if len(responseData) == 1 {
+				fmt.Println(profile.(map[string]interface{})["nick"].(string) + "/\n")
+			} else {
+				fmt.Println(profile.(map[string]interface{})["nick"].(string) + "\n")
+			}
+		}
+	}
+}
+
+// IsValidUrl tests a string to determine if it is a well-structured url or not.
+func IsValidUrl(value string) bool {
+	_, err := url.ParseRequestURI(value)
+	if err != nil {
+		return false
+	}
+
+	u, err := url.Parse(value)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return false
+	}
+
+	return true
+}
+
+var tmplMap = map[string]interface{}{
+	"basename": func(a string) string {
+		return path.Base(a)
+	},
+	"sprintf": func(a, b string) string {
+		return fmt.Sprintf(a, b)
+	},
+	"timeformat": func(a string, b time.Time) string {
+		var r string
+		switch a {
+		case "ANSIC":
+			r = b.Format(time.ANSIC)
+			break
+		case "UnixDate":
+			r = b.Format(time.UnixDate)
+			break
+		case "RubyDate":
+			r = b.Format(time.RubyDate)
+			break
+		case "RFC822":
+			r = b.Format(time.RFC822)
+			break
+		case "RFC850":
+			r = b.Format(time.RFC850)
+			break
+		case "RFC1123":
+			r = b.Format(time.RFC1123)
+			break
+		case "RFC1123Z":
+			r = b.Format(time.RFC1123Z)
+			break
+		case "RFC3339":
+			r = b.Format(time.RFC3339)
+			break
+		case "RFC3339Nano":
+			r = b.Format(time.RFC3339Nano)
+			break
+		case "Kitchen":
+			r = b.Format(time.Kitchen)
+			break
+		case "Stamp":
+			r = b.Format(time.Stamp)
+			break
+		case "StampMilli":
+			r = b.Format(time.StampMilli)
+			break
+		case "StampMicro":
+			r = b.Format(time.StampMicro)
+			break
+		case "StampNano":
+			r = b.Format(time.StampNano)
+			break
+		default:
+			r = b.Format(time.Stamp)
+		}
+		return r
+	},
+	"prn2id": func(a string) string {
+		i := strings.LastIndex(a, "/")
+		if i < 0 {
+			return "INVALID_PRN(" + a + ")"
+		}
+		i += 1
+		return a[i:]
+	},
+}
+
+func SprintTmpl(format string, obj interface{}) (string, error) {
+	var buf bytes.Buffer
+
+	tmpl, err := template.New("template").
+		Funcs(tmplMap).Funcs(sprig.GenericFuncMap()).
+		Parse(format)
+	if err != nil {
+		return "", err
+	}
+	err = tmpl.Execute(&buf, obj)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }

@@ -16,9 +16,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 
 	"gitlab.com/pantacor/pvr/libpvr"
 
@@ -70,12 +73,21 @@ func CommandAppUpdate() cli.Command {
 				Password: c.String("password"),
 			}
 			err = pvr.UpdateApplication(app)
+			if err == libpvr.ErrNeedBeRoot {
+				var fakerootPath string
+				fakerootPath, err = exec.LookPath("fakeroot")
+				if err == nil {
+					args := append([]string{fakerootPath}, os.Args...)
+					err = syscall.Exec(fakerootPath, args, os.Environ())
+				} else {
+					cli.NewExitError(errors.New("cannot find fakeroot in PATH. Install fakeroot or run ```pvr app``` as root: "+err.Error()), 5)
+				}
+			}
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
 
 			fmt.Println("Application updated")
-
 			return nil
 		},
 	}

@@ -16,6 +16,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path"
 
@@ -53,7 +54,9 @@ func CommandInit() cli.Command {
 				objectsDir = path.Join(c.GlobalString("config-dir"), "objects")
 			}
 
-			err = pvr.Init(objectsDir)
+			spec := c.String("spec")
+			initJson := fmt.Sprintf("{ \"#spec\": \"%s\" }", spec)
+			err = pvr.InitCustom(initJson, objectsDir)
 
 			if err != nil {
 				cli.NewExitError(err, 3)
@@ -64,6 +67,11 @@ func CommandInit() cli.Command {
 			cli.StringFlag{
 				Name:  "objects, o",
 				Usage: "Use `OBJECTS` directory for storing the file objects. Can be absolute or relative to working directory.",
+			},
+			cli.StringFlag{
+				Name:  "spec, s",
+				Usage: "Use `SPEC` as state format (e.g. pantavisor-service-system@1 or pantavisor-multi-platform@1 (legacy)",
+				Value: "pantavisor-service-system@1",
 			},
 		},
 	}

@@ -17,7 +17,12 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"log"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -27,9 +32,25 @@ func CommandGet() cli.Command {
 	return cli.Command{
 		Name:        "get",
 		Aliases:     []string{"g"},
-		ArgsUsage:   "[repository [target-repository]]",
+		ArgsUsage:   "[<repository>[#<part>] [<target-repository>]] | [<USER_NICK>/<DEVICE_NICK>[#<part>]]",
 		Usage:       "get update target-repository from repository",
-		Description: "default target-repository is the local .pvr one. If not <repository> is provided the last one is used.",
+		Description: "default target-repository is the local .pvr one. If not <repository> is provided the last one is used. <part> can be one of 'bsp' or $appname.",
+		BashComplete: func(c *cli.Context) {
+			if c.GlobalString("baseurl") != "" {
+				c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
+			}
+			session, err := libpvr.NewSession(c.App)
+			if err != nil {
+				log.Fatal(err.Error())
+				return
+			}
+			if c.NArg() == 0 {
+				return
+			}
+			searchTerm := c.Args()[c.NArg()-1]
+			baseURL := c.App.Metadata["PVR_BASEURL"].(string)
+			session.SuggestNicks(searchTerm, baseURL)
+		},
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -47,20 +68,45 @@ func CommandGet() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
-			var repoPath string
+			var repoUri string
 
 			if c.NArg() > 1 {
 				return errors.New("Get can have at most 1 argument. See --help.")
 			} else if c.NArg() == 0 {
-				repoPath = ""
+				repoUri = ""
 			} else {
-				repoPath = c.Args()[0]
+				repoUri = c.Args()[0]
+				uri, err := url.Parse(repoUri)
+				if err != nil {
+					return cli.NewExitError(err, 3)
+				}
+
+				pathExists, err := libpvr.IsFileExists(uri.Path)
+				if err != nil {
+					return cli.NewExitError(err, 1)
+				}
+				if !libpvr.IsValidUrl(repoUri) && !pathExists {
+					//Get owner nick & Device nick & make device repo URL
+					userNick := ""
+					deviceNick := ""
+					splits := strings.Split(repoUri, "/")
+					if len(splits) == 1 {
+						return cli.NewExitError("Device nick is missing. (syntax:pvr get <USER_NICK>/<DEVICE_NICK>[#<part>]). See --help", 2)
+					} else if len(splits) == 2 {
+						userNick = splits[0]
+						deviceNick = splits[1]
+					}
+					repoUri = "https://pvr.pantahub.com/" + userNick + "/" + deviceNick
+				}
 			}
 
-			err = pvr.GetRepo(repoPath, false)
+			objectsCount, err := pvr.GetRepo(repoUri, false, true)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
+
+			fmt.Println("\nImported " + strconv.Itoa(objectsCount) + " objects to " + pvr.Objdir)
+			fmt.Println("\n\nRun pvr checkout to checkout the changed files into the workspace.")
 
 			return nil
 		},

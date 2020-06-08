@@ -30,6 +30,9 @@ lxc.init.cmd =
 		{{- if pvr_sliceIndex .Docker.Entrypoint 0 }}
 			{{- "" }} {{ pvr_sliceIndex .Docker.Entrypoint 0}}{{ range pvr_sliceFrom .Docker.Entrypoint 1 }} "{{ . }}"{{ end }}
 		{{- end }}
+		{{- if and (.Docker.Cmd) (pvr_isSlice .Docker.Cmd) }}
+			{{- "" }} {{ range pvr_sliceFrom .Docker.Cmd 0 }} "{{ . }}"{{ end }}
+		{{- end }}
 	{{- else }}
 		{{- "" }} {{ .Docker.Entrypoint }}
 	{{- end }}
@@ -70,6 +73,9 @@ lxc.console.path = none
 lxc.mount.auto = {{ .Source.args.LXC_MOUNT_AUTO_PROC | pvr_ifNull "proc" }}
 	{{- " " }} {{ .Source.args.LXC_MOUNT_AUTO_SYS | pvr_ifNull "sys:rw" }}
 	{{- " " }} {{ .Source.args.LXC_MOUNT_AUTO_GROUP | pvr_ifNull "cgroup" }}
+{{- if .Source.args.PV_DISABLE_AUTODEV }}
+lxc.autodev = 0
+{{- end }}
 {{- if .Source.args.PV_SECURITY_FULLDEV }}
 lxc.mount.entry = /dev/ dev none bind,rw,create=dir 0 0
 {{- end }}
@@ -98,7 +104,16 @@ lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | rep
 {{- if eq .Source.args.PV_LXC_NETWORK_TYPE "veth" }}
 lxc.net.0.type = veth
 lxc.net.0.link = lxcbr0
-{{- end -}}
+lxc.net.0.flags = up
+{{- if .Source.args.PV_LXC_NETWORK_IPV4_ADDRESS }}
+lxc.net.0.ipv4.address = {{ .Source.args.PV_LXC_NETWORK_IPV4_ADDRESS }}
+{{- if .Source.args.PV_LXC_NETWORK_IPV4_GATEWAY }}
+lxc.net.0.ipv4.gateway = {{ .Source.args.PV_LXC_NETWORK_IPV4_GATEWAY }}
+{{- else }}
+lxc.net.0.ipv4.gateway = auto
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- if .Source.args.PV_LXC_EXTRA_CONF }}
 {{ .Source.args.PV_LXC_EXTRA_CONF }}

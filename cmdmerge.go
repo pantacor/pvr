@@ -17,7 +17,9 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -57,10 +59,13 @@ func CommandMerge() cli.Command {
 				repoPath = c.Args()[0]
 			}
 
-			err = pvr.GetRepo(repoPath, true)
+			objectsCount, err := pvr.GetRepo(repoPath, true, true)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
+
+			fmt.Println("\nImported " + strconv.Itoa(objectsCount) + " objects to " + pvr.Objdir)
+			fmt.Println("\n\nRun pvr checkout to checkout the changed files into the workspace.")
 
 			return nil
 		},

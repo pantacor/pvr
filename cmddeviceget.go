@@ -17,6 +17,8 @@ package main
 
 import (
 	"errors"
+	"log"
+	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
 
@@ -27,9 +29,33 @@ func CommandDeviceGet() cli.Command {
 	cmd := cli.Command{
 		Name:        "get",
 		Aliases:     []string{"get"},
-		ArgsUsage:   "<NICK|ID>",
-		Usage:       "pvr device get <NICK|ID>",
+		ArgsUsage:   "<NICK|ID> | <USER_NICK>/<NICK|ID> ",
+		Usage:       "pvr device get <NICK|ID> | <USER_NICK>/<NICK|ID> ",
 		Description: "Get Device details",
+		BashComplete: func(c *cli.Context) {
+			if c.GlobalString("baseurl") != "" {
+				c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
+			}
+			session, err := libpvr.NewSession(c.App)
+			if err != nil {
+				log.Fatal(err.Error())
+				return
+			}
+			if c.NArg() == 0 {
+				return
+			}
+			searchTerm := c.Args()[c.NArg()-1]
+			baseURL := c.App.Metadata["PVR_BASEURL"].(string)
+
+			splits := strings.Split(searchTerm, "/")
+
+			if len(splits) == 1 {
+				session.SuggestDeviceNicks("", searchTerm, baseURL)
+			} else {
+				userNick := splits[1]
+				session.SuggestDeviceNicks(userNick, searchTerm, baseURL)
+			}
+		},
 		Action: func(c *cli.Context) error {
 			session, err := libpvr.NewSession(c.App)
 			if err != nil {
@@ -37,15 +63,23 @@ func CommandDeviceGet() cli.Command {
 			}
 			baseURL := c.App.Metadata["PVR_BASEURL"].(string)
 			deviceNick := ""
+			ownerNick := ""
 			if c.NArg() > 1 {
 				return cli.NewExitError(errors.New("Device get command can have at most 1 argument. See --help"), 1)
 			} else if c.NArg() == 1 {
-				deviceNick = c.Args()[0]
+				splits := strings.Split(c.Args()[0], "/")
+				deviceNick = splits[0]
+
+				if len(splits) > 1 {
+					ownerNick = splits[0]
+					deviceNick = splits[1]
+				}
+
 			} else {
 				return cli.NewExitError(errors.New("Device ID or Nick is required. See --help"), 2)
 			}
 			// Get Device Details
-			deviceResponse, err := session.GetDevice(baseURL, deviceNick)
+			deviceResponse, err := session.GetDevice(baseURL, deviceNick, ownerNick)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}

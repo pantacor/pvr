@@ -171,7 +171,7 @@ func (p *Session) DoPs(baseurl string) ([]PantahubDevice, error) {
 	return resultSet, nil
 }
 
-func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*logs.LogsEntry, cursorID string, err error) {
+func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*logs.Entry, cursorID string, err error) {
 
 	res, err := p.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		burl, err := url.Parse(baseurl)
@@ -197,7 +197,7 @@ func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*log
 		return nil, "", errors.New("ERROR: authenticated call to " + baseurl + " failed with: " + err.Error())
 	}
 
-	var resultPage logs.LogsPager
+	var resultPage logs.Pager
 	err = json.Unmarshal(res.Body(), &resultPage)
 
 	if err != nil {
@@ -209,18 +209,21 @@ func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*log
 
 // LogFilter : Log Filter
 type LogFilter struct {
-	Devices string
-	Sources string
-	Levels  string
+	Devices   string
+	Sources   string
+	Levels    string
+	Platforms string
 }
 
 func (p *Session) DoLogs(
 	baseurl string,
 	deviceIds []string,
+	rev int,
 	startTime *time.Time,
+	endTime *time.Time,
 	cursor bool,
 	logFilter LogFilter,
-) (logEntries []*logs.LogsEntry, cursorID string, err error) {
+) (logEntries []*logs.Entry, cursorID string, err error) {
 	res, err := p.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		burl, err := url.Parse(baseurl)
 		if err != nil {
@@ -238,13 +241,21 @@ func (p *Session) DoLogs(
 		// if cursor we enable in backend request too...
 		if cursor {
 			q.Add("cursor", "true")
-			q.Add("sort", "time-created")
 			q.Add("page", "3000")
 		}
 
+		q.Add("sort", "time-created")
+
+		loc, _ := time.LoadLocation("UTC")
+
+		if rev >= 0 {
+			q.Add("rev", fmt.Sprintf("%d", rev))
+		}
 		if startTime != nil {
-			loc, _ := time.LoadLocation("UTC")
 			q.Add("after", startTime.In(loc).Format(time.RFC3339))
+		}
+		if endTime != nil && !endTime.IsZero() {
+			q.Add("before", endTime.In(loc).Format(time.RFC3339))
 		}
 		if logFilter.Devices != "" {
 			q.Add("dev", logFilter.Devices)
@@ -254,6 +265,9 @@ func (p *Session) DoLogs(
 		}
 		if logFilter.Levels != "" {
 			q.Add("lvl", logFilter.Levels)
+		}
+		if logFilter.Platforms != "" {
+			q.Add("plat", logFilter.Platforms)
 		}
 
 		fullURL.RawQuery = q.Encode()
@@ -265,7 +279,7 @@ func (p *Session) DoLogs(
 		return nil, "", errors.New("ERROR: authenticated call to " + baseurl + " failed with: " + err.Error())
 	}
 
-	var resultPage logs.LogsPager
+	var resultPage logs.Pager
 	err = json.Unmarshal(res.Body(), &resultPage)
 
 	if err != nil {

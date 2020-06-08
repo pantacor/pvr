@@ -29,6 +29,7 @@ import (
 func main() {
 
 	app := cli.NewApp()
+	app.EnableBashCompletion = true
 	app.Name = "pvr"
 	app.Usage = "PantaVisor Repo"
 	app.Version = VERSION
@@ -75,8 +76,9 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
+		libpvr.IsDebugEnabled = c.GlobalBool("debug")
 		resty.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: c.GlobalBool("insecure")})
-		resty.SetDebug(c.GlobalBool("debug"))
+		resty.SetDebug(libpvr.IsDebugEnabled)
 
 		c.App.Metadata["PVR_AUTH"] = c.GlobalString("access-token")
 
@@ -130,6 +132,7 @@ func main() {
 		CommandWhoami(),
 		CommandLogin(),
 		CommandDevice(),
+		CommandCompletion(),
 	}
 	app.Run(os.Args)
 }
