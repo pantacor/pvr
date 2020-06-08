@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"gitlab.com/pantacor/pvr/templates"
 )
@@ -64,12 +65,22 @@ func (p *Pvr) isRunningAsRoot() bool {
 	return strings.Trim(string(out), "\n") == "root"
 }
 
-func (p *Pvr) checkIfIsRunningAsRoot() error {
+func (p *Pvr) CheckIfIsRunningAsRoot() error {
 	if !p.isRunningAsRoot() {
 		return ErrNeedBeRoot
 	}
 
 	return nil
+}
+func (p *Pvr) RunAsRoot() error {
+	var fakerootPath string
+	fakerootPath, err := exec.LookPath("fakeroot")
+	if err == nil {
+		args := append([]string{fakerootPath}, os.Args...)
+		return syscall.Exec(fakerootPath, args, os.Environ())
+	}
+
+	return errors.New("cannot find fakeroot in PATH. Install fakeroot or run ```pvr app``` as root: " + err.Error())
 }
 
 func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
@@ -186,10 +197,6 @@ func (p *Pvr) InstallApplication(app AppData) error {
 		return err
 	}
 
-	if err := p.checkIfIsRunningAsRoot(); err != nil {
-		return err
-	}
-
 	trackURL := appManifest.DockerName
 	if appManifest.DockerTag != "" {
 		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
@@ -246,10 +253,6 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 		return err
 	}
 
-	if err := p.checkIfIsRunningAsRoot(); err != nil {
-		return err
-	}
-
 	trackURL := appManifest.DockerName
 	if appManifest.DockerTag != "" {
 		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
@@ -292,10 +295,6 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 func (p *Pvr) AddApplication(app AppData) error {
 	if app.Appname == "" {
 		return ErrEmptyAppName
-	}
-
-	if err := p.checkIfIsRunningAsRoot(); err != nil {
-		return err
 	}
 
 	appPath := filepath.Join(p.Dir, app.Appname)
