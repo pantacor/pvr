@@ -389,7 +389,7 @@ func Untar(dst string, src string) error {
 	if contentType == "application/octet-stream" {
 		args = []string{tarPath, "xvf", src, "-C", dst, "--exclude", ".wh.*"}
 	}
-	fmt.Println(args)
+	PrintDebugln(args)
 	untar := exec.Command(args[0], args[1:]...)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
