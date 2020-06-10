@@ -61,14 +61,100 @@ func PrintDebugln(a ...interface{}) (n int, err error) {
 	return 0, nil
 }
 
+func Create(path string) error {
+	touch, err := exec.LookPath(TOUCH_CMD)
+	if err != nil {
+		return err
+	}
+	args := []string{touch, path}
+	touchCmd := exec.Command(args[0], args[1:]...)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	touchCmd.Stdout = &out
+	touchCmd.Stderr = &stderr
+	err = touchCmd.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+	}
+	return nil
+}
+
+func MkdirAll(path string, perm os.FileMode) error {
+	mkdir, err := exec.LookPath(MKDIR_CMD)
+	if err != nil {
+		return err
+	}
+	args := []string{mkdir, "-m", perm.String(), "-p", path}
+	mkdirCmd := exec.Command(args[0], args[1:]...)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	mkdirCmd.Stdout = &out
+	mkdirCmd.Stderr = &stderr
+	err = mkdirCmd.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+	}
+	return nil
+}
+
+func Mkdir(path string, perm os.FileMode) error {
+	mkdir, err := exec.LookPath(MKDIR_CMD)
+	if err != nil {
+		return err
+	}
+	args := []string{mkdir, "-m", perm.String(), path}
+	mkdirCmd := exec.Command(args[0], args[1:]...)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	mkdirCmd.Stdout = &out
+	mkdirCmd.Stderr = &stderr
+	err = mkdirCmd.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+	}
+	return nil
+}
+
 // RemoveAll remove a path, could be a file or a folder
 func RemoveAll(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return err
 	}
-	err := os.RemoveAll(path)
+	rm, err := exec.LookPath(RM_CMD)
 	if err != nil {
 		return err
+	}
+	args := []string{rm, "-rf", path}
+	rmCmd := exec.Command(args[0], args[1:]...)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	rmCmd.Stdout = &out
+	rmCmd.Stderr = &stderr
+	err = rmCmd.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+	}
+	return nil
+}
+
+// Remove remove a path, a file
+func Remove(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		return err
+	}
+	rm, err := exec.LookPath(RM_CMD)
+	if err != nil {
+		return err
+	}
+	args := []string{rm, "-f", path}
+	rmCmd := exec.Command(args[0], args[1:]...)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	rmCmd.Stdout = &out
+	rmCmd.Stderr = &stderr
+	err = rmCmd.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 	}
 	return nil
 }
