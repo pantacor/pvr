@@ -118,8 +118,8 @@ func CommandLogs() cli.Command {
 				}
 			}
 
-			if c.String("platforms") != "" {
-				platforms = c.String("platforms")
+			if c.String("platform") != "" {
+				platforms = c.String("platform")
 			}
 
 			logFilter := libpvr.LogFilter{
