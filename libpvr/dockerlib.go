@@ -44,7 +44,10 @@ import (
 )
 
 const (
+	MKDIR_CMD                      = "mkdir"
+	RM_CMD                         = "rm"
 	TAR_CMD                        = "tar"
+	TOUCH_CMD                      = "touch"
 	MAKE_SQUASHFS_CMD              = "mksquashfs"
 	SQUASH_FILE                    = "root.squashfs"
 	DOCKER_DIGEST_FILE             = "root.squashfs.docker-digest"
@@ -386,6 +389,7 @@ func Untar(dst string, src string) error {
 	if contentType == "application/octet-stream" {
 		args = []string{tarPath, "xvf", src, "-C", dst, "--exclude", ".wh.*"}
 	}
+	fmt.Println(args)
 	untar := exec.Command(args[0], args[1:]...)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -450,7 +454,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		return err
 	}
 
-	defer os.RemoveAll(tempdir)
+	defer RemoveAll(tempdir)
 
 	files := []string{}
 	fmt.Println("Downloading layers...")
@@ -486,7 +490,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 			fmt.Printf("Extracting layers folder\n")
 		}
 
-		os.MkdirAll(tempdir+"/layers", 0777)
+		MkdirAll(tempdir+"/layers", 0777)
 		err = Untar(tempdir+"/layers", filename)
 		if err != nil {
 			return err
@@ -547,7 +551,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	}
 
 	extractPath := filepath.Join(tempdir, "rootfs")
-	os.MkdirAll(extractPath, 0777)
+	MkdirAll(extractPath, 0777)
 
 	tarPath, err := exec.LookPath(TAR_CMD)
 	if err != nil {
@@ -575,7 +579,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	fmt.Println("Stripping qemu files...")
 	for _, file := range stripFilesList {
 		fileToDelete := filepath.Join(extractPath, file)
-		os.Remove(fileToDelete)
+		Remove(fileToDelete)
 		if err != nil {
 			return err
 		}
@@ -601,7 +605,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	}
 	// make sure the squashfs file did not exists
 	if squashExist {
-		err := os.Remove(squashFile)
+		err := Remove(squashFile)
 		if err != nil {
 			return err
 		}
@@ -609,7 +613,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 
 	args := []string{makeSquashfsPath, extractPath, tempSquashFile, "-comp", "xz"}
 
-	fmt.Println("Generating squashfs file")
+	fmt.Println("Generating squashfs file: " + strings.Join(args, " "))
 	makeSquashfs := exec.Command(args[0], args[1:]...)
 	err = makeSquashfs.Run()
 	if err != nil {
