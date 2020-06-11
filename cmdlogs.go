@@ -101,7 +101,10 @@ func CommandLogs() cli.Command {
 				splits = strings.Split(filter, "/")
 			}
 			if len(splits) > 0 {
-				devices = []string{splits[0]}
+				devices = strings.Split(splits[0], ",")
+				for k, v := range devices {
+					devices[k] = "prn:::devices:/" + v
+				}
 			}
 
 			if len(splits) > 1 {
