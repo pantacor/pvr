@@ -23,6 +23,7 @@ import (
 	duration "github.com/ChannelMeter/iso8601duration"
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func CommandLogs() cli.Command {
@@ -101,7 +102,7 @@ func CommandLogs() cli.Command {
 				splits = strings.Split(filter, "/")
 			}
 			if len(splits) > 0 {
-				devices = []string{splits[0]}
+				devices = strings.Split(splits[0], ",")
 			}
 
 			if len(splits) > 1 {
@@ -118,8 +119,27 @@ func CommandLogs() cli.Command {
 				}
 			}
 
-			if c.String("platforms") != "" {
-				platforms = c.String("platforms")
+			if c.String("device") != "" {
+				devices = strings.Split(c.String("device"), ",")
+			}
+
+			for k, v := range devices {
+				_, err := primitive.ObjectIDFromHex(v)
+				if err == nil {
+					devices[k] = "prn:::devices:/" + v
+				}
+			}
+
+			if c.String("source") != "" {
+				source = c.String("source")
+			}
+
+			if c.String("level") != "" {
+				level = c.String("level")
+			}
+
+			if c.String("platform") != "" {
+				platforms = c.String("platform")
 			}
 
 			logFilter := libpvr.LogFilter{
@@ -214,6 +234,21 @@ func CommandLogs() cli.Command {
 				Name:   "platform,p",
 				Usage:  "Platform, e.g.: --platform=linux,windows",
 				EnvVar: "PVR_LOGS_PLATFORM",
+			},
+			cli.StringFlag{
+				Name:   "device,d",
+				Usage:  "device, e.g.: --device=5ee13a6087dfb60008ab8f5c,7ee13a6087dfb60008ab8f5e",
+				EnvVar: "PVR_LOGS_DEVICE",
+			},
+			cli.StringFlag{
+				Name:   "source,src",
+				Usage:  "source, e.g.: --source=pantavisor.log,updater,pvr-sdk-lxc",
+				EnvVar: "PVR_LOGS_SOURCE",
+			},
+			cli.StringFlag{
+				Name:   "level,l",
+				Usage:  "level, e.g.: --level=DEBUG,INFO",
+				EnvVar: "PVR_LOGS_LEVEL",
 			},
 		},
 	}
