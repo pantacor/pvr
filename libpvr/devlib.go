@@ -83,6 +83,11 @@ func Scan() {
 			}
 			if res.DeviceId != "" {
 				devices = append(devices, res)
+				wwwURL := "https://www.pantahub.com/u/_/devices/" + res.DeviceId
+				if strings.Contains(res.Pantahub, "api2") {
+					wwwURL = "https://www2.pantahub.com/u/_/devices/" + res.DeviceId
+				}
+
 				fmt.Printf("\tID: %s\n", res)
 				fmt.Printf("\tHost: %s\n", res.Hostname)
 				fmt.Printf("\tIPv4: %s\n", res.AddrIPv4)
@@ -91,7 +96,7 @@ func Scan() {
 				if res.Challenge != "" {
 					fmt.Printf("\tClaim Cmd: %s\n", res.ClaimCmd())
 				} else {
-					fmt.Printf("\tPantahub WWW: %s\n", "https://www.pantahub.com/u/_/devices/"+res.DeviceId)
+					fmt.Printf("\tPantahub WWW: %s\n", wwwURL)
 					fmt.Printf("\tPVR Clone: %s\n", res.Pantahub+"/trails/"+res.DeviceId)
 				}
 			}
