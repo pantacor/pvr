@@ -1504,7 +1504,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	return objectsCount, err
 }
 
-func (p *Pvr) getJsonBuf(pvrRemote pvrapi.PvrRemote) ([]byte, error) {
+func (p *Pvr) getJSONBuf(pvrRemote pvrapi.PvrRemote) ([]byte, error) {
 
 	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
 		return req.Get(pvrRemote.JsonGetUrl)
@@ -1740,7 +1740,7 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 		return objectsCount, err
 	}
 
-	jsonData, err := p.getJsonBuf(remotePvr)
+	jsonData, err := p.getJSONBuf(remotePvr)
 
 	if err != nil {
 		return objectsCount, err
