@@ -1187,6 +1187,57 @@ func (p *Pvr) PutObjects(uri string, force bool) error {
 	return p.postObjects(pvr, force)
 }
 
+func (p *Pvr) postRemoteJson(remotePvr pvrapi.PvrRemote, pvrMap PvrMap, envelope string,
+	commitMsg string, rev int, force bool) ([]byte, error) {
+
+	if envelope == "" {
+		envelope = "{}"
+	}
+
+	envJSON := map[string]interface{}{}
+	err := json.Unmarshal([]byte(envelope), &envJSON)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if commitMsg != "" {
+		envJSON["commit-msg"] = commitMsg
+	}
+
+	if rev != 0 {
+		envJSON["rev"] = rev
+	}
+
+	if remotePvr.JsonKey != "" {
+		envJSON[remotePvr.JsonKey] = pvrMap
+	} else {
+		envJSON["post"] = pvrMap
+	}
+
+	data, err := json.MarshalIndent(envJSON, "", "\t")
+
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		return req.SetBody(data).SetContentLength(true).Post(remotePvr.PostUrl)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode() != 200 {
+		return nil, errors.New("REST call failed. " +
+			strconv.Itoa(response.StatusCode()) + "  " + response.Status() +
+			"\n\t" + string(response.Body()))
+	}
+
+	return response.Body(), nil
+}
+
 // make a json post to a REST endpoint. You can provide metainfo etc. in post
 // argument as json. postKey if set will be used as key that refers to the posted
 // json. Example usage: json blog post, json revision repo with commit message etc
@@ -1239,53 +1290,14 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 		return err
 	}
 
-	if envelope == "" {
-		envelope = "{}"
-	}
-
-	envJson := map[string]interface{}{}
-	err = json.Unmarshal([]byte(envelope), &envJson)
+	body, err := p.postRemoteJson(remotePvr, p.PristineJsonMap, envelope, commitMsg, rev, force)
 
 	if err != nil {
 		return err
-	}
-
-	if commitMsg != "" {
-		envJson["commit-msg"] = commitMsg
-	}
-
-	if rev != 0 {
-		envJson["rev"] = rev
-	}
-
-	if remotePvr.JsonKey != "" {
-		envJson[remotePvr.JsonKey] = p.PristineJsonMap
-	} else {
-		envJson["post"] = p.PristineJsonMap
-	}
-
-	data, err := json.Marshal(envJson)
-
-	if err != nil {
-		return err
-	}
-
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
-		return req.SetBody(data).SetContentLength(true).Post(remotePvr.PostUrl)
-	})
-
-	if err != nil {
-		return err
-	}
-
-	if response.StatusCode() != 200 {
-		return errors.New("REST call failed. " +
-			strconv.Itoa(response.StatusCode()) + "  " + response.Status() +
-			"\n\t" + string(response.Body()))
 	}
 
 	responseMap := map[string]interface{}{}
-	err = json.Unmarshal(response.Body(), &responseMap)
+	err = json.Unmarshal(body, &responseMap)
 	if err != nil {
 		return err
 	}
