@@ -17,6 +17,7 @@ package main
 
 import (
 	"crypto/tls"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -88,11 +89,23 @@ func main() {
 			c.App.Metadata["PVR_BASEURL"] = "https://api.pantahub.com"
 		}
 
+		baseURL, err := url.Parse(c.App.Metadata["PVR_BASEURL"].(string))
+		if err != nil {
+			return err
+		}
+		c.App.Metadata["PVR_BASEURL_url"] = baseURL
+
 		if c.GlobalString("repo-baseurl") != "" {
 			c.App.Metadata["PVR_REPO_BASEURL"] = c.GlobalString("repo-baseurl")
 		} else {
 			c.App.Metadata["PVR_REPO_BASEURL"] = "https://pvr.pantahub.com"
 		}
+
+		repoBaseURL, err := url.Parse(c.App.Metadata["PVR_REPO_BASEURL"].(string))
+		if err != nil {
+			return err
+		}
+		c.App.Metadata["PVR_REPO_BASEURL_url"] = repoBaseURL
 
 		if c.GlobalString("config-dir") != "" {
 			c.App.Metadata["PVR_CONFIG_DIR"] = c.GlobalString("config-dir")
