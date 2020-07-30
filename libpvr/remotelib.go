@@ -39,10 +39,20 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 	if err != nil {
 		return err
 	}
+	if !srcURL.IsAbs() {
+		var repoURL *url.URL
+		repoURL = p.Session.GetApp().Metadata["PVR_REPO_BASEURL_url"].(*url.URL)
+		srcURL = repoURL.ResolveReference(srcURL)
+	}
 
 	destURL, err := url.Parse(pvrDest)
 	if err != nil {
 		return err
+	}
+	if !destURL.IsAbs() {
+		var repoURL *url.URL
+		repoURL = p.Session.GetApp().Metadata["PVR_REPO_BASEURL_url"].(*url.URL)
+		destURL = repoURL.ResolveReference(destURL)
 	}
 
 	srcRemote, err := p.initializeRemote(srcURL)
