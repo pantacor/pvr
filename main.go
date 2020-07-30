@@ -119,6 +119,7 @@ func main() {
 		CommandMerge(),
 		CommandReset(),
 		CommandClone(),
+		CommandFastCopy(),
 		CommandPutObjects(),
 		CommandExport(),
 		CommandImport(),
