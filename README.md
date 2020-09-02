@@ -260,6 +260,51 @@ $ pvr clone https://api.pantahub.com/trails/<YOURDEVICE>/steps/<REV>
 ...
 ```
 
+### pvr fastcopy <SOURCE> <DESTINATION>
+
+You can copy device state or subelements from one device to another without
+downloading the bits to your local machine.
+
+This only works for source devices that the user has access to. Right now
+thats the case for Public devices as well as for devices owned by the
+user itself.
+
+To fastcopy a complete device experience you would simply use:
+
+```
+pvr fastcopy -m "your commit message to remember" \
+	https://pvr.pantahub.com/pantahub-ci/rpi4_initial_latest \
+	https://pvr.pantahub.com/yournick/yourdevice
+```
+
+NOTE: this will delete app apps and bsp/ entries before replacing them. If you dont want that you have to use
+#fragment encoded in the URL to select specific source elements to copy and replace.
+
+
+To fastcopy a specific folder of your source device and replace the matching folder you coudl simply use:
+
+```
+pvr fastcopy -m "your commit message (copying #fragement)" \
+	https://pvr.pantahub.com/pantahub-ci/rpi4_initial_latest#fragment \
+	https://pvr.pantahub.com/yournick/yourdevice
+```
+
+Example (copy just the bsp/):
+
+```
+pvr fastcopy -m "your commit message to file for the new revision" \
+	https://pvr.pantahub.com/pantahub-ci/rpi4_initial_latest#bsp \
+	https://pvr.pantahub.com/yournick/yourdevice
+```
+
+Similarly you can copy apps this way:
+
+```
+pvr fastcopy -m "copy pvr-sdk from source device to yourdevice" \
+	https://pvr.pantahub.com/pantahub-ci/rpi4_initial_latest#pvr-sdk \
+	https://pvr.pantahub.com/yournick/yourdevice
+```
+
 # PVR Device Commands
 
 PVR Devices commands provide convenience for developers and individuals
