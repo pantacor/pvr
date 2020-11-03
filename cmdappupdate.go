@@ -74,12 +74,18 @@ func CommandAppUpdate() cli.Command {
 				return cli.NewExitError(err, 3)
 			}
 			app := libpvr.AppData{
-				Appname:  appname,
-				From:     trackURL,
-				Source:   c.String("source"),
-				Username: c.String("username"),
-				Password: c.String("password"),
+				Appname:      appname,
+				From:         trackURL,
+				Source:       c.String("source"),
+				Username:     c.String("username"),
+				Password:     c.String("password"),
+				TemplateArgs: map[string]interface{}{},
 			}
+
+			if c.String("runlevel") != "" {
+				app.TemplateArgs["PV_RUNLEVEL"] = c.String("runlevel")
+			}
+
 			err = pvr.UpdateApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)

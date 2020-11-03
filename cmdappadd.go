@@ -28,6 +28,7 @@ import (
 
 // SourceFlagUsage : Source Flag Usage Description
 var SourceFlagUsage = "Comma separated priority list of source (valid sources: local and remote)"
+var RunlevelFlagUsage = "runlevel to install app to, valid runlevels at this point: root, platform, app [default: app]"
 
 func CommandAppAdd() cli.Command {
 	cmd := cli.Command{
@@ -100,6 +101,11 @@ func CommandAppAdd() cli.Command {
 				Volumes:      c.StringSlice("volume"),
 				TemplateArgs: templateArgs,
 			}
+
+			if c.String("runlevel") != "" {
+				app.TemplateArgs["PV_RUNLEVEL"] = c.String("runlevel")
+			}
+
 			err = pvr.FindDockerImage(&app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
@@ -136,6 +142,12 @@ func CommandAppAdd() cli.Command {
 			Usage:  SourceFlagUsage,
 			EnvVar: "PVR_SOURCE",
 			Value:  "remote,local",
+		},
+		cli.StringFlag{
+			Name:   "runlevel",
+			Usage:  RunlevelFlagUsage,
+			EnvVar: "PVR_RUNLEVEL",
+			Value:  "app",
 		},
 		cli.StringFlag{
 			Name:   "config-json",
