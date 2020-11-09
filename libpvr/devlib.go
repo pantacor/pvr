@@ -83,9 +83,9 @@ func Scan() {
 			}
 			if res.DeviceId != "" {
 				devices = append(devices, res)
-				wwwURL := "https://www.pantahub.com/u/_/devices/" + res.DeviceId
+				wwwURL := "https://hub.pantacor.com/u/_/devices/" + res.DeviceId
 				if strings.Contains(res.Pantahub, "api2") {
-					wwwURL = "https://www2.pantahub.com/u/_/devices/" + res.DeviceId
+					wwwURL = "https://stage.hub.pantacor.com/u/_/devices/" + res.DeviceId
 				}
 
 				fmt.Printf("\tID: %s\n", res)
