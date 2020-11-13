@@ -25,6 +25,8 @@ import (
 	"github.com/urfave/cli"
 )
 
+var RunlevelFlagUsageNoDefault = "runlevel to install app to, valid runlevels at this point: root, platform, app [default: \"\"]"
+
 func CommandAppInstall() cli.Command {
 	cmd := cli.Command{
 		Name:        "install",
@@ -94,12 +96,14 @@ func CommandAppInstall() cli.Command {
 			}
 
 			app := libpvr.AppData{
-				Appname:  appname,
-				From:     from,
-				Source:   source,
-				Username: username,
-				Password: password,
+				Appname:      appname,
+				From:         from,
+				Source:       source,
+				Username:     username,
+				Password:     password,
+				TemplateArgs: map[string]interface{}{},
 			}
+
 			err = pvr.FindDockerImage(&app)
 			if err != nil {
 				fmt.Println("\nSeems like you have an invalid docker digest value in your " + appname + "/src.json file\n")
@@ -133,6 +137,12 @@ func CommandAppInstall() cli.Command {
 			Usage:  SourceFlagUsage,
 			EnvVar: "PVR_SOURCE",
 			Value:  "",
+		},
+		cli.StringFlag{
+			Name:   "runlevel",
+			Usage:  RunlevelFlagUsageNoDefault,
+			EnvVar: "PVR_RUNLEVEL",
+			Value:  "app",
 		},
 	}
 

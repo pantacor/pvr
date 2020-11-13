@@ -125,6 +125,9 @@ lxc.net.0.ipv4.gateway = auto
 	"#spec": "service-manifest-run@1",
 	"config": "lxc.container.conf",
 	"name":"{{- .Source.name -}}",
+	{{- if .Source.args.PV_RUNLEVEL }}
+	"runlevel": "{{- .Source.args.PV_RUNLEVEL }}",
+	{{- end }}
 	"storage":{
 		{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes .Source.persistence -}}
 		{{- if ne $key "lxc-overlay" }}
@@ -137,6 +140,7 @@ lxc.net.0.ipv4.gateway = auto
 			"persistence": "{{ if index .Source.persistence "lxc-overlay" }}{{ index .Source.persistence "lxc-overlay" }}{{ else }}boot{{ end }}"
 		}
 	},
+	"logs": {{  .Source.logs | sprig_toPrettyJson | sprig_indent 8 }},
 	"type":"lxc",
 	"root-volume": "root.squashfs",
 	"volumes":[]
