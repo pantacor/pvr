@@ -43,16 +43,17 @@ var (
 )
 
 type Source struct {
-	Name         string                 `json:"name,omitempty"`
-	Spec         string                 `json:"#spec"`
-	Template     string                 `json:"template"`
-	TemplateArgs map[string]interface{} `json:"args"`
-	Config       map[string]interface{} `json:"config"`
-	DockerName   string                 `json:"docker_name"`
-	DockerTag    string                 `json:"docker_tag"`
-	DockerDigest string                 `json:"docker_digest"`
-	DockerSource string                 `json:"docker_source"`
-	Persistence  map[string]string      `json:"persistence"`
+	Name         string                   `json:"name,omitempty"`
+	Spec         string                   `json:"#spec"`
+	Template     string                   `json:"template"`
+	TemplateArgs map[string]interface{}   `json:"args"`
+	Logs         []map[string]interface{} `json:"logs"`
+	Config       map[string]interface{}   `json:"config"`
+	DockerName   string                   `json:"docker_name"`
+	DockerTag    string                   `json:"docker_tag"`
+	DockerDigest string                   `json:"docker_digest"`
+	DockerSource string                   `json:"docker_source"`
+	Persistence  map[string]string        `json:"persistence"`
 }
 
 func (p *Pvr) isRunningAsRoot() bool {
@@ -93,6 +94,7 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 	result := Source{
 		TemplateArgs: map[string]interface{}{},
 		Config:       map[string]interface{}{},
+		Logs:         []map[string]interface{}{},
 		DockerSource: "remote,local",
 	}
 
