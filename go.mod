@@ -10,7 +10,7 @@ require (
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
-	github.com/asac/json-patch v0.0.0-20170214153119-c7d7c4ba959b
+	github.com/asac/json-patch v0.0.0-20201120095033-59358024a068
 	github.com/cavaliercoder/grab v2.0.0+incompatible
 	github.com/containerd/containerd v1.3.3 // indirect
 	github.com/containerd/continuity v0.0.0-20200413184840-d3ef23f19fbb // indirect

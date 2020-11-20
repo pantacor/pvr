@@ -254,7 +254,7 @@ func (p *Pvr) AddFile(globs []string) error {
 		return err
 	}
 
-	jsonData, err := json.Marshal(p.NewFiles)
+	jsonData, err := json.MarshalIndent(p.NewFiles, "", "	")
 	if err != nil {
 		return err
 	}
@@ -335,7 +335,7 @@ func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 		return []byte{}, []string{}, err
 	}
 
-	b, err := json.Marshal(workingJson)
+	b, err := json.MarshalIndent(workingJson, "", "	")
 
 	if err != nil {
 		return []byte{}, []string{}, err
@@ -1157,7 +1157,7 @@ func (p *Pvr) SaveConfig() error {
 	configNew := filepath.Join(p.Pvrdir, "config.new")
 	configPath := filepath.Join(p.Pvrdir, "config")
 
-	byteJson, err := json.Marshal(p.Pvrconfig)
+	byteJson, err := json.MarshalIndent(p.Pvrconfig, "", "	")
 	if err != nil {
 		return err
 	}
@@ -1468,7 +1468,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		if err != nil {
 			return objectsCount, err
 		}
-		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
+		jsonMerged, err = jsonpatch.MergePatchIndent(p.PristineJson, jsonDataSelect, "", "	")
 	} else {
 		// manually remove everything not matching the part from fragement ...
 		pJSONMap := p.PristineJsonMap
@@ -1778,6 +1778,7 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 		}
 
 		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
+
 	} else {
 		// manually remove everything not matching the part from fragement ...
 		pJSONMap := p.PristineJsonMap
@@ -1910,7 +1911,7 @@ func (p *Pvr) Reset() error {
 		}
 
 		if strings.HasSuffix(k, ".json") {
-			data, err := json.Marshal(v)
+			data, err := json.MarshalIndent(v, "", "	")
 			if err != nil {
 				return err
 			}
