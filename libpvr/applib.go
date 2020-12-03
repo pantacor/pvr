@@ -48,6 +48,7 @@ type Source struct {
 	Template     string                   `json:"template"`
 	TemplateArgs map[string]interface{}   `json:"args"`
 	Logs         []map[string]interface{} `json:"logs"`
+	Exports      []string                 `json:"exports"`
 	Config       map[string]interface{}   `json:"config"`
 	DockerName   string                   `json:"docker_name"`
 	DockerTag    string                   `json:"docker_tag"`
@@ -95,6 +96,7 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 		TemplateArgs: map[string]interface{}{},
 		Config:       map[string]interface{}{},
 		Logs:         []map[string]interface{}{},
+		Exports:      []string{},
 		DockerSource: "remote,local",
 	}
 
