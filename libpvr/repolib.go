@@ -45,6 +45,8 @@ import (
 	"gopkg.in/cheggaaa/pb.v1"
 )
 
+const PvrCheckpointFilename = "checkpoint.json"
+
 type PvrStatus struct {
 	NewFiles       []string
 	RemovedFiles   []string
@@ -456,7 +458,57 @@ func (p *Pvr) Status() (*PvrStatus, error) {
 	return &rs, nil
 }
 
-func (p *Pvr) Commit(msg string) error {
+func (p *Pvr) prepCommitCheckpoint() error {
+
+	fPath := path.Join(p.Dir, PvrCheckpointFilename)
+	fNewPath := fPath + ".new"
+	var fd *os.File
+
+	p.NewFiles[PvrCheckpointFilename] = ""
+	checkpointInfo := map[string]interface{}{
+		"major": time.Now().Format(time.RFC3339),
+	}
+	buf, err := json.Marshal(checkpointInfo)
+	if err != nil {
+		goto exit
+	}
+
+	fd, err = os.OpenFile(fNewPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
+	if err != nil {
+		goto exit
+	}
+	defer fd.Close()
+
+	_, err = fd.Write(buf)
+	if err != nil {
+		goto exit
+	}
+
+	fd.Close()
+
+	err = os.Rename(fNewPath, fPath)
+
+	if err != nil {
+		goto exit
+	}
+
+	// lets remember this file as NEW file right away ...
+	if p.NewFiles[PvrCheckpointFilename] == "" {
+		p.NewFiles[PvrCheckpointFilename] = "NO SHA NEEDED FOR JSON"
+	}
+
+exit:
+	os.Remove(fNewPath)
+	return err
+}
+
+func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
+
+	// lets generate checkpoint file
+	if isCheckpoint {
+		err = p.prepCommitCheckpoint()
+	}
+
 	status, err := p.Status()
 
 	if err != nil {
@@ -538,7 +590,7 @@ func (p *Pvr) Commit(msg string) error {
 	// ignore error here as new might not exist
 	os.Remove(filepath.Join(p.Pvrdir, "new"))
 
-	return nil
+	return err
 }
 
 func (p *Pvr) PutLocal(repoPath string) error {
