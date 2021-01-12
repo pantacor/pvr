@@ -49,7 +49,9 @@ func CommandCommit() cli.Command {
 			if commitmsg == "" {
 				commitmsg = "** No commit message **"
 			}
-			err = pvr.Commit(commitmsg)
+			isCheckpoint := c.Bool("checkpoint")
+
+			err = pvr.Commit(commitmsg, isCheckpoint)
 			if err != nil {
 				return err
 			}
@@ -60,6 +62,10 @@ func CommandCommit() cli.Command {
 			cli.StringFlag{
 				Name:  "message, m",
 				Usage: "provide a commit message",
+			},
+			cli.BoolFlag{
+				Name:  "checkpoint, c",
+				Usage: "commit an updated checkpoint token to ensure this revision will get properly tested and checkpointed as a fallback revision",
 			},
 		},
 	}
