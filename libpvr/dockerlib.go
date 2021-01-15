@@ -417,6 +417,7 @@ type AppData struct {
 	Source          string
 	ConfigFile      string
 	Volumes         []string
+	FormatOptions   string
 }
 
 func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
@@ -611,7 +612,15 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		}
 	}
 
-	args := []string{makeSquashfsPath, extractPath, tempSquashFile, "-comp", "xz"}
+	comp := []string{}
+	if app.Appmanifest.FormatOptions == "" {
+		comp = []string{"-comp", "xz"}
+	} else {
+		comp = strings.Split(app.Appmanifest.FormatOptions, " ")
+	}
+
+	args := []string{makeSquashfsPath, extractPath, tempSquashFile}
+	args = append(args, comp...)
 
 	fmt.Println("Generating squashfs file: " + strings.Join(args, " "))
 	makeSquashfs := exec.Command(args[0], args[1:]...)

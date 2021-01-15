@@ -92,14 +92,15 @@ func CommandAppAdd() cli.Command {
 				return cli.NewExitError(errors.New(" --from flag is required (e.g. --from=nginx)"), 4)
 			}
 			app := libpvr.AppData{
-				Appname:      appname,
-				Username:     c.String("username"),
-				Password:     c.String("password"),
-				From:         c.String("from"),
-				Source:       c.String("source"),
-				ConfigFile:   c.String("config-json"),
-				Volumes:      c.StringSlice("volume"),
-				TemplateArgs: templateArgs,
+				Appname:       appname,
+				Username:      c.String("username"),
+				Password:      c.String("password"),
+				From:          c.String("from"),
+				Source:        c.String("source"),
+				ConfigFile:    c.String("config-json"),
+				Volumes:       c.StringSlice("volume"),
+				FormatOptions: c.String("format-options"),
+				TemplateArgs:  templateArgs,
 			}
 
 			if c.String("runlevel") != "" {
@@ -163,6 +164,11 @@ func CommandAppAdd() cli.Command {
 			Name:   "volume",
 			Usage:  "Persistence volume",
 			EnvVar: "PVR_PERSISTENCE_VOLUME",
+		},
+		cli.StringFlag{
+			Name:   "format-options,o",
+			Usage:  "Format Options for Target FS (e.g. \"-comp gzip\")",
+			EnvVar: "PVR_FORMAT_OPTIONS",
 		},
 	}
 
