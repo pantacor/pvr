@@ -144,7 +144,17 @@ lxc.net.0.ipv4.gateway = auto
 	"logs": {{  .Source.logs | sprig_toPrettyJson | sprig_indent 8 }},
 	"type":"lxc",
 	"root-volume": "root.squashfs",
-	"volumes":[]
+	"volumes":[
+		{{- if .Source.args.PV_EXTRA_VOLUMES }}
+			{{- $v := sprig_splitList "," .Source.args.PV_EXTRA_VOLUMES -}}
+			{{- $n := sprig_list  }}
+			{{- range $i, $j := $v }}
+				{{- $q := quote $j }}
+				{{- $n = sprig_append $n $q }}
+			{{- end }}
+			{{- join "," $n }}
+		{{- end }}
+	]
 }`
 )
 
