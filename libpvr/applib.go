@@ -112,7 +112,7 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 
 func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[string]interface{}, appManifest *Source) error {
 	appConfig := appManifest.Config
-	for k, _ := range dockerConfig {
+	for k, _ := range appConfig {
 		value := appConfig[k]
 		if value != nil {
 			dockerConfig[k] = value
