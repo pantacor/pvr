@@ -118,6 +118,20 @@ lxc.net.0.ipv4.gateway = auto
 {{- if .Source.args.PV_LXC_EXTRA_CONF }}
 {{ .Source.args.PV_LXC_EXTRA_CONF }}
 {{- end }}
+{{- if .Source.args.PV_FILEIMPORTS }}
+	{{- range $k,$v := splitList "," .Source.args.PV_FILEIMPORTS }}
+		{{- $sourcePath := splitList ":" $v | sprig_first }}
+		{{- $targetPath := splitList ":" $v | sprig_last }}
+lxc.mount.entry = /exports/{{- $sourcePath }} {{ $targetPath }} none bind,rw,create=file 0 0
+	{{- end }}
+{{- end }}
+{{- if .Source.args.PV_VOLUME_MOUNTS }}
+{{- range $k,$v := splitList "," .Source.args.PV_VOLUME_MOUNTS }}
+{{- $volume := splitList ":" $v | sprig_first }}
+{{- $mountTarget := splitList ":" $v | sprig_last }}
+lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} none bind,rw,create=dir 0 0
+{{- end }}
+{{- end }}
 `
 
 	RUN_JSON = `{{ "" -}}
@@ -145,15 +159,23 @@ lxc.net.0.ipv4.gateway = auto
 	"type":"lxc",
 	"root-volume": "root.squashfs",
 	"volumes":[
+		{{- $v := sprig_list }}
 		{{- if .Source.args.PV_EXTRA_VOLUMES }}
-			{{- $v := sprig_splitList "," .Source.args.PV_EXTRA_VOLUMES -}}
-			{{- $n := sprig_list  }}
-			{{- range $i, $j := $v }}
-				{{- $q := quote $j }}
-				{{- $n = sprig_append $n $q }}
-			{{- end }}
-			{{- join "," $n }}
+			{{- $v = sprig_splitList "," .Source.args.PV_EXTRA_VOLUMES -}}
 		{{- end }}
+		{{- if .Source.args.PV_VOLUME_MOUNTS }}
+			{{- $m := sprig_splitList "," .Source.args.PV_VOLUME_MOUNTS -}}
+			{{- range $i, $j := $m }}
+				{{- $key := sprig_splitList ":" $j | sprig_first }}
+				{{- $v = sprig_append $v $key }}
+			{{- end }}
+		{{- end }}
+		{{- $n := sprig_list }}
+		{{- range $i, $j := $v }}
+			{{- $q := quote $j }}
+			{{- $n = sprig_append $n $q }}
+		{{- end }}
+		{{ join ",\\n" $n }}
 	]
 }`
 )
