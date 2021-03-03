@@ -73,6 +73,10 @@ func CommandAppUpdate() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
+			if c.String("from") != "" {
+				trackURL = c.String("from")
+			}
+
 			app := libpvr.AppData{
 				Appname:      appname,
 				From:         trackURL,
@@ -111,6 +115,12 @@ func CommandAppUpdate() cli.Command {
 			Name:   "source",
 			Usage:  SourceFlagUsage,
 			EnvVar: "PVR_SOURCE",
+			Value:  "",
+		},
+		cli.StringFlag{
+			Name:   "from",
+			Usage:  "Update docker_name and docker_tag fields before updating according to value",
+			EnvVar: "PVR_APP_FROM",
 			Value:  "",
 		},
 	}
