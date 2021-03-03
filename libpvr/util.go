@@ -178,6 +178,16 @@ func Copy(dst, src string) error {
 	return cerr
 }
 
+func Hardlink(dst, src string) error {
+	os.Remove(dst)
+	err := os.Link(src, dst)
+	if err != nil {
+		return err
+	}
+	err = os.Chmod(dst, 0444)
+	return err
+}
+
 func RenameFile(src string, dst string) (err error) {
 	err = Copy(dst, src)
 	if err != nil {

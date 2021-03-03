@@ -1482,6 +1482,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		objPathNew := filepath.Join(p.Objdir, v.(string)+".new")
 		objPath := filepath.Join(p.Objdir, v.(string))
 		fileExists, err := IsFileExists(objPath)
+
 		if err != nil {
 			return objectsCount, err
 		}
@@ -1503,7 +1504,9 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		}
 
 		err = Copy(objPathNew, getPath)
+
 		if err != nil {
+			fmt.Println("ERROR : " + err.Error())
 			return objectsCount, err
 		}
 		err = os.Rename(objPathNew, objPath)
@@ -1929,6 +1932,14 @@ save:
 }
 
 func (p *Pvr) Reset() error {
+	return p.resetInternal(false)
+}
+
+func (p *Pvr) ResetWithHardlink() error {
+	return p.resetInternal(true)
+}
+
+func (p *Pvr) resetInternal(hardlink bool) error {
 	data, err := ioutil.ReadFile(filepath.Join(p.Pvrdir, "json"))
 
 	if err != nil {
@@ -1974,15 +1985,18 @@ func (p *Pvr) Reset() error {
 			err = os.Rename(targetP+".new",
 				targetP)
 		} else {
-
 			objectP := filepath.Join(p.Objdir, v.(string))
-			err = Copy(targetP+".new", objectP)
-			if err != nil {
-				return err
-			}
-			err = os.Rename(targetP+".new", targetP)
-			if err != nil {
-				return err
+			if !hardlink {
+				err = Copy(targetP+".new", objectP)
+				if err != nil {
+					return err
+				}
+				err = os.Rename(targetP+".new", targetP)
+				if err != nil {
+					return err
+				}
+			} else {
+				err = Hardlink(targetP, objectP)
 			}
 		}
 	}

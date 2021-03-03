@@ -46,12 +46,23 @@ func CommandReset() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
-			err = pvr.Reset()
+			if c.Bool("hardlink") {
+				err = pvr.ResetWithHardlink()
+			} else {
+				err = pvr.Reset()
+			}
+
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
 
 			return nil
+		},
+		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name:  "hardlink, hl",
+				Usage: "checkout working copy with harlinks to objects; change files to read only.",
+			},
 		},
 	}
 }
