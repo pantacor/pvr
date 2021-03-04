@@ -118,6 +118,10 @@ func main() {
 		return nil
 	}
 
+	if os.Getenv("HTTP_PROXY") != "" {
+		resty.DefaultClient.SetProxy(os.Getenv("HTTP_PROXY"))
+	}
+
 	app.Commands = []cli.Command{
 		CommandInit(),
 		CommandAdd(),

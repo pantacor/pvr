@@ -112,7 +112,7 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 
 func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[string]interface{}, appManifest *Source) error {
 	appConfig := appManifest.Config
-	for k, _ := range dockerConfig {
+	for k, _ := range appConfig {
 		value := appConfig[k]
 		if value != nil {
 			dockerConfig[k] = value
@@ -254,6 +254,11 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 	if app.Source == "" {
 		app.Source = appManifest.DockerSource
 	}
+
+	if app.From != "" {
+		updateDockerFromFrom(appManifest, app.From)
+	}
+
 	err = p.FindDockerImage(&app)
 	if err != nil {
 		return err
@@ -298,6 +303,16 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 	return p.InstallApplication(app)
 }
 
+func updateDockerFromFrom(src *Source, from string) {
+	components := strings.Split(from, ":")
+	if len(components) < 2 {
+		src.DockerTag = "latest"
+	} else {
+		src.DockerTag = components[len(components)-1]
+	}
+	src.DockerName = strings.Replace(from, ":"+src.DockerTag, "", 1)
+}
+
 func (p *Pvr) AddApplication(app AppData) error {
 	if app.Appname == "" {
 		return ErrEmptyAppName
@@ -330,13 +345,8 @@ func (p *Pvr) AddApplication(app AppData) error {
 		DockerSource:  app.Source,
 		FormatOptions: app.FormatOptions,
 	}
-	components := strings.Split(app.From, ":")
-	if len(components) < 2 {
-		src.DockerTag = "latest"
-	} else {
-		src.DockerTag = components[len(components)-1]
-	}
-	src.DockerName = strings.Replace(app.From, ":"+src.DockerTag, "", 1)
+
+	updateDockerFromFrom(&src, app.From)
 
 	dockerConfig := map[string]interface{}{}
 	//	Exists flag is true only if the image got loaded which will depend on
