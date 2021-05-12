@@ -1047,18 +1047,23 @@ Application updated
 
 ```
 
-```
+
+## pvr deploy <deploy-dir> [source-repos]+
+
+
+With pvr deploy you can deploy one to many source repos to a deployment directory such as the
+one you find on the pantavisor device for each revision.
+
+This command can be used to modify a rootfs and change/replace/update apps.
+
+Example, will deploy the 'os' container from a local repository, the 'bsp' container from a pvr
+export to a factory revision (trails/0) in a pantavisor enabled rootfs.
 
 ```
-
+pvr deploy trails/0  /path/to/repo/.pvr#os /tmp/export.tgz#bsp
 ```
 
-```
+This command will create hardlinks of the objects to the objects pool so do not
+use this on a host where you intend the checkout to be edited.
 
-```
 
-```
-
-```
-
-```
