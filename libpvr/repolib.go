@@ -1,5 +1,5 @@
 //
-// Copyright 2017, 2018  Pantacor Ltd.
+// Copyright 2017-2021  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -127,6 +127,10 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(pvr.Dir, 0700)
+		if err != nil {
+			return nil, err
+		}
+		fileInfo, err = os.Stat(pvr.Dir)
 	}
 
 	if err != nil {
@@ -159,6 +163,7 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 		}
 		pvr.PristineJson = byteJSON
 	} else {
+		fmt.Println("WARN: pvr location (" + jPath + ") is not a pvr repository; filling the gaps...")
 		pvr.PristineJson = []byte("{}")
 	}
 
@@ -197,6 +202,9 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 
 	if pvr.Pvrconfig.ObjectsDir != "" {
 		pvr.Objdir = pvr.Pvrconfig.ObjectsDir
+		if !filepath.IsAbs(pvr.Objdir) {
+			pvr.Objdir = path.Join(pvr.Pvrdir, "..", pvr.Objdir)
+		}
 	}
 	return &pvr, nil
 }
@@ -2147,6 +2155,73 @@ func (p *Pvr) Import(src string) error {
 			return err
 		}
 		err = os.Rename(filePathNew, filePath)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// DeployPvLinks sets up the hardlinks for the .pv/ files
+func (p *Pvr) DeployPvLinks() error {
+
+	var buf []byte
+	var err error
+	jsonMap := map[string]interface{}{}
+
+	bspRunJSON := path.Join(p.Dir, "bsp", "run.json")
+	buf, err = ioutil.ReadFile(bspRunJSON)
+
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(buf, &jsonMap)
+	if err != nil {
+		return err
+	}
+
+	kernelFileI := jsonMap["kernel"]
+	initrdFile := "pantavisor"
+	dtbFileI := jsonMap["fdt"]
+
+	var kernelFile string
+	if kernelFileI != nil {
+		kernelFile = kernelFileI.(string)
+	} else {
+		kernelFile = "kernel.img"
+	}
+
+	var dtbFile string
+	if dtbFileI != nil {
+		dtbFile = dtbFileI.(string)
+	}
+
+	kernelLink := path.Join(p.Dir, ".pv", "pv-kernel.img")
+	initrdLink := path.Join(p.Dir, ".pv", "pv-initrd.img")
+	dtbLink := ""
+	if dtbFile != "" {
+		dtbLink = path.Join(p.Dir, ".pv", "pv-fdt.dtb")
+	}
+	os.Mkdir(path.Join(p.Dir, ".pv"), 0755)
+	os.Remove(kernelLink)
+	os.Remove(initrdLink)
+	if dtbLink != "" {
+		os.Remove(dtbLink)
+	}
+
+	err = os.Link(path.Join(p.Dir, "bsp", kernelFile), kernelLink)
+	if err != nil {
+		return err
+	}
+	err = os.Link(path.Join(p.Dir, "bsp", initrdFile), initrdLink)
+	if err != nil {
+		return err
+	}
+
+	if dtbFile != "" {
+		err = os.Link(path.Join(p.Dir, "bsp", dtbFile), dtbLink)
 		if err != nil {
 			return err
 		}
