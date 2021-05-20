@@ -1389,6 +1389,89 @@ func (p *Pvr) UnpackRepo(repoPath string, outDir string) error {
 	return err
 }
 
+func (p *Pvr) GetStateJson(uri string) (
+	state map[string]interface{},
+	err error,
+) {
+	var u *url.URL
+	var data []byte
+
+	if uri == "" {
+		uri = p.Pvrconfig.DefaultGetUrl
+	}
+
+	u, err = url.Parse(uri)
+
+	if err != nil {
+		return
+	}
+
+	exists, err := IsFileExists(uri)
+
+	if err != nil {
+		return
+	}
+
+	if u.Scheme == "" && exists {
+		var fileInfo os.FileInfo
+		repoPath := uri
+
+		fileInfo, err = os.Stat(repoPath)
+		if err != nil {
+			return
+		}
+
+		// if we dont have a dir for local we might have a tarball export
+		if !fileInfo.IsDir() {
+			repoPath, err = ioutil.TempDir(os.TempDir(), "pvr-tmprepo-")
+			if err != nil {
+				return
+			}
+			defer os.RemoveAll(repoPath)
+
+			err = p.UnpackRepo(uri, repoPath)
+			if err != nil {
+				return
+			}
+		}
+
+		localJsonPath := filepath.Join(repoPath, "json")
+		data, err = ioutil.ReadFile(localJsonPath)
+		if err != nil {
+			return
+		}
+		err = json.Unmarshal(data, &state)
+		if err != nil {
+			return
+		}
+	} else {
+
+		if u.Scheme == "" {
+			u, err = url.Parse("https://pvr.pantahub.com/" + uri)
+		}
+
+		if err != nil {
+			return
+		}
+
+		var remote pvrapi.PvrRemote
+		remote, err = p.initializeRemote(u)
+		if err != nil {
+			return
+		}
+		data, err = p.getJSONBuf(remote)
+		if err != nil {
+			return
+		}
+		err = json.Unmarshal(data, &state)
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
 func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	objectsCount int,
 	err error) {
