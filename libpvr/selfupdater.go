@@ -109,21 +109,21 @@ func (pvr *Pvr) UpdatePvr(username, password string, silent bool) error {
 
 	if currentDigest == previousDigest {
 		if silent != true {
-			fmt.Println("You already have the latest version of PVR :) \n\r")
+			fmt.Fprintln(os.Stderr, "You already have the latest version of PVR :) \n\r")
 		}
 		return nil
 	}
 
-	fmt.Printf("Starting update PVR using Docker latest tag (%v) \r\n ", currentDigest)
+	fmt.Fprintf(os.Stderr, "Starting update PVR using Docker latest tag (%v) \r\n ", currentDigest)
 
 	cacheFolder, err := pvr.downloadAdUpdateBinary(username, password, currentDigest, manifestV2)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("\r\nDocker layers are going to be cache on: %v \r\n\r\n", cacheFolder)
+	fmt.Fprintf(os.Stderr, "\r\nDocker layers are going to be cache on: %v \r\n\r\n", cacheFolder)
 
-	fmt.Printf("PVR has been updated! \r\n\r\n ")
+	fmt.Fprintf(os.Stderr, "PVR has been updated! \r\n\r\n ")
 	return nil
 }
 
@@ -216,7 +216,7 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 	downloads := make(chan *downloadData)
 	var waitGroup sync.WaitGroup
 
-	fmt.Printf("\n\rDownloading layers %d ... \r\n", totalLayers)
+	fmt.Fprintf(os.Stderr, "\n\rDownloading layers %d ... \r\n", totalLayers)
 
 	waitGroup.Add(totalLayers)
 	for i, layer := range dockerManifest.Layers {
@@ -249,7 +249,7 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 		return "", "", err
 	}
 
-	fmt.Printf("\n\rExtracting layers %d ... \r\n", len(files))
+	fmt.Fprintf(os.Stderr, "\n\rExtracting layers %d ... \r\n", len(files))
 
 	err = ExtractFiles(files, extractPath)
 	if err != nil {
@@ -290,7 +290,7 @@ func updatePvrBinary(extractPath string) error {
 		return err
 	}
 
-	fmt.Printf("\r\nPvr installed on %v \r\n", *pvrPath)
+	fmt.Fprintf(os.Stderr, "\r\nPvr installed on %v \r\n", *pvrPath)
 
 	return nil
 }
@@ -304,7 +304,7 @@ func processDownloads(downloads chan *downloadData, totalLayers int) ([]string, 
 		if download.err != nil {
 			return nil, download.err
 		}
-		fmt.Printf("Done with [%d/%d] %v \r\n", download.number, totalLayers, fromMessages[download.cached])
+		fmt.Fprintf(os.Stderr, "Done with [%d/%d] %v \r\n", download.number, totalLayers, fromMessages[download.cached])
 		files = append(files, download.filename)
 	}
 	return files, nil

@@ -344,7 +344,7 @@ func (s *Session) Whoami() error {
 		if err != nil {
 			return err
 		}
-		fmt.Print(responseBody["nick"].(string) + "(" + responseBody["prn"].(string) + ") at " + authEndPoint + "\n")
+		fmt.Fprint(os.Stderr, responseBody["nick"].(string)+"("+responseBody["prn"].(string)+") at "+authEndPoint+"\n")
 	}
 	return nil
 }

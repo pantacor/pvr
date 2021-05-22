@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 
 	"github.com/go-resty/resty"
@@ -132,7 +133,7 @@ func (s *Session) DoAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error)
 				return nil, err
 			}
 		} else if response.StatusCode() == http.StatusForbidden {
-			fmt.Println("** ACCESS DENIED: user cannot access repository. **")
+			fmt.Fprintln(os.Stderr, "** ACCESS DENIED: user cannot access repository. **")
 			bearer, err = s.auth.getNewAccessToken(authHeader, false)
 			if err != nil {
 				// getting new bearer token didnt go very well
