@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -136,7 +137,7 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 		return err
 	}
 
-	fmt.Printf("Successfully posted Revision %d (%s) to device id %s\n", int(responseMap["rev"].(float64)),
+	fmt.Fprintf(os.Stderr, "Successfully posted Revision %d (%s) to device id %s\n", int(responseMap["rev"].(float64)),
 		responseMap["state-sha"].(string)[:8], responseMap["trail-id"])
 
 	return nil

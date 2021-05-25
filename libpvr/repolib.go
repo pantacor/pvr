@@ -163,7 +163,7 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 		}
 		pvr.PristineJson = byteJSON
 	} else {
-		fmt.Println("WARN: pvr location (" + jPath + ") is not a pvr repository; filling the gaps...")
+		fmt.Fprintln(os.Stderr, "WARN: pvr location ("+jPath+") is not a pvr repository; filling the gaps...")
 		pvr.PristineJson = []byte("{}")
 	}
 
@@ -247,7 +247,7 @@ func (p *Pvr) AddFile(globs []string) error {
 			}
 			matched, err := filepath.Match(absglob, walkPath)
 			if err != nil {
-				fmt.Println("WARNING: cannot read file (" + err.Error() + "):" + walkPath)
+				fmt.Fprintln(os.Stderr, "WARNING: cannot read file ("+err.Error()+"):"+walkPath)
 				return err
 			}
 			if matched {
@@ -524,7 +524,7 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 	}
 
 	for _, v := range status.ChangedFiles {
-		fmt.Println("Committing " + filepath.Join(p.Objdir, v))
+		fmt.Fprintln(os.Stderr, "Committing "+filepath.Join(p.Objdir, v))
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
@@ -540,7 +540,7 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 
 	// copy all objects with atomic commit
 	for _, v := range status.NewFiles {
-		fmt.Println("Adding " + v)
+		fmt.Fprintln(os.Stderr, "Adding "+v)
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
@@ -569,7 +569,7 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 	}
 
 	for _, v := range status.RemovedFiles {
-		fmt.Println("Removing " + v)
+		fmt.Fprintln(os.Stderr, "Removing "+v)
 	}
 
 	ioutil.WriteFile(filepath.Join(p.Pvrdir, "commitmsg.new"), []byte(msg), 0644)
@@ -728,8 +728,8 @@ func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
 func readChallenge(targetPrompt string) string {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("*** Claim with challenge @ " + targetPrompt + " ***")
-	fmt.Print("Enter Challenge: ")
+	fmt.Fprintln(os.Stderr, "*** Claim with challenge @ "+targetPrompt+" ***")
+	fmt.Fprint(os.Stderr, "Enter Challenge: ")
 	challenge, _ := reader.ReadString('\n')
 
 	return strings.TrimRight(challenge, "\n")
@@ -738,8 +738,8 @@ func readChallenge(targetPrompt string) string {
 func readCredentials(targetPrompt string) (string, string) {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("*** Login (/type [R] to register) @ " + targetPrompt + " ***")
-	fmt.Print("Username: ")
+	fmt.Fprintln(os.Stderr, "*** Login (/type [R] to register) @ "+targetPrompt+" ***")
+	fmt.Fprint(os.Stderr, "Username: ")
 	username, _ := reader.ReadString('\n')
 
 	username = strings.TrimSpace(username)
@@ -748,11 +748,11 @@ func readCredentials(targetPrompt string) (string, string) {
 		return "REGISTER", ""
 	}
 
-	fmt.Print("Password: ")
+	fmt.Fprint(os.Stderr, "Password: ")
 	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-	fmt.Println("*****")
+	fmt.Fprintln(os.Stderr, "*****")
 	if err != nil {
-		fmt.Println("Error: " + err.Error())
+		fmt.Fprintln(os.Stderr, "Error: "+err.Error())
 	}
 	password := string(bytePassword)
 
@@ -762,33 +762,33 @@ func readCredentials(targetPrompt string) (string, string) {
 func readRegistration(targetPrompt string) (string, string, string) {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("\n*** REGISTER ACCOUNT @ " + targetPrompt + "***")
-	fmt.Print(" 1. Email: ")
+	fmt.Fprintln(os.Stderr, "\n*** REGISTER ACCOUNT @ "+targetPrompt+"***")
+	fmt.Fprint(os.Stderr, " 1. Email: ")
 	email, _ := reader.ReadString('\n')
-	fmt.Print(" 2. Username: ")
+	fmt.Fprint(os.Stderr, " 2. Username: ")
 	username, _ := reader.ReadString('\n')
 
 	password := ""
 
 	for {
-		fmt.Print(" 3. Password: ")
+		fmt.Fprint(os.Stderr, " 3. Password: ")
 		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-		fmt.Println("*****")
+		fmt.Fprintln(os.Stderr, "*****")
 		if err != nil {
-			fmt.Println("Error: " + err.Error())
+			fmt.Fprintln(os.Stderr, "Error: "+err.Error())
 			continue
 		}
 		password = string(bytePassword)
 
-		fmt.Print(" 4. Password Repeat: ")
+		fmt.Fprint(os.Stderr, " 4. Password Repeat: ")
 		bytePassword, err = terminal.ReadPassword(int(syscall.Stdin))
-		fmt.Println("*****")
+		fmt.Fprintln(os.Stderr, "*****")
 		if err != nil {
-			fmt.Println("Error: " + err.Error())
+			fmt.Fprintln(os.Stderr, "Error: "+err.Error())
 			continue
 		}
 		if password != string(bytePassword) {
-			fmt.Println("Passwords do not match. Try again!")
+			fmt.Fprintln(os.Stderr, "Passwords do not match. Try again!")
 			continue
 		}
 		password = string(bytePassword)
@@ -1033,7 +1033,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 		if shaSeen[remoteObject.Sha] != nil {
 			_str := remoteObject.ObjectName[0:Min(len(remoteObject.ObjectName)-1, 12)] + " "
-			fmt.Println(_str + "[OK - Dupe]")
+			fmt.Fprintln(os.Stderr, _str+"[OK - Dupe]")
 			continue
 		}
 		shaSeen[remoteObject.Sha] = "yes"
@@ -1048,18 +1048,18 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			objectType := response.Header().Get(objects.HttpHeaderPantahubObjectType)
 			if !force {
 				if objectType == objects.ObjectTypeLink {
-					fmt.Println(_str + "[LK]")
+					fmt.Fprintln(os.Stderr, _str+"[LK]")
 				} else if objectType == objects.ObjectTypeObject {
-					fmt.Println(_str + "[OK]")
+					fmt.Fprintln(os.Stderr, _str+"[OK]")
 				} else {
-					fmt.Println(_str + "[OK]")
+					fmt.Fprintln(os.Stderr, _str+"[OK]")
 				}
 				continue
 			}
 
 			// if force
 			if objectType == objects.ObjectTypeLink {
-				fmt.Println(_str + "[LK]")
+				fmt.Fprintln(os.Stderr, _str+"[LK]")
 				continue
 			}
 		}
@@ -1362,7 +1362,7 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 		return err
 	}
 
-	fmt.Printf("Successfully posted Revision %d (%s) to device id %s\n", int(responseMap["rev"].(float64)),
+	fmt.Fprintf(os.Stderr, "Successfully posted Revision %d (%s) to device id %s\n", int(responseMap["rev"].(float64)),
 		responseMap["state-sha"].(string)[:8], responseMap["trail-id"])
 
 	p.Pvrconfig.DefaultPostUrl = uri
@@ -1377,7 +1377,7 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	err = p.SaveConfig()
 
 	if err != nil {
-		fmt.Println("WARNING: couldnt save config " + err.Error())
+		fmt.Fprintln(os.Stderr, "WARNING: couldnt save config "+err.Error())
 	}
 
 	return nil
@@ -1585,19 +1585,19 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 			}
 
 			if len(k) >= 15 {
-				fmt.Println(k[:15] + " [OK" + cache + "]")
+				fmt.Fprintln(os.Stderr, k[:15]+" [OK"+cache+"]")
 			} else {
-				fmt.Println(k + " [OK" + cache + "]")
+				fmt.Fprintln(os.Stderr, k+" [OK"+cache+"]")
 			}
 
 		} else {
-			fmt.Println("pulling objects file " + getPath + "-> " + objPathNew)
+			fmt.Fprintln(os.Stderr, "pulling objects file "+getPath+"-> "+objPathNew)
 		}
 
 		err = Copy(objPathNew, getPath)
 
 		if err != nil {
-			fmt.Println("ERROR : " + err.Error())
+			fmt.Fprintln(os.Stderr, "ERROR : "+err.Error())
 			return objectsCount, err
 		}
 		err = os.Rename(objPathNew, objPath)

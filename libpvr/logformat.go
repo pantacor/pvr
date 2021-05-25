@@ -17,6 +17,7 @@ package libpvr
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"gitlab.com/pantacor/pantahub-base/logs"
 )
@@ -37,7 +38,7 @@ func (s *LogFormatterJson) DoLog(m *logs.Entry) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(buf))
+	fmt.Fprintln(os.Stderr, string(buf))
 	return nil
 }
 
@@ -55,6 +56,6 @@ func (s *LogFormatterTemplate) DoLog(v *logs.Entry) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(r)
+	fmt.Fprintln(os.Stderr, r)
 	return nil
 }

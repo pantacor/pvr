@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -88,16 +89,16 @@ func Scan() {
 					wwwURL = "https://stage.hub.pantacor.com/u/_/devices/" + res.DeviceId
 				}
 
-				fmt.Printf("\tID: %s\n", res)
-				fmt.Printf("\tHost: %s\n", res.Hostname)
-				fmt.Printf("\tIPv4: %s\n", res.AddrIPv4)
-				fmt.Printf("\tIPv6: %s\n", res.AddrIPv6)
-				fmt.Printf("\tPort: %d\n", res.Port)
+				fmt.Fprintf(os.Stderr, "\tID: %s\n", res)
+				fmt.Fprintf(os.Stderr, "\tHost: %s\n", res.Hostname)
+				fmt.Fprintf(os.Stderr, "\tIPv4: %s\n", res.AddrIPv4)
+				fmt.Fprintf(os.Stderr, "\tIPv6: %s\n", res.AddrIPv6)
+				fmt.Fprintf(os.Stderr, "\tPort: %d\n", res.Port)
 				if res.Challenge != "" {
-					fmt.Printf("\tClaim Cmd: %s\n", res.ClaimCmd())
+					fmt.Fprintf(os.Stderr, "\tClaim Cmd: %s\n", res.ClaimCmd())
 				} else {
-					fmt.Printf("\tPantahub WWW: %s\n", wwwURL)
-					fmt.Printf("\tPVR Clone: %s\n", res.Pantahub+"/trails/"+res.DeviceId)
+					fmt.Fprintf(os.Stderr, "\tPantahub WWW: %s\n", wwwURL)
+					fmt.Fprintf(os.Stderr, "\tPVR Clone: %s\n", res.Pantahub+"/trails/"+res.DeviceId)
 				}
 			}
 		}
@@ -109,9 +110,9 @@ func Scan() {
 	if err != nil {
 		log.Fatalln("Failed to browse:", err.Error())
 	}
-	fmt.Println("Scanning ...")
+	fmt.Fprintln(os.Stderr, "Scanning ...")
 
 	<-ctx.Done()
 
-	fmt.Printf("Pantavisor devices detected in network: %d (see above for details)\n", len(devices))
+	fmt.Fprintf(os.Stderr, "Pantavisor devices detected in network: %d (see above for details)\n", len(devices))
 }
