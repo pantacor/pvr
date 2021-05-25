@@ -1486,7 +1486,23 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	}
 
 	repoPath := repoUri.Path
-	partname := repoUri.Fragment
+
+	// lets keep only those matching prefix
+	partPrefixes := []string{}
+	unpartPrefixes := []string{}
+	if repoUri.Fragment != "" {
+		parsePrefixes := strings.Split(repoUri.Fragment, ",")
+		for _, v := range parsePrefixes {
+			if !strings.HasSuffix(v, "/") {
+				v = v + "/"
+			}
+			if !strings.HasPrefix(v, "-") {
+				partPrefixes = append(partPrefixes, v)
+			} else {
+				unpartPrefixes = append(unpartPrefixes, v[1:])
+			}
+		}
+	}
 
 	f, err := os.Stat(repoPath)
 
@@ -1526,13 +1542,16 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		return objectsCount, errors.New("JSON Unmarshal (json.new):" + err.Error())
 	}
 
-	partPrefix := partname
-	if partname != "" {
-		partPrefix = partname + "/"
-	}
-
+	// delete keys that have no prefix
 	for k := range rs {
-		if !strings.HasPrefix(k, partPrefix) {
+		found := false
+		for _, v := range partPrefixes {
+			if strings.HasPrefix(k, v) {
+				found = true
+				break
+			}
+		}
+		if !found {
 			delete(rs, k)
 		}
 	}
@@ -1618,19 +1637,29 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	} else {
 		// manually remove everything not matching the part from fragement ...
 		pJSONMap := p.PristineJsonMap
-		// remove all files for name "${part}/"
-		for k := range pJSONMap {
-			if strings.HasPrefix(k, partPrefix) {
-				delete(pJSONMap, k)
+		for _, partPrefix := range partPrefixes {
+			// remove all files for name "app/"
+			for k := range pJSONMap {
+				if strings.HasPrefix(k, partPrefix) {
+					delete(pJSONMap, k)
+				}
+			}
+			// add back all from new map
+			for k, v := range pJSONMap {
+				if strings.HasPrefix(k, partPrefix) {
+					pJSONMap[k] = v
+				}
+			}
+		}
+		for _, unpartPrefix := range unpartPrefixes {
+			// remove all files for name "app/"
+			for k := range pJSONMap {
+				if strings.HasPrefix(k, unpartPrefix) {
+					delete(pJSONMap, k)
+				}
 			}
 		}
 
-		// add back all from new map
-		for k, v := range rs {
-			if strings.HasPrefix(k, partPrefix) {
-				pJSONMap[k] = v
-			}
-		}
 		jsonMerged, err = json.MarshalIndent(pJSONMap, "", "    ")
 	}
 
@@ -1900,12 +1929,32 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 	}
 
 	// lets keep only those matching prefix
-	partPrefix := url.Fragment
-	if partPrefix != "" {
-		partPrefix = partPrefix + "/"
+	partPrefixes := []string{}
+	unpartPrefixes := []string{}
+	if url.Fragment != "" {
+		parsePrefixes := strings.Split(url.Fragment, ",")
+		for _, v := range parsePrefixes {
+			if !strings.HasSuffix(v, "/") {
+				v = v + "/"
+			}
+			if !strings.HasPrefix(v, "-") {
+				partPrefixes = append(partPrefixes, v)
+			} else {
+				unpartPrefixes = append(unpartPrefixes, v[1:])
+			}
+		}
 	}
+
+	// delete keys that have no prefix
 	for k := range jsonMap {
-		if !strings.HasPrefix(k, partPrefix) {
+		found := false
+		for _, v := range partPrefixes {
+			if strings.HasPrefix(k, v) {
+				found = true
+				break
+			}
+		}
+		if !found {
 			delete(jsonMap, k)
 		}
 	}
@@ -1923,21 +1972,44 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 			return objectsCount, err
 		}
 
+		pJSONMap := p.PristineJsonMap
+
+		for _, unpartPrefix := range unpartPrefixes {
+			// remove all files for name "app/"
+			for k := range pJSONMap {
+				if strings.HasPrefix(k, unpartPrefix) {
+					delete(pJSONMap, k)
+				}
+			}
+		}
+
 		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
 
 	} else {
-		// manually remove everything not matching the part from fragement ...
+		// manually remove everything not matching the part from fragment ...
 		pJSONMap := p.PristineJsonMap
-		// remove all files for name "app/"
-		for k := range pJSONMap {
-			if strings.HasPrefix(k, partPrefix) {
-				delete(pJSONMap, k)
+
+		for _, partPrefix := range partPrefixes {
+			// remove all files for name "app/"
+			for k := range pJSONMap {
+				if strings.HasPrefix(k, partPrefix) {
+					delete(pJSONMap, k)
+				}
+			}
+			// add back all from new map
+			for k, v := range jsonMap {
+				if strings.HasPrefix(k, partPrefix) {
+					pJSONMap[k] = v
+				}
 			}
 		}
-		// add back all from new map
-		for k, v := range jsonMap {
-			if strings.HasPrefix(k, partPrefix) {
-				pJSONMap[k] = v
+
+		for _, unpartPrefix := range unpartPrefixes {
+			// remove all files for name "app/"
+			for k := range pJSONMap {
+				if strings.HasPrefix(k, unpartPrefix) {
+					delete(pJSONMap, k)
+				}
 			}
 		}
 
