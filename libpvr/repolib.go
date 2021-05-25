@@ -1544,11 +1544,13 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 
 	// delete keys that have no prefix
 	for k := range rs {
-		found := false
+		found := true
 		for _, v := range partPrefixes {
 			if strings.HasPrefix(k, v) {
 				found = true
 				break
+			} else {
+				found = false
 			}
 		}
 		if !found {
@@ -1637,6 +1639,11 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	} else {
 		// manually remove everything not matching the part from fragement ...
 		pJSONMap := p.PristineJsonMap
+
+		if len(partPrefixes) == 0 {
+			partPrefixes = append(partPrefixes, "")
+		}
+
 		for _, partPrefix := range partPrefixes {
 			// remove all files for name "app/"
 			for k := range pJSONMap {
@@ -1947,11 +1954,13 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 
 	// delete keys that have no prefix
 	for k := range jsonMap {
-		found := false
+		found := true
 		for _, v := range partPrefixes {
 			if strings.HasPrefix(k, v) {
 				found = true
 				break
+			} else {
+				found = false
 			}
 		}
 		if !found {
@@ -1988,6 +1997,10 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 	} else {
 		// manually remove everything not matching the part from fragment ...
 		pJSONMap := p.PristineJsonMap
+
+		if len(partPrefixes) == 0 {
+			partPrefixes = append(partPrefixes, "")
+		}
 
 		for _, partPrefix := range partPrefixes {
 			// remove all files for name "app/"
