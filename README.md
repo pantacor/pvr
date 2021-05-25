@@ -761,7 +761,7 @@ sirinibin(prn:::accounts:/5bf2ac9e41b2dd0009a96c97) at https://api.pantahub.com/
 
 ```
 
-## pvr get [remote-or-local-repository[#part]] [target-repository]
+## pvr get [remote-or-local-repository[#part1,part2,-unpart]] [target-repository]
 
 Update target-repository from remote or local repository
 
@@ -812,6 +812,21 @@ pvr get pantahub-ci/rpi3_initial_latest#bsp
 018e41b74500fa7 [OK]
 fe4d959c5541950 [OK]
 dee31a19ce47772 [OK]
+```
+
+You can also retrieve two mor more parts with , separated (e.g. 'bsp' and $appname) using the fragment (#) notation:
+
+```
+pvr get pantahub-ci/rpi3_initial_latest#bsp,$appname
+...
+```
+
+Further can also remove one or multiple parts from repo in the same operation by prefixing the part with a '-', e.g.
+the following would get the latest bsp but also remove $appname from the pvr repo
+
+```
+pvr get pantahub-ci/rpi3_initial_latest#bsp,-$appname
+...
 ```
 
 You can also get from a tarball produced with ```pvr export```:
