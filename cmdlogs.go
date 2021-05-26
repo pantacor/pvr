@@ -206,7 +206,6 @@ func CommandLogs() cli.Command {
 					}
 				}
 			}
-			return nil
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
