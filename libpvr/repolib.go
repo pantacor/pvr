@@ -704,7 +704,7 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 }
 
 // list all objects reffed by current repo json
-func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
+func (p *Pvr) listFilesAndObjects(parts []string) (map[string]string, error) {
 
 	filesAndObjects := map[string]string{}
 	// push all objects
@@ -716,6 +716,20 @@ func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
 			continue
 		}
 		objId, ok := v.(string)
+
+		found := true
+		for _, e := range parts {
+			if strings.HasPrefix(k, e+"/") {
+				found = true
+				break
+			} else {
+				found = false
+			}
+		}
+
+		if !found {
+			continue
+		}
 
 		if !ok {
 			return map[string]string{}, errors.New("bad object id for file '" + k + "' in pristine pvr json")
@@ -991,7 +1005,7 @@ func (p *Pvr) putFiles(filePut ...FilePut) []FilePut {
 
 func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
-	filesAndObjects, err := p.listFilesAndObjects()
+	filesAndObjects, err := p.listFilesAndObjects([]string{})
 	if err != nil {
 		return err
 	}
@@ -2216,7 +2230,7 @@ func addToTar(writer *tar.Writer, archivePath, sourcePath string) error {
 	return nil
 }
 
-func (p *Pvr) Export(dst string) error {
+func (p *Pvr) Export(parts []string, dst string) error {
 
 	file, err := os.Create(dst)
 	if err != nil {
@@ -2241,7 +2255,7 @@ func (p *Pvr) Export(dst string) error {
 	tw := tar.NewWriter(fileWriter)
 	defer tw.Close()
 
-	filesAndObjects, err := p.listFilesAndObjects()
+	filesAndObjects, err := p.listFilesAndObjects(parts)
 	if err != nil {
 		return err
 	}

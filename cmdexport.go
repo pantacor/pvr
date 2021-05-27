@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2017-2021  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package main
 import (
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -53,12 +54,24 @@ func CommandExport() cli.Command {
 			if c.NArg() < 1 {
 				return errors.New("export-file name is required. See --help")
 			}
-			err = pvr.Export(c.Args()[0])
+			var parts []string
+			if c.String("parts") != "" {
+				parts = strings.Split(c.String("parts"), ",")
+			} else {
+				parts = []string{}
+			}
+			err = pvr.Export(parts, c.Args()[0])
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
 
 			return nil
+		},
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "parts, p",
+				Usage: "comma separate list of parts to export; if empty we export all",
+			},
 		},
 	}
 }
