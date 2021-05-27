@@ -1475,7 +1475,7 @@ func (p *Pvr) GetStateJson(uri string) (
 func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	objectsCount int,
 	err error) {
-	rs := map[string]interface{}{}
+	jsonMap := map[string]interface{}{}
 
 	objectsCount = 0
 
@@ -1537,13 +1537,13 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		return objectsCount, err
 	}
 
-	err = json.Unmarshal(jsonData, &rs)
+	err = json.Unmarshal(jsonData, &jsonMap)
 	if err != nil {
 		return objectsCount, errors.New("JSON Unmarshal (json.new):" + err.Error())
 	}
 
 	// delete keys that have no prefix
-	for k := range rs {
+	for k := range jsonMap {
 		found := true
 		for _, v := range partPrefixes {
 			if strings.HasPrefix(k, v) {
@@ -1554,7 +1554,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 			}
 		}
 		if !found {
-			delete(rs, k)
+			delete(jsonMap, k)
 		}
 	}
 
@@ -1573,7 +1573,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		}
 	}
 
-	for k, v := range rs {
+	for k, v := range jsonMap {
 		if strings.HasSuffix(k, ".json") {
 			continue
 		}
@@ -1630,7 +1630,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 
 	var jsonMerged []byte
 	if merge {
-		jsonDataSelect, err := json.Marshal(rs)
+		jsonDataSelect, err := json.Marshal(jsonMap)
 
 		if err != nil {
 			return objectsCount, err
@@ -1652,7 +1652,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 				}
 			}
 			// add back all from new map
-			for k, v := range pJSONMap {
+			for k, v := range jsonMap {
 				if strings.HasPrefix(k, partPrefix) {
 					pJSONMap[k] = v
 				}
