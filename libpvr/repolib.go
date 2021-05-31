@@ -1376,8 +1376,14 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "Successfully posted Revision %d (%s) to device id %s\n", int(responseMap["rev"].(float64)),
-		responseMap["state-sha"].(string)[:8], responseMap["trail-id"])
+	stateSha := responseMap["state-sha"].(string)
+	revLocal := fmt.Sprintf("%d", int(responseMap["rev"].(float64)))
+	if revLocal == "-1" {
+		revLocal = responseMap["revlocal"].(string)
+	}
+
+	fmt.Fprintf(os.Stderr, "Successfully posted Revision %s (%s) to device id %s\n", revLocal,
+		stateSha[:Min(8, len(stateSha))], responseMap["trail-id"])
 
 	p.Pvrconfig.DefaultPostUrl = uri
 	if p.Pvrconfig.DefaultGetUrl == "" {
