@@ -915,6 +915,7 @@ func worker(jobs chan FilePut, done chan FilePut) {
 		}
 
 		req, err := http.NewRequest(http.MethodPut, j.putUrl, r)
+		req.ContentLength = fstat.Size()
 
 		if err != nil {
 			j.bar.Finish()
