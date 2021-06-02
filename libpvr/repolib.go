@@ -2239,14 +2239,22 @@ func addToTar(writer *tar.Writer, archivePath, sourcePath string) error {
 
 func (p *Pvr) Export(parts []string, dst string) error {
 
-	file, err := os.Create(dst)
-	if err != nil {
-		return err
+	var file *os.File
+	var err error
+
+	if dst == "-" {
+		file = os.Stdout
+	} else {
+		file, err := os.Create(dst)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
 	}
-	defer file.Close()
 
 	var fileWriter io.WriteCloser
 
+	// stdout and
 	if strings.HasSuffix(strings.ToLower(dst), ".gz") ||
 		strings.HasSuffix(strings.ToLower(dst), ".tgz") {
 
