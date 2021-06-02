@@ -2285,7 +2285,40 @@ func (p *Pvr) Export(parts []string, dst string) error {
 		}
 	}
 
-	if err := addToTar(tw, "json", filepath.Join(p.Pvrdir, "json")); err != nil {
+	filteredMap := map[string]interface{}{}
+
+	for k, v := range p.PristineJsonMap {
+		for _, p := range parts {
+			if !strings.HasSuffix(p, "/") {
+				p = p + "/"
+			}
+			if strings.HasPrefix(k, p) {
+				filteredMap[k] = v
+				break
+			}
+		}
+	}
+	jsonFile, err := ioutil.TempFile(os.TempDir(), "filtered-json.json.XXXXXXXX")
+	if err != nil {
+		return err
+	}
+
+	defer jsonFile.Close()
+	defer os.Remove(jsonFile.Name())
+
+	buf, err := json.Marshal(filteredMap)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = jsonFile.Write(buf)
+
+	if err != nil {
+		return err
+	}
+
+	if err := addToTar(tw, "json", jsonFile.Name()); err != nil {
 		return err
 	}
 
