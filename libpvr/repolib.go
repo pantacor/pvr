@@ -2245,7 +2245,7 @@ func (p *Pvr) Export(parts []string, dst string) error {
 	if dst == "-" {
 		file = os.Stdout
 	} else {
-		file, err := os.Create(dst)
+		file, err = os.Create(dst)
 		if err != nil {
 			return err
 		}
