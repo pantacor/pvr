@@ -48,7 +48,7 @@ var IsDebugEnabled bool
 // PrintDebugf forwards to Printfs if IsDebugEnabled
 func PrintDebugf(format string, a ...interface{}) (n int, err error) {
 	if IsDebugEnabled {
-		return fmt.Printf(format, a...)
+		return fmt.Fprintf(os.Stderr, format, a...)
 	}
 	return 0, nil
 }
@@ -56,7 +56,7 @@ func PrintDebugf(format string, a ...interface{}) (n int, err error) {
 // PrintDebugln forwards to Printfs if IsDebugEnabled
 func PrintDebugln(a ...interface{}) (n int, err error) {
 	if IsDebugEnabled {
-		return fmt.Println(a...)
+		return fmt.Fprintln(os.Stderr, a...)
 	}
 	return 0, nil
 }
@@ -74,7 +74,7 @@ func Create(path string) error {
 	touchCmd.Stderr = &stderr
 	err = touchCmd.Run()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		fmt.Fprintln(os.Stderr, fmt.Sprint(err)+": "+stderr.String())
 	}
 	return nil
 }
@@ -92,7 +92,7 @@ func MkdirAll(path string, perm os.FileMode) error {
 	mkdirCmd.Stderr = &stderr
 	err = mkdirCmd.Run()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		fmt.Fprintln(os.Stderr, fmt.Sprint(err)+": "+stderr.String())
 	}
 	return nil
 }
@@ -110,7 +110,7 @@ func Mkdir(path string, perm os.FileMode) error {
 	mkdirCmd.Stderr = &stderr
 	err = mkdirCmd.Run()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		fmt.Fprintln(os.Stderr, fmt.Sprint(err)+": "+stderr.String())
 	}
 	return nil
 }
@@ -132,7 +132,7 @@ func RemoveAll(path string) error {
 	rmCmd.Stderr = &stderr
 	err = rmCmd.Run()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		fmt.Fprintln(os.Stderr, fmt.Sprint(err)+": "+stderr.String())
 	}
 	return nil
 }
@@ -154,7 +154,7 @@ func Remove(path string) error {
 	rmCmd.Stderr = &stderr
 	err = rmCmd.Run()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		fmt.Fprintln(os.Stderr, fmt.Sprint(err)+": "+stderr.String())
 	}
 	return nil
 }
@@ -261,6 +261,10 @@ func GetPhAuthHeaderTokenKey(authHeader string) (string, error) {
 	authEpString := opts["ph-aeps"]
 	authEps := strings.Split(authEpString, ",")
 
+	if _, ok := opts["error"]; ok {
+		return "", nil
+	}
+
 	if len(authEps) == 0 || len(realm) == 0 {
 		return "", errors.New("Bad Server Behaviour. Need ph-aeps and realm token in Www-Authenticate header. Check your server version")
 	}
@@ -305,7 +309,11 @@ func WriteTxtFile(filePath string, content string) error {
 
 // GetPlatform get string with the full platform name
 func GetPlatform() string {
-	values := []string{string(runtime.GOOS), string(runtime.GOARCH)}
+	arch := string(runtime.GOARCH)
+	if arch == "arm" {
+		arch = "armv6"
+	}
+	values := []string{string(runtime.GOOS), arch}
 
 	return strings.Join(values, "_")
 }
@@ -313,7 +321,7 @@ func GetPlatform() string {
 // AskForConfirmation ask the user for confirmation action
 func AskForConfirmation(question string) bool {
 	var response string
-	fmt.Println(question)
+	fmt.Fprintln(os.Stderr, question)
 
 	_, err := fmt.Scanln(&response)
 	if err != nil {
@@ -766,33 +774,33 @@ func (s *Session) SuggestNicks(searchTerm string, baseURL string) {
 func (s *Session) SuggestDeviceNicks(userNick, searchTerm string, baseURL string) {
 	IsLoggedIn, err := s.IsUserLoggedIn(baseURL)
 	if err != nil {
-		fmt.Println(err.Error() + "\n")
+		fmt.Fprintln(os.Stderr, err.Error()+"\n")
 		return
 	}
 	if !IsLoggedIn {
-		fmt.Println("Not-Loggedin -")
+		fmt.Fprintln(os.Stderr, "Not-Loggedin -")
 		return
 	}
 
 	devicesResponse, err := s.GetDevices(baseURL, userNick, searchTerm)
 	if err != nil {
-		fmt.Println(err.Error() + "\n")
+		fmt.Fprintln(os.Stderr, err.Error()+"\n")
 		return
 	}
 	responseData := []interface{}{}
 	err = json.Unmarshal(devicesResponse.Body(), &responseData)
 	if err != nil {
-		fmt.Println(err.Error() + "\n")
+		fmt.Fprintln(os.Stderr, err.Error()+"\n")
 		return
 	}
 	if len(responseData) == 0 {
-		fmt.Println("No results")
+		fmt.Fprintln(os.Stderr, "No results")
 	} else {
 		for _, device := range responseData {
 			if userNick != "" {
-				fmt.Println(userNick + "/" + device.(map[string]interface{})["nick"].(string) + "\n")
+				fmt.Fprintln(os.Stderr, userNick+"/"+device.(map[string]interface{})["nick"].(string)+"\n")
 			} else {
-				fmt.Println(device.(map[string]interface{})["nick"].(string) + "\n")
+				fmt.Fprintln(os.Stderr, device.(map[string]interface{})["nick"].(string)+"\n")
 			}
 
 		}
@@ -803,32 +811,32 @@ func (s *Session) SuggestDeviceNicks(userNick, searchTerm string, baseURL string
 func (s *Session) SuggestUserNicks(searchTerm string, baseURL string) {
 	IsLoggedIn, err := s.IsUserLoggedIn(baseURL)
 	if err != nil {
-		fmt.Println(err.Error() + "\n")
+		fmt.Fprintln(os.Stderr, err.Error()+"\n")
 		return
 	}
 	if !IsLoggedIn {
-		fmt.Println("Not-Loggedin -")
+		fmt.Fprintln(os.Stderr, "Not-Loggedin -")
 		return
 	}
 	profilesResponse, err := s.GetUserProfiles(baseURL, searchTerm)
 	if err != nil {
-		fmt.Println(err.Error() + "\n")
+		fmt.Fprintln(os.Stderr, err.Error()+"\n")
 		return
 	}
 	responseData := []interface{}{}
 	err = json.Unmarshal(profilesResponse.Body(), &responseData)
 	if err != nil {
-		fmt.Println(err.Error() + "\n")
+		fmt.Fprintln(os.Stderr, err.Error()+"\n")
 		return
 	}
 	if len(responseData) == 0 {
-		fmt.Println("No results")
+		fmt.Fprintln(os.Stderr, "No results")
 	} else {
 		for _, profile := range responseData {
 			if len(responseData) == 1 {
-				fmt.Println(profile.(map[string]interface{})["nick"].(string) + "/\n")
+				fmt.Fprintln(os.Stderr, profile.(map[string]interface{})["nick"].(string)+"/\n")
 			} else {
-				fmt.Println(profile.(map[string]interface{})["nick"].(string) + "\n")
+				fmt.Fprintln(os.Stderr, profile.(map[string]interface{})["nick"].(string)+"\n")
 			}
 		}
 	}
@@ -861,46 +869,32 @@ var tmplMap = map[string]interface{}{
 		switch a {
 		case "ANSIC":
 			r = b.Format(time.ANSIC)
-			break
 		case "UnixDate":
 			r = b.Format(time.UnixDate)
-			break
 		case "RubyDate":
 			r = b.Format(time.RubyDate)
-			break
 		case "RFC822":
 			r = b.Format(time.RFC822)
-			break
 		case "RFC850":
 			r = b.Format(time.RFC850)
-			break
 		case "RFC1123":
 			r = b.Format(time.RFC1123)
-			break
 		case "RFC1123Z":
 			r = b.Format(time.RFC1123Z)
-			break
 		case "RFC3339":
 			r = b.Format(time.RFC3339)
-			break
 		case "RFC3339Nano":
 			r = b.Format(time.RFC3339Nano)
-			break
 		case "Kitchen":
 			r = b.Format(time.Kitchen)
-			break
 		case "Stamp":
 			r = b.Format(time.Stamp)
-			break
 		case "StampMilli":
 			r = b.Format(time.StampMilli)
-			break
 		case "StampMicro":
 			r = b.Format(time.StampMicro)
-			break
 		case "StampNano":
 			r = b.Format(time.StampNano)
-			break
 		default:
 			r = b.Format(time.Stamp)
 		}

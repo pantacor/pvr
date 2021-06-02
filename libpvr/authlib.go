@@ -157,11 +157,12 @@ func (p *PvrAuthConfig) Save() error {
 	return err
 }
 
-func doAuthenticate(authEp, username, password string) (string, string, error) {
+func doAuthenticate(authEp, username, password, scopes string) (string, string, error) {
 
 	m := map[string]string{
 		"username": username,
 		"password": password,
+		"scope":    scopes,
 	}
 
 	if username == "" {
@@ -174,8 +175,10 @@ func doAuthenticate(authEp, username, password string) (string, string, error) {
 		return "", "", errors.New("doAuthenticate: no authentication endpoint provided.")
 	}
 
-	response, err := resty.R().SetBody(m).
-		Post(authEp + "/login")
+	response, err := resty.R().SetBody(m).Post(authEp + "/login")
+	if err != nil {
+		return "", "", err
+	}
 
 	m1 := map[string]interface{}{}
 	err = json.Unmarshal(response.Body(), &m1)
@@ -252,6 +255,7 @@ func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh bool) (s
 
 	realm := opts["realm"]
 	authEpString := opts["ph-aeps"]
+	_, requestFailed := opts["error"]
 	authEps := strings.Split(authEpString, ",")
 
 	if len(authEps) == 0 {
@@ -268,7 +272,7 @@ func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh bool) (s
 	s.AccessToken = ""
 
 	// if we have a refresh token
-	if s.RefreshToken != "" && tryRefresh {
+	if s.RefreshToken != "" && tryRefresh && !requestFailed {
 		accessToken, refreshToken, err := p.DoRefresh(authEp, s.RefreshToken)
 
 		if err != nil {
@@ -288,18 +292,26 @@ func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh bool) (s
 	var err error
 	// get fresh user/pass auth
 	for i := 0; i < 3; i++ {
-		var accessToken, refreshToken string
-		username, password := readCredentials(authEp + " (realm=" + realm + ")")
-		if username == "REGISTER" {
-			email, username, password := readRegistration(authEp + " (realm=" + realm + ")")
-			err = ShowOrOpenRegisterLink(authEp, email, username, password)
-			if err != nil {
-				log.Fatal("error registering with PH: " + err.Error())
-				os.Exit(122)
+		var accessToken, refreshToken, username, password, scopes string
+		if !requestFailed {
+			username = "prn:pantahub.com:auth:/anon"
+			password = "prn:pantahub.com:auth:/anon"
+			scopes = "devices.readonly objects.readonly trails.readonly"
+		} else {
+			username, password = readCredentials(authEp + " (realm=" + realm + ")")
+			if username == "REGISTER" {
+				email, username, password := readRegistration(authEp + " (realm=" + realm + ")")
+				err = ShowOrOpenRegisterLink(authEp, email, username, password)
+				if err != nil {
+					log.Fatal("error registering with PH: " + err.Error())
+					os.Exit(122)
+				}
 			}
 		}
-		accessToken, refreshToken, err = doAuthenticate(authEp, username, password)
+
+		accessToken, refreshToken, err = doAuthenticate(authEp, username, password, scopes)
 		if err != nil {
+			requestFailed = true
 			continue
 		}
 
@@ -344,7 +356,7 @@ func (s *Session) Whoami() error {
 		if err != nil {
 			return err
 		}
-		fmt.Print(responseBody["nick"].(string) + "(" + responseBody["prn"].(string) + ") at " + authEndPoint + "\n")
+		fmt.Fprint(os.Stderr, responseBody["nick"].(string)+"("+responseBody["prn"].(string)+") at "+authEndPoint+"\n")
 	}
 	return nil
 }

@@ -163,7 +163,7 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 		}
 		pvr.PristineJson = byteJSON
 	} else {
-		fmt.Println("WARN: pvr location (" + jPath + ") is not a pvr repository; filling the gaps...")
+		fmt.Fprintln(os.Stderr, "WARN: pvr location ("+jPath+") is not a pvr repository; filling the gaps...")
 		pvr.PristineJson = []byte("{}")
 	}
 
@@ -247,7 +247,7 @@ func (p *Pvr) AddFile(globs []string) error {
 			}
 			matched, err := filepath.Match(absglob, walkPath)
 			if err != nil {
-				fmt.Println("WARNING: cannot read file (" + err.Error() + "):" + walkPath)
+				fmt.Fprintln(os.Stderr, "WARNING: cannot read file ("+err.Error()+"):"+walkPath)
 				return err
 			}
 			if matched {
@@ -524,7 +524,7 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 	}
 
 	for _, v := range status.ChangedFiles {
-		fmt.Println("Committing " + filepath.Join(p.Objdir, v))
+		fmt.Fprintln(os.Stderr, "Committing "+filepath.Join(p.Objdir, v))
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
@@ -540,7 +540,7 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 
 	// copy all objects with atomic commit
 	for _, v := range status.NewFiles {
-		fmt.Println("Adding " + v)
+		fmt.Fprintln(os.Stderr, "Adding "+v)
 		if strings.HasSuffix(v, ".json") {
 			continue
 		}
@@ -569,7 +569,7 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 	}
 
 	for _, v := range status.RemovedFiles {
-		fmt.Println("Removing " + v)
+		fmt.Fprintln(os.Stderr, "Removing "+v)
 	}
 
 	ioutil.WriteFile(filepath.Join(p.Pvrdir, "commitmsg.new"), []byte(msg), 0644)
@@ -704,7 +704,7 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 }
 
 // list all objects reffed by current repo json
-func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
+func (p *Pvr) listFilesAndObjects(parts []string) (map[string]string, error) {
 
 	filesAndObjects := map[string]string{}
 	// push all objects
@@ -717,6 +717,20 @@ func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
 		}
 		objId, ok := v.(string)
 
+		found := true
+		for _, e := range parts {
+			if strings.HasPrefix(k, e+"/") {
+				found = true
+				break
+			} else {
+				found = false
+			}
+		}
+
+		if !found {
+			continue
+		}
+
 		if !ok {
 			return map[string]string{}, errors.New("bad object id for file '" + k + "' in pristine pvr json")
 		}
@@ -728,8 +742,8 @@ func (p *Pvr) listFilesAndObjects() (map[string]string, error) {
 func readChallenge(targetPrompt string) string {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("*** Claim with challenge @ " + targetPrompt + " ***")
-	fmt.Print("Enter Challenge: ")
+	fmt.Fprintln(os.Stderr, "*** Claim with challenge @ "+targetPrompt+" ***")
+	fmt.Fprint(os.Stderr, "Enter Challenge: ")
 	challenge, _ := reader.ReadString('\n')
 
 	return strings.TrimRight(challenge, "\n")
@@ -738,8 +752,8 @@ func readChallenge(targetPrompt string) string {
 func readCredentials(targetPrompt string) (string, string) {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("*** Login (/type [R] to register) @ " + targetPrompt + " ***")
-	fmt.Print("Username: ")
+	fmt.Fprintln(os.Stderr, "*** Login (/type [R] to register) @ "+targetPrompt+" ***")
+	fmt.Fprint(os.Stderr, "Username: ")
 	username, _ := reader.ReadString('\n')
 
 	username = strings.TrimSpace(username)
@@ -748,11 +762,11 @@ func readCredentials(targetPrompt string) (string, string) {
 		return "REGISTER", ""
 	}
 
-	fmt.Print("Password: ")
+	fmt.Fprint(os.Stderr, "Password: ")
 	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-	fmt.Println("*****")
+	fmt.Fprintln(os.Stderr, "*****")
 	if err != nil {
-		fmt.Println("Error: " + err.Error())
+		fmt.Fprintln(os.Stderr, "Error: "+err.Error())
 	}
 	password := string(bytePassword)
 
@@ -762,33 +776,33 @@ func readCredentials(targetPrompt string) (string, string) {
 func readRegistration(targetPrompt string) (string, string, string) {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("\n*** REGISTER ACCOUNT @ " + targetPrompt + "***")
-	fmt.Print(" 1. Email: ")
+	fmt.Fprintln(os.Stderr, "\n*** REGISTER ACCOUNT @ "+targetPrompt+"***")
+	fmt.Fprint(os.Stderr, " 1. Email: ")
 	email, _ := reader.ReadString('\n')
-	fmt.Print(" 2. Username: ")
+	fmt.Fprint(os.Stderr, " 2. Username: ")
 	username, _ := reader.ReadString('\n')
 
 	password := ""
 
 	for {
-		fmt.Print(" 3. Password: ")
+		fmt.Fprint(os.Stderr, " 3. Password: ")
 		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-		fmt.Println("*****")
+		fmt.Fprintln(os.Stderr, "*****")
 		if err != nil {
-			fmt.Println("Error: " + err.Error())
+			fmt.Fprintln(os.Stderr, "Error: "+err.Error())
 			continue
 		}
 		password = string(bytePassword)
 
-		fmt.Print(" 4. Password Repeat: ")
+		fmt.Fprint(os.Stderr, " 4. Password Repeat: ")
 		bytePassword, err = terminal.ReadPassword(int(syscall.Stdin))
-		fmt.Println("*****")
+		fmt.Fprintln(os.Stderr, "*****")
 		if err != nil {
-			fmt.Println("Error: " + err.Error())
+			fmt.Fprintln(os.Stderr, "Error: "+err.Error())
 			continue
 		}
 		if password != string(bytePassword) {
-			fmt.Println("Passwords do not match. Try again!")
+			fmt.Fprintln(os.Stderr, "Passwords do not match. Try again!")
 			continue
 		}
 		password = string(bytePassword)
@@ -800,14 +814,14 @@ func readRegistration(targetPrompt string) (string, string, string) {
 
 func getWwwAuthenticateInfo(header string) (string, map[string]string) {
 	parts := strings.SplitN(header, " ", 2)
-	authType := parts[0]
+	authType := strings.TrimSpace(parts[0])
 	parts = strings.Split(parts[1], ", ")
 	opts := make(map[string]string)
 
 	for _, part := range parts {
 		vals := strings.SplitN(part, "=", 2)
-		key := vals[0]
-		val := strings.Trim(vals[1], "\",")
+		key := strings.ToLower(strings.TrimSpace(vals[0]))
+		val := strings.TrimSpace(strings.Trim(vals[1], "\","))
 		opts[key] = val
 	}
 	return authType, opts
@@ -901,6 +915,7 @@ func worker(jobs chan FilePut, done chan FilePut) {
 		}
 
 		req, err := http.NewRequest(http.MethodPut, j.putUrl, r)
+		req.ContentLength = fstat.Size()
 
 		if err != nil {
 			j.bar.Finish()
@@ -991,7 +1006,7 @@ func (p *Pvr) putFiles(filePut ...FilePut) []FilePut {
 
 func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
-	filesAndObjects, err := p.listFilesAndObjects()
+	filesAndObjects, err := p.listFilesAndObjects([]string{})
 	if err != nil {
 		return err
 	}
@@ -1033,7 +1048,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 		if shaSeen[remoteObject.Sha] != nil {
 			_str := remoteObject.ObjectName[0:Min(len(remoteObject.ObjectName)-1, 12)] + " "
-			fmt.Println(_str + "[OK - Dupe]")
+			fmt.Fprintln(os.Stderr, _str+"[OK - Dupe]")
 			continue
 		}
 		shaSeen[remoteObject.Sha] = "yes"
@@ -1048,18 +1063,18 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			objectType := response.Header().Get(objects.HttpHeaderPantahubObjectType)
 			if !force {
 				if objectType == objects.ObjectTypeLink {
-					fmt.Println(_str + "[LK]")
+					fmt.Fprintln(os.Stderr, _str+"[LK]")
 				} else if objectType == objects.ObjectTypeObject {
-					fmt.Println(_str + "[OK]")
+					fmt.Fprintln(os.Stderr, _str+"[OK]")
 				} else {
-					fmt.Println(_str + "[OK]")
+					fmt.Fprintln(os.Stderr, _str+"[OK]")
 				}
 				continue
 			}
 
 			// if force
 			if objectType == objects.ObjectTypeLink {
-				fmt.Println(_str + "[LK]")
+				fmt.Fprintln(os.Stderr, _str+"[LK]")
 				continue
 			}
 		}
@@ -1362,8 +1377,14 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 		return err
 	}
 
-	fmt.Printf("Successfully posted Revision %d (%s) to device id %s\n", int(responseMap["rev"].(float64)),
-		responseMap["state-sha"].(string)[:8], responseMap["trail-id"])
+	stateSha := responseMap["state-sha"].(string)
+	revLocal := fmt.Sprintf("%d", int(responseMap["rev"].(float64)))
+	if revLocal == "-1" {
+		revLocal = responseMap["revlocal"].(string)
+	}
+
+	fmt.Fprintf(os.Stderr, "Successfully posted Revision %s (%s) to device id %s\n", revLocal,
+		stateSha[:Min(8, len(stateSha))], responseMap["trail-id"])
 
 	p.Pvrconfig.DefaultPostUrl = uri
 	if p.Pvrconfig.DefaultGetUrl == "" {
@@ -1377,7 +1398,7 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	err = p.SaveConfig()
 
 	if err != nil {
-		fmt.Println("WARNING: couldnt save config " + err.Error())
+		fmt.Fprintln(os.Stderr, "WARNING: couldnt save config "+err.Error())
 	}
 
 	return nil
@@ -1389,10 +1410,93 @@ func (p *Pvr) UnpackRepo(repoPath string, outDir string) error {
 	return err
 }
 
+func (p *Pvr) GetStateJson(uri string) (
+	state map[string]interface{},
+	err error,
+) {
+	var u *url.URL
+	var data []byte
+
+	if uri == "" {
+		uri = p.Pvrconfig.DefaultGetUrl
+	}
+
+	u, err = url.Parse(uri)
+
+	if err != nil {
+		return
+	}
+
+	exists, err := IsFileExists(uri)
+
+	if err != nil {
+		return
+	}
+
+	if u.Scheme == "" && exists {
+		var fileInfo os.FileInfo
+		repoPath := uri
+
+		fileInfo, err = os.Stat(repoPath)
+		if err != nil {
+			return
+		}
+
+		// if we dont have a dir for local we might have a tarball export
+		if !fileInfo.IsDir() {
+			repoPath, err = ioutil.TempDir(os.TempDir(), "pvr-tmprepo-")
+			if err != nil {
+				return
+			}
+			defer os.RemoveAll(repoPath)
+
+			err = p.UnpackRepo(uri, repoPath)
+			if err != nil {
+				return
+			}
+		}
+
+		localJsonPath := filepath.Join(repoPath, "json")
+		data, err = ioutil.ReadFile(localJsonPath)
+		if err != nil {
+			return
+		}
+		err = json.Unmarshal(data, &state)
+		if err != nil {
+			return
+		}
+	} else {
+
+		if u.Scheme == "" {
+			u, err = url.Parse("https://pvr.pantahub.com/" + uri)
+		}
+
+		if err != nil {
+			return
+		}
+
+		var remote pvrapi.PvrRemote
+		remote, err = p.initializeRemote(u)
+		if err != nil {
+			return
+		}
+		data, err = p.getJSONBuf(remote)
+		if err != nil {
+			return
+		}
+		err = json.Unmarshal(data, &state)
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
 func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	objectsCount int,
 	err error) {
-	rs := map[string]interface{}{}
+	jsonMap := map[string]interface{}{}
 
 	objectsCount = 0
 
@@ -1403,7 +1507,23 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	}
 
 	repoPath := repoUri.Path
-	partname := repoUri.Fragment
+
+	// lets keep only those matching prefix
+	partPrefixes := []string{}
+	unpartPrefixes := []string{}
+	if repoUri.Fragment != "" {
+		parsePrefixes := strings.Split(repoUri.Fragment, ",")
+		for _, v := range parsePrefixes {
+			if !strings.HasSuffix(v, "/") {
+				v = v + "/"
+			}
+			if !strings.HasPrefix(v, "-") {
+				partPrefixes = append(partPrefixes, v)
+			} else {
+				unpartPrefixes = append(unpartPrefixes, v[1:])
+			}
+		}
+	}
 
 	f, err := os.Stat(repoPath)
 
@@ -1438,19 +1558,24 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		return objectsCount, err
 	}
 
-	err = json.Unmarshal(jsonData, &rs)
+	err = json.Unmarshal(jsonData, &jsonMap)
 	if err != nil {
 		return objectsCount, errors.New("JSON Unmarshal (json.new):" + err.Error())
 	}
 
-	partPrefix := partname
-	if partname != "" {
-		partPrefix = partname + "/"
-	}
-
-	for k := range rs {
-		if !strings.HasPrefix(k, partPrefix) {
-			delete(rs, k)
+	// delete keys that have no prefix
+	for k := range jsonMap {
+		found := true
+		for _, v := range partPrefixes {
+			if strings.HasPrefix(k, v) {
+				found = true
+				break
+			} else {
+				found = false
+			}
+		}
+		if !found {
+			delete(jsonMap, k)
 		}
 	}
 
@@ -1469,7 +1594,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		}
 	}
 
-	for k, v := range rs {
+	for k, v := range jsonMap {
 		if strings.HasSuffix(k, ".json") {
 			continue
 		}
@@ -1502,19 +1627,19 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 			}
 
 			if len(k) >= 15 {
-				fmt.Println(k[:15] + " [OK" + cache + "]")
+				fmt.Fprintln(os.Stderr, k[:15]+" [OK"+cache+"]")
 			} else {
-				fmt.Println(k + " [OK" + cache + "]")
+				fmt.Fprintln(os.Stderr, k+" [OK"+cache+"]")
 			}
 
 		} else {
-			fmt.Println("pulling objects file " + getPath + "-> " + objPathNew)
+			fmt.Fprintln(os.Stderr, "pulling objects file "+getPath+"-> "+objPathNew)
 		}
 
 		err = Copy(objPathNew, getPath)
 
 		if err != nil {
-			fmt.Println("ERROR : " + err.Error())
+			fmt.Fprintln(os.Stderr, "ERROR : "+err.Error())
 			return objectsCount, err
 		}
 		err = os.Rename(objPathNew, objPath)
@@ -1526,7 +1651,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 
 	var jsonMerged []byte
 	if merge {
-		jsonDataSelect, err := json.Marshal(rs)
+		jsonDataSelect, err := json.Marshal(jsonMap)
 
 		if err != nil {
 			return objectsCount, err
@@ -1535,19 +1660,34 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	} else {
 		// manually remove everything not matching the part from fragement ...
 		pJSONMap := p.PristineJsonMap
-		// remove all files for name "${part}/"
-		for k := range pJSONMap {
-			if strings.HasPrefix(k, partPrefix) {
-				delete(pJSONMap, k)
+
+		if len(partPrefixes) == 0 {
+			partPrefixes = append(partPrefixes, "")
+		}
+
+		for _, partPrefix := range partPrefixes {
+			// remove all files for name "app/"
+			for k := range pJSONMap {
+				if strings.HasPrefix(k, partPrefix) {
+					delete(pJSONMap, k)
+				}
+			}
+			// add back all from new map
+			for k, v := range jsonMap {
+				if strings.HasPrefix(k, partPrefix) {
+					pJSONMap[k] = v
+				}
+			}
+		}
+		for _, unpartPrefix := range unpartPrefixes {
+			// remove all files for name "app/"
+			for k := range pJSONMap {
+				if strings.HasPrefix(k, unpartPrefix) {
+					delete(pJSONMap, k)
+				}
 			}
 		}
 
-		// add back all from new map
-		for k, v := range rs {
-			if strings.HasPrefix(k, partPrefix) {
-				pJSONMap[k] = v
-			}
-		}
 		jsonMerged, err = json.MarshalIndent(pJSONMap, "", "    ")
 	}
 
@@ -1817,12 +1957,34 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 	}
 
 	// lets keep only those matching prefix
-	partPrefix := url.Fragment
-	if partPrefix != "" {
-		partPrefix = partPrefix + "/"
+	partPrefixes := []string{}
+	unpartPrefixes := []string{}
+	if url.Fragment != "" {
+		parsePrefixes := strings.Split(url.Fragment, ",")
+		for _, v := range parsePrefixes {
+			if !strings.HasSuffix(v, "/") {
+				v = v + "/"
+			}
+			if !strings.HasPrefix(v, "-") {
+				partPrefixes = append(partPrefixes, v)
+			} else {
+				unpartPrefixes = append(unpartPrefixes, v[1:])
+			}
+		}
 	}
+
+	// delete keys that have no prefix
 	for k := range jsonMap {
-		if !strings.HasPrefix(k, partPrefix) {
+		found := true
+		for _, v := range partPrefixes {
+			if strings.HasPrefix(k, v) {
+				found = true
+				break
+			} else {
+				found = false
+			}
+		}
+		if !found {
 			delete(jsonMap, k)
 		}
 	}
@@ -1840,21 +2002,48 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 			return objectsCount, err
 		}
 
+		pJSONMap := p.PristineJsonMap
+
+		for _, unpartPrefix := range unpartPrefixes {
+			// remove all files for name "app/"
+			for k := range pJSONMap {
+				if strings.HasPrefix(k, unpartPrefix) {
+					delete(pJSONMap, k)
+				}
+			}
+		}
+
 		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
 
 	} else {
-		// manually remove everything not matching the part from fragement ...
+		// manually remove everything not matching the part from fragment ...
 		pJSONMap := p.PristineJsonMap
-		// remove all files for name "app/"
-		for k := range pJSONMap {
-			if strings.HasPrefix(k, partPrefix) {
-				delete(pJSONMap, k)
+
+		if len(partPrefixes) == 0 {
+			partPrefixes = append(partPrefixes, "")
+		}
+
+		for _, partPrefix := range partPrefixes {
+			// remove all files for name "app/"
+			for k := range pJSONMap {
+				if strings.HasPrefix(k, partPrefix) {
+					delete(pJSONMap, k)
+				}
+			}
+			// add back all from new map
+			for k, v := range jsonMap {
+				if strings.HasPrefix(k, partPrefix) {
+					pJSONMap[k] = v
+				}
 			}
 		}
-		// add back all from new map
-		for k, v := range jsonMap {
-			if strings.HasPrefix(k, partPrefix) {
-				pJSONMap[k] = v
+
+		for _, unpartPrefix := range unpartPrefixes {
+			// remove all files for name "app/"
+			for k := range pJSONMap {
+				if strings.HasPrefix(k, unpartPrefix) {
+					delete(pJSONMap, k)
+				}
 			}
 		}
 
@@ -2048,16 +2237,24 @@ func addToTar(writer *tar.Writer, archivePath, sourcePath string) error {
 	return nil
 }
 
-func (p *Pvr) Export(dst string) error {
+func (p *Pvr) Export(parts []string, dst string) error {
 
-	file, err := os.Create(dst)
-	if err != nil {
-		return err
+	var file *os.File
+	var err error
+
+	if dst == "-" {
+		file = os.Stdout
+	} else {
+		file, err = os.Create(dst)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
 	}
-	defer file.Close()
 
 	var fileWriter io.WriteCloser
 
+	// stdout and
 	if strings.HasSuffix(strings.ToLower(dst), ".gz") ||
 		strings.HasSuffix(strings.ToLower(dst), ".tgz") {
 
@@ -2073,7 +2270,7 @@ func (p *Pvr) Export(dst string) error {
 	tw := tar.NewWriter(fileWriter)
 	defer tw.Close()
 
-	filesAndObjects, err := p.listFilesAndObjects()
+	filesAndObjects, err := p.listFilesAndObjects(parts)
 	if err != nil {
 		return err
 	}

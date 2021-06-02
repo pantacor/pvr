@@ -1,5 +1,5 @@
 //
-// Copyright 2017-2021  Pantacor Ltd.
+// Copyright 2021  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,21 +16,22 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
-	"strings"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
 )
 
-func CommandExport() cli.Command {
+func CommandInspect() cli.Command {
 	return cli.Command{
-		Name:        "export",
-		Aliases:     []string{"g"},
-		ArgsUsage:   "<export-file>",
-		Usage:       "export repo into single file (tarball)",
-		Description: "if export file ends with .gz or .tgz it will create a zipped tarball. Otherwise plain",
+		Name:        "inspect",
+		Aliases:     []string{"i"},
+		ArgsUsage:   "[<repository>[#<part>] [<target-repository>]] | [<USER_NICK>/<DEVICE_NICK>[#<part>]]",
+		Usage:       "inspect repository state",
+		Description: "default target-repository is the local .pvr one. If not <repository> is provided the last one is used. <part> can be one of 'bsp' or $appname.",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -48,30 +49,32 @@ func CommandExport() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
+			var repoUri string
+
 			if c.NArg() > 1 {
-				return errors.New("export can have at most 1 argument. See --help")
-			}
-			if c.NArg() < 1 {
-				return errors.New("export-file name is required. See --help")
-			}
-			var parts []string
-			if c.String("parts") != "" {
-				parts = strings.Split(c.String("parts"), ",")
+				return errors.New("Get can have at most 1 argument. See --help.")
+			} else if c.NArg() == 0 {
+				repoUri = pvr.Pvrdir
 			} else {
-				parts = []string{}
-			}
-			err = pvr.Export(parts, c.Args()[0])
-			if err != nil {
-				return cli.NewExitError(err, 3)
+				repoUri = c.Args()[0]
 			}
 
+			jsonMap, err := pvr.GetStateJson(repoUri)
+			if err != nil {
+				return cli.NewExitError(err, 1)
+			}
+
+			jsonData, err := json.MarshalIndent(jsonMap, "", "    ")
+
+			if err != nil {
+				return cli.NewExitError(err, 1)
+			}
+
+			jsonStr := string(jsonData)
+
+			fmt.Println(jsonStr)
+
 			return nil
-		},
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:  "parts, p",
-				Usage: "comma separate list of parts to export; if empty we export all",
-			},
 		},
 	}
 }
