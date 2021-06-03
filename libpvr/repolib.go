@@ -1695,6 +1695,13 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		return objectsCount, err
 	}
 
+	p.PristineJson = jsonMerged
+	err = json.Unmarshal(p.PristineJson, &p.PristineJsonMap)
+
+	if err != nil {
+		return objectsCount, err
+	}
+
 	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
 
 	if err != nil {
@@ -2049,6 +2056,13 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 
 		jsonMerged, err = json.MarshalIndent(pJSONMap, "", "    ")
 	}
+
+	if err != nil {
+		return objectsCount, err
+	}
+
+	p.PristineJson = jsonMerged
+	err = json.Unmarshal(p.PristineJson, &p.PristineJsonMap)
 
 	if err != nil {
 		return objectsCount, err
