@@ -2288,14 +2288,19 @@ func (p *Pvr) Export(parts []string, dst string) error {
 	filteredMap := map[string]interface{}{}
 
 	for k, v := range p.PristineJsonMap {
+		found := true
 		for _, p := range parts {
 			if !strings.HasSuffix(p, "/") {
 				p = p + "/"
 			}
 			if strings.HasPrefix(k, p) {
-				filteredMap[k] = v
+				found = true
 				break
 			}
+			found = false
+		}
+		if found {
+			filteredMap[k] = v
 		}
 	}
 	jsonFile, err := ioutil.TempFile(os.TempDir(), "filtered-json.json.XXXXXXXX")
