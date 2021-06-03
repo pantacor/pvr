@@ -95,10 +95,11 @@ func CommandDeploy() cli.Command {
 				}
 			}
 
+			merge := !c.Bool("nomerge")
 			if c.NArg() > 1 {
 				for _, repoPath = range c.Args()[1:] {
 					fmt.Println("   - deploying " + repoPath)
-					_, err = deployPvr.GetRepo(repoPath, false, true)
+					_, err = deployPvr.GetRepo(repoPath, merge, true)
 					if err != nil {
 						return cli.NewExitError(err, 6)
 					}
@@ -106,7 +107,7 @@ func CommandDeploy() cli.Command {
 			} else {
 				// wd repo gets deployed in this branch
 				fmt.Println("   - deploying " + repoPath)
-				_, err = deployPvr.GetRepo(repoPath, false, true)
+				_, err = deployPvr.GetRepo(repoPath, merge, true)
 				if err != nil {
 					return cli.NewExitError(err, 6)
 				}
@@ -130,6 +131,12 @@ func CommandDeploy() cli.Command {
 			fmt.Println("Deployment finished. Now now available at: " + deployDir)
 
 			return nil
+		},
+		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name:  "nomerge, n",
+				Usage: "Replace full target state (by default we try a merge)",
+			},
 		},
 	}
 }
