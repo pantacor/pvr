@@ -704,11 +704,11 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 }
 
 // list all objects reffed by current repo json
-func (p *Pvr) listFilesAndObjects(parts []string) (map[string]string, error) {
+func listFilesAndObjectsFromJson(json map[string]interface{}, parts []string) (map[string]string, error) {
 
 	filesAndObjects := map[string]string{}
 	// push all objects
-	for k, v := range p.PristineJsonMap {
+	for k, v := range json {
 		if strings.HasSuffix(k, ".json") {
 			continue
 		}
@@ -737,6 +737,12 @@ func (p *Pvr) listFilesAndObjects(parts []string) (map[string]string, error) {
 		filesAndObjects[k] = objId
 	}
 	return filesAndObjects, nil
+}
+
+// list all objects reffed by current repo json
+func (p *Pvr) listFilesAndObjects(parts []string) (map[string]string, error) {
+
+	return listFilesAndObjectsFromJson(p.PristineJsonMap, parts)
 }
 
 func readChallenge(targetPrompt string) string {
@@ -1006,6 +1012,30 @@ func (p *Pvr) putFiles(filePut ...FilePut) []FilePut {
 
 func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
+	var baselineState map[string]interface{}
+	buf, err := p.getJSONBuf(pvrRemote)
+
+	if err != nil {
+		return err
+	}
+
+	json.Unmarshal(buf, &baselineState)
+
+	if err != nil {
+		return err
+	}
+
+	baselineFilesAndObjects, err := listFilesAndObjectsFromJson(baselineState, []string{})
+
+	if err != nil {
+		return err
+	}
+
+	refObjects := map[string]interface{}{}
+	for _, v := range baselineFilesAndObjects {
+		refObjects[v] = true
+	}
+
 	filesAndObjects, err := p.listFilesAndObjects([]string{})
 	if err != nil {
 		return err
@@ -1017,6 +1047,12 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	// push all objects
 	for k, v := range filesAndObjects {
+
+		// we skip objects already in baseline state
+		if refObjects[v] != nil {
+			continue
+		}
+
 		info, err := os.Stat(filepath.Join(p.Objdir, v))
 		if err != nil {
 			return err
