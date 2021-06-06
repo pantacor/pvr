@@ -1909,6 +1909,26 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 
 		v := jsonMap[k].(string)
 
+		fullPathV := path.Join(p.Objdir, v)
+
+		fSha, err := FiletoSha(fullPathV)
+		if err != nil && !os.IsNotExist(err) {
+			log.Println("ERROR: error calculating sha for existing file " + fullPathV + ": " + err.Error())
+			return objectsCount, err
+		}
+
+		if err == nil && fSha != v {
+			err = os.Remove(fullPathV)
+			if err != nil {
+				log.Println("WARNING: error removing not sha-matching local object: " + fullPathV + " - " + err.Error())
+			}
+		}
+
+		if err == nil && fSha == v {
+			// skip objects for which we have a valid sha in pool
+			continue
+		}
+
 		// only add to downloads if we have not seen this sha already
 		if shaMap[v] != nil {
 			continue
@@ -1936,21 +1956,6 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 
 		if err != nil {
 			return objectsCount, err
-		}
-
-		fullPathV := path.Join(p.Objdir, v)
-
-		fSha, err := FiletoSha(fullPathV)
-		if err != nil && !os.IsNotExist(err) {
-			log.Println("ERROR: error calculating sha for existing file " + fullPathV + ": " + err.Error())
-			return objectsCount, err
-		}
-
-		if err == nil && fSha != v {
-			err = os.Remove(fullPathV)
-			if err != nil {
-				log.Println("WARNING: error removing not sha-matching local object: " + fullPathV + " - " + err.Error())
-			}
 		}
 
 		// we grab them to .new file ... and rename them when completed
