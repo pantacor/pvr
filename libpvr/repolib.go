@@ -1013,16 +1013,20 @@ func (p *Pvr) putFiles(filePut ...FilePut) []FilePut {
 func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	var baselineState map[string]interface{}
-	buf, err := p.getJSONBuf(pvrRemote)
 
-	if err != nil {
-		return err
-	}
+	// we have no getUrl in device create and pubobjects case
+	if pvrRemote.JsonGetUrl != "" {
+		buf, err := p.getJSONBuf(pvrRemote)
 
-	json.Unmarshal(buf, &baselineState)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
+		json.Unmarshal(buf, &baselineState)
+
+		if err != nil {
+			return err
+		}
 	}
 
 	baselineFilesAndObjects, err := listFilesAndObjectsFromJson(baselineState, []string{})
