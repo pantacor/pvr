@@ -16,6 +16,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -141,6 +142,8 @@ func CommandClone() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 9)
 			}
+
+			fmt.Println("Successfully cloned: " + base)
 
 			return nil
 		},
