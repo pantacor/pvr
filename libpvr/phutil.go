@@ -143,7 +143,7 @@ type PantahubDevice struct {
 }
 
 func (p *Session) DoPs(baseurl string) ([]PantahubDevice, error) {
-	res, err := p.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	res, err := p.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 		burl, err := url.Parse(baseurl)
 		if err != nil {
 			return nil, errors.New("Cannot parse baseurl '" + baseurl + "': " + err.Error())
@@ -174,7 +174,7 @@ func (p *Session) DoPs(baseurl string) ([]PantahubDevice, error) {
 
 func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*logs.Entry, cursorID string, err error) {
 
-	res, err := p.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	res, err := p.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 		burl, err := url.Parse(baseurl)
 		if err != nil {
 			return nil, errors.New("Cannot parse baseurl '" + baseurl + "': " + err.Error())
@@ -225,7 +225,7 @@ func (p *Session) DoLogs(
 	cursor bool,
 	logFilter LogFilter,
 ) (logEntries []*logs.Entry, cursorID string, err error) {
-	res, err := p.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	res, err := p.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 		burl, err := url.Parse(baseurl)
 		if err != nil {
 			return nil, errors.New("Cannot parse baseurl '" + baseurl + "': " + err.Error())

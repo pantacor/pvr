@@ -680,7 +680,7 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 	pvrRemoteUrl := repoUrl
 	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
 
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 		return req.Get(pvrRemoteUrl.String())
 	})
 
@@ -849,7 +849,7 @@ func (p *Pvr) DoClaim(deviceEp, challenge string) error {
 	uV.Set("challenge", challenge)
 	u.RawQuery = uV.Encode()
 
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 		return req.Put(u.String())
 	})
 
@@ -1074,7 +1074,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			uri += "/"
 		}
 
-		response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 			return req.SetBody(remoteObject).Post(uri)
 		})
 
@@ -1186,7 +1186,7 @@ func (p *Pvr) PutRemote(repoPath *url.URL, force bool) error {
 		return err
 	}
 
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 		return req.SetBody(body).Put(uri)
 	})
 
@@ -1336,7 +1336,7 @@ func (p *Pvr) postRemoteJson(remotePvr pvrapi.PvrRemote, pvrMap PvrMap, envelope
 		return nil, err
 	}
 
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 		return req.SetBody(data).SetContentLength(true).Post(remotePvr.PostUrl)
 	})
 
@@ -1756,7 +1756,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 
 func (p *Pvr) getJSONBuf(pvrRemote pvrapi.PvrRemote) ([]byte, error) {
 
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 		return req.Get(pvrRemote.JsonGetUrl)
 	})
 
@@ -1942,7 +1942,7 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 
 		uri := pvrRemote.ObjectsEndpointUrl + "/" + v
 
-		response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 			return req.Get(uri)
 		})
 
