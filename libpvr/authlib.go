@@ -246,13 +246,12 @@ func (session *Session) IsUserLoggedIn(baseURL string) (bool, error) {
 	}
 	return false, nil
 }
-func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh bool) (string, error) {
+func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh, withAnon bool) (string, error) {
 
 	authType, opts := getWwwAuthenticateInfo(authHeader)
 	if authType != "JWT" && authType != "Bearer" {
 		return "", errors.New("Invalid www-authenticate header retrieved")
 	}
-
 	realm := opts["realm"]
 	authEpString := opts["ph-aeps"]
 	_, requestFailed := opts["error"]
@@ -293,7 +292,7 @@ func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh bool) (s
 	// get fresh user/pass auth
 	for i := 0; i < 3; i++ {
 		var accessToken, refreshToken, username, password, scopes string
-		if !requestFailed {
+		if !requestFailed && withAnon {
 			username = "prn:pantahub.com:auth:/anon"
 			password = "prn:pantahub.com:auth:/anon"
 			scopes = "devices.readonly objects.readonly trails.readonly"
@@ -345,7 +344,7 @@ func (s *Session) Whoami() error {
 			continue
 		}
 		authEndPoint := splits[0]
-		response, err := s.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		response, err := s.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 			return req.Get(authEndPoint + "/auth_status")
 		})
 		if err != nil {

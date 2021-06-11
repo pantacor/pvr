@@ -680,7 +680,7 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 	pvrRemoteUrl := repoUrl
 	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
 
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 		return req.Get(pvrRemoteUrl.String())
 	})
 
@@ -704,11 +704,11 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 }
 
 // list all objects reffed by current repo json
-func (p *Pvr) listFilesAndObjects(parts []string) (map[string]string, error) {
+func listFilesAndObjectsFromJson(json map[string]interface{}, parts []string) (map[string]string, error) {
 
 	filesAndObjects := map[string]string{}
 	// push all objects
-	for k, v := range p.PristineJsonMap {
+	for k, v := range json {
 		if strings.HasSuffix(k, ".json") {
 			continue
 		}
@@ -737,6 +737,12 @@ func (p *Pvr) listFilesAndObjects(parts []string) (map[string]string, error) {
 		filesAndObjects[k] = objId
 	}
 	return filesAndObjects, nil
+}
+
+// list all objects reffed by current repo json
+func (p *Pvr) listFilesAndObjects(parts []string) (map[string]string, error) {
+
+	return listFilesAndObjectsFromJson(p.PristineJsonMap, parts)
 }
 
 func readChallenge(targetPrompt string) string {
@@ -843,7 +849,7 @@ func (p *Pvr) DoClaim(deviceEp, challenge string) error {
 	uV.Set("challenge", challenge)
 	u.RawQuery = uV.Encode()
 
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 		return req.Put(u.String())
 	})
 
@@ -1006,6 +1012,34 @@ func (p *Pvr) putFiles(filePut ...FilePut) []FilePut {
 
 func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
+	var baselineState map[string]interface{}
+
+	// we have no getUrl in device create and pubobjects case
+	if pvrRemote.JsonGetUrl != "" {
+		buf, err := p.getJSONBuf(pvrRemote)
+
+		if err != nil {
+			return err
+		}
+
+		json.Unmarshal(buf, &baselineState)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	baselineFilesAndObjects, err := listFilesAndObjectsFromJson(baselineState, []string{})
+
+	if err != nil {
+		return err
+	}
+
+	refObjects := map[string]interface{}{}
+	for _, v := range baselineFilesAndObjects {
+		refObjects[v] = true
+	}
+
 	filesAndObjects, err := p.listFilesAndObjects([]string{})
 	if err != nil {
 		return err
@@ -1017,6 +1051,12 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	// push all objects
 	for k, v := range filesAndObjects {
+
+		// we skip objects already in baseline state
+		if refObjects[v] != nil {
+			continue
+		}
+
 		info, err := os.Stat(filepath.Join(p.Objdir, v))
 		if err != nil {
 			return err
@@ -1034,7 +1074,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			uri += "/"
 		}
 
-		response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 			return req.SetBody(remoteObject).Post(uri)
 		})
 
@@ -1146,7 +1186,7 @@ func (p *Pvr) PutRemote(repoPath *url.URL, force bool) error {
 		return err
 	}
 
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 		return req.SetBody(body).Put(uri)
 	})
 
@@ -1296,7 +1336,7 @@ func (p *Pvr) postRemoteJson(remotePvr pvrapi.PvrRemote, pvrMap PvrMap, envelope
 		return nil, err
 	}
 
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 		return req.SetBody(data).SetContentLength(true).Post(remotePvr.PostUrl)
 	})
 
@@ -1695,6 +1735,13 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		return objectsCount, err
 	}
 
+	p.PristineJson = jsonMerged
+	err = json.Unmarshal(p.PristineJson, &p.PristineJsonMap)
+
+	if err != nil {
+		return objectsCount, err
+	}
+
 	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
 
 	if err != nil {
@@ -1709,7 +1756,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 
 func (p *Pvr) getJSONBuf(pvrRemote pvrapi.PvrRemote) ([]byte, error) {
 
-	response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 		return req.Get(pvrRemote.JsonGetUrl)
 	})
 
@@ -1866,6 +1913,26 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 
 		v := jsonMap[k].(string)
 
+		fullPathV := path.Join(p.Objdir, v)
+
+		fSha, err := FiletoSha(fullPathV)
+		if err != nil && !os.IsNotExist(err) {
+			log.Println("ERROR: error calculating sha for existing file " + fullPathV + ": " + err.Error())
+			return objectsCount, err
+		}
+
+		if err == nil && fSha != v {
+			err = os.Remove(fullPathV)
+			if err != nil {
+				log.Println("WARNING: error removing not sha-matching local object: " + fullPathV + " - " + err.Error())
+			}
+		}
+
+		if err == nil && fSha == v {
+			// skip objects for which we have a valid sha in pool
+			continue
+		}
+
 		// only add to downloads if we have not seen this sha already
 		if shaMap[v] != nil {
 			continue
@@ -1875,7 +1942,7 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 
 		uri := pvrRemote.ObjectsEndpointUrl + "/" + v
 
-		response, err := p.Session.DoAuthCall(func(req *resty.Request) (*resty.Response, error) {
+		response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 			return req.Get(uri)
 		})
 
@@ -1893,21 +1960,6 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 
 		if err != nil {
 			return objectsCount, err
-		}
-
-		fullPathV := path.Join(p.Objdir, v)
-
-		fSha, err := FiletoSha(fullPathV)
-		if err != nil && !os.IsNotExist(err) {
-			log.Println("ERROR: error calculating sha for existing file " + fullPathV + ": " + err.Error())
-			return objectsCount, err
-		}
-
-		if err == nil && fSha != v {
-			err = os.Remove(fullPathV)
-			if err != nil {
-				log.Println("WARNING: error removing not sha-matching local object: " + fullPathV + " - " + err.Error())
-			}
 		}
 
 		// we grab them to .new file ... and rename them when completed
@@ -2049,6 +2101,13 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 
 		jsonMerged, err = json.MarshalIndent(pJSONMap, "", "    ")
 	}
+
+	if err != nil {
+		return objectsCount, err
+	}
+
+	p.PristineJson = jsonMerged
+	err = json.Unmarshal(p.PristineJson, &p.PristineJsonMap)
 
 	if err != nil {
 		return objectsCount, err
