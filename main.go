@@ -70,6 +70,11 @@ func main() {
 			EnvVar: "PVR_DEBUG",
 		},
 		cli.BoolFlag{
+			Name:   "disable-self-upgrade",
+			Usage:  "disable self-upgrades",
+			EnvVar: "PVR_DISABLE_SELF_UPGRADE",
+		},
+		cli.BoolFlag{
 			Name:   "insecure, i",
 			Usage:  "skip tls verify",
 			EnvVar: "PVR_INSECURE",
@@ -111,6 +116,12 @@ func main() {
 			c.App.Metadata["PVR_CONFIG_DIR"] = c.GlobalString("config-dir")
 		} else {
 			c.App.Metadata["PVR_CONFIG_DIR"] = filepath.Join(usr.HomeDir, ".pvr")
+		}
+
+		if !c.GlobalBool("disable-self-upgrade") {
+			c.App.Metadata["PVR_SELF_UPGRADE"] = "yes"
+		} else {
+			c.App.Metadata["PVR_SELF_UPGRADE"] = nil
 		}
 
 		libpvr.UpdateIfNecessary(c)
