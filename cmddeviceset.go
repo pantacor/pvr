@@ -66,9 +66,13 @@ func CommandDeviceSet() cli.Command {
 			data := map[string]interface{}{}
 			for k, v := range c.Args() {
 				if k > 0 {
-					splits := strings.Split(v, "=")
+					splits := strings.SplitN(v, "=", 2)
 					if len(splits) == 2 {
 						data[splits[0]] = splits[1]
+					} else if len(splits) == 1 {
+						data[splits[0]] = nil
+					} else {
+						return cli.NewExitError(errors.New("<KEY1>=<VALUE1> [KEY2]=[VALUE2].. is required. See --help"), 2)
 					}
 				}
 			}
