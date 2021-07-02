@@ -78,6 +78,11 @@ func UpdateIfNecessary(c *cli.Context) error {
 		return err
 	}
 
+	fmt.Print("UP IF NEC")
+	if c.App.Metadata["PVR_SELF_UPGRADE"] == nil {
+		fmt.Print("UP IF NEC FASEFA")
+		return nil
+	}
 	if !pvr.Session.Configuration.AutoUpgrade {
 		return nil
 	}
