@@ -38,6 +38,7 @@ import (
 
 	jsonpatch "github.com/asac/json-patch"
 	"github.com/cavaliercoder/grab"
+	cjson "github.com/gibson042/canonicaljson-go"
 	"github.com/go-resty/resty"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	pvrapi "gitlab.com/pantacor/pvr/api"
@@ -264,7 +265,7 @@ func (p *Pvr) AddFile(globs []string) error {
 		return err
 	}
 
-	jsonData, err := json.MarshalIndent(p.NewFiles, "", "	")
+	jsonData, err := cjson.Marshal(p.NewFiles)
 	if err != nil {
 		return err
 	}
@@ -345,7 +346,7 @@ func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 		return []byte{}, []string{}, err
 	}
 
-	b, err := json.MarshalIndent(workingJson, "", "	")
+	b, err := cjson.Marshal(workingJson)
 
 	if err != nil {
 		return []byte{}, []string{}, err
@@ -476,7 +477,7 @@ func (p *Pvr) prepCommitCheckpoint() error {
 	checkpointInfo := map[string]interface{}{
 		"major": time.Now().Format(time.RFC3339),
 	}
-	buf, err := json.Marshal(checkpointInfo)
+	buf, err := cjson.Marshal(checkpointInfo)
 	if err != nil {
 		goto exit
 	}
@@ -1330,7 +1331,7 @@ func (p *Pvr) postRemoteJson(remotePvr pvrapi.PvrRemote, pvrMap PvrMap, envelope
 		envJSON["post"] = pvrMap
 	}
 
-	data, err := json.MarshalIndent(envJSON, "", "\t")
+	data, err := cjson.Marshal(envJSON)
 
 	if err != nil {
 		return nil, err
@@ -1691,7 +1692,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 
 	var jsonMerged []byte
 	if merge {
-		jsonDataSelect, err := json.Marshal(jsonMap)
+		jsonDataSelect, err := cjson.Marshal(jsonMap)
 
 		if err != nil {
 			return objectsCount, err
@@ -1728,7 +1729,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 			}
 		}
 
-		jsonMerged, err = json.MarshalIndent(pJSONMap, "", "    ")
+		jsonMerged, err = cjson.Marshal(pJSONMap)
 	}
 
 	if err != nil {
@@ -1737,6 +1738,12 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 
 	p.PristineJson = jsonMerged
 	err = json.Unmarshal(p.PristineJson, &p.PristineJsonMap)
+
+	if err != nil {
+		return objectsCount, err
+	}
+
+	jsonMerged, err = cjson.Marshal(p.PristineJsonMap)
 
 	if err != nil {
 		return objectsCount, err
@@ -2049,7 +2056,7 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 
 	var jsonMerged []byte
 	if merge {
-		jsonDataSelect, err := json.Marshal(jsonMap)
+		jsonDataSelect, err := cjson.Marshal(jsonMap)
 		if err != nil {
 			return objectsCount, err
 		}
@@ -2099,7 +2106,7 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 			}
 		}
 
-		jsonMerged, err = json.MarshalIndent(pJSONMap, "", "    ")
+		jsonMerged, err = cjson.Marshal(pJSONMap)
 	}
 
 	if err != nil {
@@ -2108,6 +2115,12 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 
 	p.PristineJson = jsonMerged
 	err = json.Unmarshal(p.PristineJson, &p.PristineJsonMap)
+
+	if err != nil {
+		return objectsCount, err
+	}
+
+	jsonMerged, err = cjson.Marshal(p.PristineJsonMap)
 
 	if err != nil {
 		return objectsCount, err
@@ -2230,7 +2243,7 @@ func (p *Pvr) resetInternal(hardlink bool) error {
 		}
 
 		if strings.HasSuffix(k, ".json") {
-			data, err := json.MarshalIndent(v, "", "	")
+			data, err := json.MarshalIndent(v, "", "    ")
 			if err != nil {
 				return err
 			}
@@ -2370,7 +2383,7 @@ func (p *Pvr) Export(parts []string, dst string) error {
 	defer jsonFile.Close()
 	defer os.Remove(jsonFile.Name())
 
-	buf, err := json.Marshal(filteredMap)
+	buf, err := cjson.Marshal(filteredMap)
 
 	if err != nil {
 		return err
