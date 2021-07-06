@@ -23,6 +23,7 @@ require (
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/fluent/fluent-logger-golang v1.5.0 // indirect
 	github.com/genuinetools/reg v0.16.1
+	github.com/gibson042/canonicaljson-go v1.0.3
 	github.com/go-resty/resty v1.12.0
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/lint v0.0.0-20190409202823-959b441ac422 // indirect
