@@ -288,9 +288,57 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 	if err != nil {
 		return err
 	}
-	repoDigest, err := p.GetDockerImageRepoDigest(image, auth)
-	if err != nil {
-		return err
+
+	dockerJsonI, ok := p.PristineJsonMap["_hostconfig/pvr/docker.json"]
+	var platforms []interface{}
+
+	if ok {
+		dockerJson := dockerJsonI.(map[string]interface{})
+		platformsI, ok := dockerJson["platforms"]
+		if ok {
+			platforms = platformsI.([]interface{})
+		}
+	}
+
+	var repoDigest string
+
+	// we go down the multiarch path if we have seen a platform
+	// restriction in pvr-docker.json
+	if platforms != nil {
+		manifestList, err := dockerRegistry.ManifestList(context.Background(),
+			image.Path, image.Reference())
+
+		if err != nil {
+			return err
+		}
+
+		for _, v := range manifestList.Manifests {
+			for _, v1 := range platforms {
+				v1S := v1.(string)
+				p := strings.SplitN(v1S, "/", 2)
+				if v.Platform.Architecture == p[1] {
+					repoDigest = v.Digest.String()
+					fmt.Println("found plat ... " + v1S + " with digest " + repoDigest)
+					break
+				}
+			}
+			if repoDigest != "" {
+				dm, err := dockerRegistry.ManifestV2(context.Background(), image.Path, repoDigest)
+				dockerManifest = &dm
+				if err != nil {
+					return err
+				}
+				break
+			}
+		}
+	}
+
+	// if we cannot find our arch we go the old direct way of retrieving repo
+	if repoDigest == "" {
+		repoDigest, err = p.GetDockerImageRepoDigest(image, auth)
+		if err != nil {
+			return err
+		}
 	}
 
 	splits := make([]string, 2)
@@ -309,6 +357,7 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 	if !strings.Contains(repoDigest, "@") {
 		repoDigest = imageName + "@" + repoDigest
 	}
+	fmt.Println("final digest " + repoDigest)
 
 	app.Username = auth.Username
 	app.Password = auth.Password
