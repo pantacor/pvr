@@ -81,6 +81,7 @@ func CommandAppUpdate() cli.Command {
 				Appname:      appname,
 				From:         trackURL,
 				Source:       c.String("source"),
+				Platform:     c.String("platform"),
 				Username:     c.String("username"),
 				Password:     c.String("password"),
 				TemplateArgs: map[string]interface{}{},
@@ -116,6 +117,11 @@ func CommandAppUpdate() cli.Command {
 			Usage:  SourceFlagUsage,
 			EnvVar: "PVR_SOURCE",
 			Value:  "",
+		},
+		cli.StringFlag{
+			Name:   "platform",
+			Usage:  "docker platform to resolve",
+			EnvVar: "PVR_PLATFORM",
 		},
 		cli.StringFlag{
 			Name:   "from",
