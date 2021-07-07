@@ -93,6 +93,7 @@ func CommandAppAdd() cli.Command {
 			}
 			app := libpvr.AppData{
 				Appname:       appname,
+				Platform:      c.String("platform"),
 				Username:      c.String("username"),
 				Password:      c.String("password"),
 				From:          c.String("from"),
@@ -137,6 +138,11 @@ func CommandAppAdd() cli.Command {
 			Name:   "from",
 			Usage:  "Container image to add",
 			EnvVar: "PVR_FROM",
+		},
+		cli.StringFlag{
+			Name:   "platform",
+			Usage:  "docker platform to resolve",
+			EnvVar: "PVR_PLATFORM",
 		},
 		cli.StringFlag{
 			Name:   "source",
