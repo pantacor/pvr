@@ -53,6 +53,12 @@ func main() {
 			Value:  "https://api.pantahub.com",
 		},
 		cli.StringFlag{
+			Name:   "http-proxy",
+			Usage:  "Use `PVR_HTTP_PROXY` for explicitly overloading http_proxy env. To disable proxy use 'no'",
+			EnvVar: "PVR_HTTP_PROXY",
+			Value:  "",
+		},
+		cli.StringFlag{
 			Name:   "repo-baseurl, r",
 			Usage:  "Use `PVR_REPO_BASEURL` for resolving PVR repositories like docker through user/name syntax.",
 			EnvVar: "PVR_REPO_BASEURL",
@@ -122,6 +128,17 @@ func main() {
 			c.App.Metadata["PVR_SELF_UPGRADE"] = "yes"
 		} else {
 			c.App.Metadata["PVR_SELF_UPGRADE"] = nil
+		}
+
+		// --http-proxy=no -> disable proxy even if http_proxy env is set
+		if c.GlobalString("http-proxy") != "" {
+			if c.GlobalString("http-proxy") != "no" {
+				resty.DefaultClient.SetProxy(c.GlobalString("http-proxy"))
+			}
+		} else if os.Getenv("HTTP_PROXY") != "" {
+			resty.DefaultClient.SetProxy(os.Getenv("HTTP_PROXY"))
+		} else if os.Getenv("http_proxy") != "" {
+			resty.DefaultClient.SetProxy(os.Getenv("http_proxy"))
 		}
 
 		libpvr.UpdateIfNecessary(c)
