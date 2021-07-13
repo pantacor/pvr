@@ -584,6 +584,13 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 	if err != nil {
 		return err
 	}
+
+	newJson, err = FormatJsonC(newJson)
+
+	if err != nil {
+		return err
+	}
+
 	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), newJson, 0644)
 
 	if err != nil {
