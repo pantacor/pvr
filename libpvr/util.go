@@ -39,6 +39,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/sprig"
+	cjson "github.com/gibson042/canonicaljson-go"
 	"github.com/go-resty/resty"
 )
 
@@ -208,6 +209,22 @@ func FormatJson(data []byte) ([]byte, error) {
 	}
 
 	return prettyJSON.Bytes(), nil
+}
+
+func FormatJsonC(data []byte) ([]byte, error) {
+	var value interface{}
+	err := json.Unmarshal(data, &value)
+
+	if err != nil {
+		return nil, err
+	}
+	buf, err := cjson.Marshal(value)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
 
 func FiletoSha(path string) (string, error) {

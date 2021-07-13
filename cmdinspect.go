@@ -70,11 +70,27 @@ func CommandInspect() cli.Command {
 				return cli.NewExitError(err, 1)
 			}
 
-			jsonStr := string(jsonData)
+			if c.Bool("canonical") {
+				jsonData, err = libpvr.FormatJsonC(jsonData)
+				if err != nil {
+					cli.NewExitError(err, 4)
+				}
+			} else {
+				jsonData, err = libpvr.FormatJson(jsonData)
+				if err != nil {
+					cli.NewExitError(err, 4)
+				}
+			}
 
-			fmt.Println(jsonStr)
+			fmt.Println(string(jsonData))
 
 			return nil
+		},
+		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name:  "canonical, c",
+				Usage: "Format Output in Canonical JSON",
+			},
 		},
 	}
 }
