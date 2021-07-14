@@ -17,6 +17,8 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
+	"net/http"
 	"net/url"
 	"os"
 	"os/user"
@@ -54,9 +56,9 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:   "http-proxy",
-			Usage:  "Use `PVR_HTTP_PROXY` for explicitly overloading http_proxy env. To disable proxy use 'no'",
+			Usage:  "Use `PVR_HTTP_PROXY` to configure the proxy mode. Values 'no' (disable), '<URL>' (use proxy by url), 'system' (use system settings - default)",
 			EnvVar: "PVR_HTTP_PROXY",
-			Value:  "",
+			Value:  "system",
 		},
 		cli.StringFlag{
 			Name:   "repo-baseurl, r",
@@ -130,26 +132,26 @@ func main() {
 			c.App.Metadata["PVR_SELF_UPGRADE"] = nil
 		}
 
+		transport := http.DefaultTransport.(*http.Transport)
+
 		// --http-proxy=no -> disable proxy even if http_proxy env is set
-		if c.GlobalString("http-proxy") != "" {
-			if c.GlobalString("http-proxy") != "no" {
-				resty.DefaultClient.SetProxy(c.GlobalString("http-proxy"))
+		if c.GlobalString("http-proxy") == "system" {
+			transport.Proxy = http.ProxyFromEnvironment
+		} else if c.GlobalString("http-proxy") == "no" {
+			transport.Proxy = nil
+		} else {
+			u, err := url.Parse(c.GlobalString("http-proxy"))
+			if err != nil {
+				return errors.New("ERROR: http-proxy not a valid url")
 			}
-		} else if os.Getenv("HTTP_PROXY") != "" {
-			resty.DefaultClient.SetProxy(os.Getenv("HTTP_PROXY"))
-		} else if os.Getenv("http_proxy") != "" {
-			resty.DefaultClient.SetProxy(os.Getenv("http_proxy"))
+			transport.Proxy = http.ProxyURL(u)
 		}
+
+		resty.SetTransport(transport)
 
 		libpvr.UpdateIfNecessary(c)
 
 		return nil
-	}
-
-	if os.Getenv("HTTP_PROXY") != "" {
-		resty.DefaultClient.SetProxy(os.Getenv("HTTP_PROXY"))
-	} else if os.Getenv("http_proxy") != "" {
-		resty.DefaultClient.SetProxy(os.Getenv("http_proxy"))
 	}
 
 	app.Commands = []cli.Command{
