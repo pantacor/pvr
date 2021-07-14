@@ -25,7 +25,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -940,20 +939,7 @@ func worker(jobs chan FilePut, done chan FilePut) {
 			continue
 		}
 
-		transport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   60 * time.Minute,
-				KeepAlive: 30 * time.Second,
-				DualStack: true,
-			}).DialContext,
-			ForceAttemptHTTP2:     false,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   30 * time.Second,
-			ExpectContinueTimeout: 15 * time.Second,
-		}
-		httpClient := &http.Client{Transport: transport}
+		httpClient := http.DefaultClient
 
 		res, err := httpClient.Do(req)
 		j.bar.ShowFinalTime = true
@@ -1788,6 +1774,7 @@ func (p *Pvr) grabObjects(showFilenames bool, requests ...*grab.Request) (
 	err error,
 ) {
 	client := grab.NewClient()
+	client.HTTPClient.Transport = http.DefaultTransport
 
 	client.UserAgent = "PVR client"
 	respch := client.DoBatch(4, requests...)

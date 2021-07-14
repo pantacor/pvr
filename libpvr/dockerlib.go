@@ -204,6 +204,7 @@ func DownloadLayersFromLocalDocker(digest string) (io.ReadCloser, error) {
 	cli, err := client.NewEnvClient()
 	cli.NegotiateAPIVersion(ctx)
 	httpClient := cli.HTTPClient()
+
 	url := "http://v" + cli.ClientVersion() + "/images/" + digest + "/get"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
