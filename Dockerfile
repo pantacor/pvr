@@ -11,6 +11,13 @@ RUN version=`git describe --tags` && sed -i "s/NA/$version/" version.go
 RUN sed -i "s/defaultDistributionTag = \"develop\"/defaultDistributionTag = \"${DOCKERTAG}\"/" ./libpvr/configurationlib.go
 RUN go get
 
+# build riscv64 linux static
+FROM src as linux_riscv64
+
+RUN apk update; apk add git
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -o /go/bin/linux_arm64/pvr -v .
+
+
 # build amd64 linux static
 FROM src as linux_amd64
 

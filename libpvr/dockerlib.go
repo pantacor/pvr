@@ -204,6 +204,7 @@ func DownloadLayersFromLocalDocker(digest string) (io.ReadCloser, error) {
 	cli, err := client.NewEnvClient()
 	cli.NegotiateAPIVersion(ctx)
 	httpClient := cli.HTTPClient()
+
 	url := "http://v" + cli.ClientVersion() + "/images/" + digest + "/get"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -224,6 +225,7 @@ type DockerImage struct {
 	DockerManifest *schema2.Manifest
 	DockerRegistry *registry.Registry
 	ImagePath      string
+	DockerPlatform string
 }
 
 // FindDockerImage : Find Docker Image
@@ -288,9 +290,66 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 	if err != nil {
 		return err
 	}
-	repoDigest, err := p.GetDockerImageRepoDigest(image, auth)
-	if err != nil {
-		return err
+
+	var repoDigest string
+	var dockerPlatform string
+	var platforms []interface{}
+
+	if app.Platform == "" {
+		dockerJsonI, ok := p.PristineJsonMap["_hostconfig/pvr/docker.json"]
+
+		if ok {
+			dockerJson := dockerJsonI.(map[string]interface{})
+			platformsI, ok := dockerJson["platforms"]
+			if ok {
+				platforms = platformsI.([]interface{})
+			}
+		}
+	} else {
+		platforms = append(platforms, app.Platform)
+	}
+
+	// we go down the multiarch path if we have seen a platform
+	// restriction in pvr-docker.json
+	if platforms != nil {
+		manifestList, err := dockerRegistry.ManifestList(context.Background(),
+			image.Path, image.Reference())
+
+		if err != nil {
+			return err
+		}
+
+		for _, v := range manifestList.Manifests {
+			for _, v1 := range platforms {
+				v1S := v1.(string)
+				p := strings.SplitN(v1S, "/", 2)
+				if v.Platform.Architecture == p[1] {
+					repoDigest = v.Digest.String()
+					dockerPlatform = v1S
+					break
+				}
+			}
+			if repoDigest != "" {
+				dm, err := dockerRegistry.ManifestV2(context.Background(), image.Path, repoDigest)
+				dockerManifest = &dm
+				if err != nil {
+					return err
+				}
+				break
+			} else {
+				dockerPlatform = ""
+			}
+		}
+	}
+
+	// if we cannot find our arch we go the old direct way of retrieving repo
+	if repoDigest == "" && app.RemoteImage.DockerPlatform != "" {
+		return errors.New("no docker image found for platform " + app.RemoteImage.DockerPlatform)
+	} else if repoDigest == "" {
+		repoDigest, err = p.GetDockerImageRepoDigest(image, auth)
+		if err != nil {
+			return err
+		}
 	}
 
 	splits := make([]string, 2)
@@ -318,6 +377,7 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 	app.RemoteImage.DockerConfig = dockerConfig
 	app.RemoteImage.DockerManifest = dockerManifest
 	app.RemoteImage.DockerRegistry = dockerRegistry
+	app.RemoteImage.DockerPlatform = dockerPlatform
 	app.RemoteImage.ImagePath = image.Path
 
 	return nil
@@ -419,6 +479,7 @@ type AppData struct {
 	RemoteImage     DockerImage
 	From            string
 	Source          string
+	Platform        string
 	ConfigFile      string
 	Volumes         []string
 	FormatOptions   string

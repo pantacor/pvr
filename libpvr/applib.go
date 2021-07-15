@@ -43,19 +43,20 @@ var (
 )
 
 type Source struct {
-	Name          string                   `json:"name,omitempty"`
-	Spec          string                   `json:"#spec"`
-	Template      string                   `json:"template"`
-	TemplateArgs  map[string]interface{}   `json:"args"`
-	Logs          []map[string]interface{} `json:"logs,omitempty"`
-	Exports       []string                 `json:"exports,omitempty"`
-	Config        map[string]interface{}   `json:"config"`
-	DockerName    string                   `json:"docker_name"`
-	DockerTag     string                   `json:"docker_tag"`
-	DockerDigest  string                   `json:"docker_digest"`
-	DockerSource  string                   `json:"docker_source"`
-	FormatOptions string                   `json:"format_options,omitempty"`
-	Persistence   map[string]string        `json:"persistence"`
+	Name           string                   `json:"name,omitempty"`
+	Spec           string                   `json:"#spec"`
+	Template       string                   `json:"template"`
+	TemplateArgs   map[string]interface{}   `json:"args"`
+	Logs           []map[string]interface{} `json:"logs,omitempty"`
+	Exports        []string                 `json:"exports,omitempty"`
+	Config         map[string]interface{}   `json:"config"`
+	DockerName     string                   `json:"docker_name"`
+	DockerTag      string                   `json:"docker_tag"`
+	DockerDigest   string                   `json:"docker_digest"`
+	DockerSource   string                   `json:"docker_source"`
+	DockerPlatform string                   `json:"docker_platform,omitempty"`
+	FormatOptions  string                   `json:"format_options,omitempty"`
+	Persistence    map[string]string        `json:"persistence"`
 }
 
 func (p *Pvr) isRunningAsRoot() bool {
@@ -254,6 +255,9 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 	if app.Source == "" {
 		app.Source = appManifest.DockerSource
 	}
+	if app.Platform == "" {
+		app.Platform = appManifest.DockerPlatform
+	}
 
 	if app.From != "" {
 		updateDockerFromFrom(appManifest, app.From)
@@ -270,14 +274,17 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 	}
 
 	dockerDigest := ""
+	dockerPlatform := ""
 	//	Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
 		dockerDigest = app.LocalImage.DockerDigest
 	} else if app.RemoteImage.Exists {
 		dockerDigest = app.RemoteImage.DockerDigest
+		dockerPlatform = app.RemoteImage.DockerPlatform
 	}
 
+	appManifest.DockerPlatform = dockerPlatform
 	appManifest.DockerDigest = dockerDigest
 	appManifest.DockerSource = app.Source
 
@@ -358,6 +365,7 @@ func (p *Pvr) AddApplication(app AppData) error {
 	} else if app.RemoteImage.Exists {
 		// Remote repo.
 		src.DockerDigest = app.RemoteImage.DockerDigest
+		src.DockerPlatform = app.RemoteImage.DockerPlatform
 		dockerConfig = app.RemoteImage.DockerConfig
 	}
 

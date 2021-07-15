@@ -78,6 +78,10 @@ func UpdateIfNecessary(c *cli.Context) error {
 		return err
 	}
 
+	if c.App.Metadata["PVR_SELF_UPGRADE"] == nil {
+		return nil
+	}
+
 	if !pvr.Session.Configuration.AutoUpgrade {
 		return nil
 	}

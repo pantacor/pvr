@@ -17,6 +17,8 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
+	"net/http"
 	"net/url"
 	"os"
 	"os/user"
@@ -53,6 +55,12 @@ func main() {
 			Value:  "https://api.pantahub.com",
 		},
 		cli.StringFlag{
+			Name:   "http-proxy",
+			Usage:  "Use `PVR_HTTP_PROXY` to configure the proxy mode. Values 'no' (disable), '<URL>' (use proxy by url), 'system' (use system settings - default)",
+			EnvVar: "PVR_HTTP_PROXY",
+			Value:  "system",
+		},
+		cli.StringFlag{
 			Name:   "repo-baseurl, r",
 			Usage:  "Use `PVR_REPO_BASEURL` for resolving PVR repositories like docker through user/name syntax.",
 			EnvVar: "PVR_REPO_BASEURL",
@@ -68,6 +76,11 @@ func main() {
 			Name:   "debug, d",
 			Usage:  "enable debugging output for rest calls",
 			EnvVar: "PVR_DEBUG",
+		},
+		cli.BoolFlag{
+			Name:   "disable-self-upgrade",
+			Usage:  "disable self-upgrades",
+			EnvVar: "PVR_DISABLE_SELF_UPGRADE",
 		},
 		cli.BoolFlag{
 			Name:   "insecure, i",
@@ -113,15 +126,32 @@ func main() {
 			c.App.Metadata["PVR_CONFIG_DIR"] = filepath.Join(usr.HomeDir, ".pvr")
 		}
 
+		if !c.GlobalBool("disable-self-upgrade") {
+			c.App.Metadata["PVR_SELF_UPGRADE"] = "yes"
+		} else {
+			c.App.Metadata["PVR_SELF_UPGRADE"] = nil
+		}
+
+		transport := http.DefaultTransport.(*http.Transport)
+
+		// --http-proxy=no -> disable proxy even if http_proxy env is set
+		if c.GlobalString("http-proxy") == "system" {
+			transport.Proxy = http.ProxyFromEnvironment
+		} else if c.GlobalString("http-proxy") == "no" {
+			transport.Proxy = nil
+		} else {
+			u, err := url.Parse(c.GlobalString("http-proxy"))
+			if err != nil {
+				return errors.New("ERROR: http-proxy not a valid url")
+			}
+			transport.Proxy = http.ProxyURL(u)
+		}
+
+		resty.SetTransport(transport)
+
 		libpvr.UpdateIfNecessary(c)
 
 		return nil
-	}
-
-	if os.Getenv("HTTP_PROXY") != "" {
-		resty.DefaultClient.SetProxy(os.Getenv("HTTP_PROXY"))
-	} else if os.Getenv("http_proxy") != "" {
-		resty.DefaultClient.SetProxy(os.Getenv("http_proxy"))
 	}
 
 	app.Commands = []cli.Command{

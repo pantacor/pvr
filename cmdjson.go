@@ -52,14 +52,29 @@ func CommandJson() cli.Command {
 				return cli.NewExitError(err, 3)
 			}
 
-			resultF, err := libpvr.FormatJson(result)
-			if err != nil {
-				cli.NewExitError(err, 4)
+			var resultF []byte
+
+			if c.Bool("canonical") {
+				resultF, err = libpvr.FormatJsonC(result)
+				if err != nil {
+					cli.NewExitError(err, 4)
+				}
+			} else {
+				resultF, err = libpvr.FormatJson(result)
+				if err != nil {
+					cli.NewExitError(err, 4)
+				}
 			}
 
 			fmt.Println(string(resultF))
 
 			return nil
+		},
+		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name:  "canonical, c",
+				Usage: "Format Output in Canonical JSON",
+			},
 		},
 	}
 }
