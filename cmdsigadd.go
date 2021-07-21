@@ -16,18 +16,20 @@
 package main
 
 import (
+	"errors"
 	"os"
+	"path"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
 )
 
-func CommandCommit() cli.Command {
+func CommandSigAdd() cli.Command {
 	return cli.Command{
-		Name:      "commit",
+		Name:      "add",
 		Aliases:   []string{"ci"},
 		ArgsUsage: "",
-		Usage:     "commit status changes",
+		Usage:     "embed a signature protecting the json document elements by matchrule",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -49,9 +51,37 @@ func CommandCommit() cli.Command {
 			if commitmsg == "" {
 				commitmsg = "** No commit message **"
 			}
-			isCheckpoint := c.Bool("checkpoint")
+			part := c.String("part")
 
-			err = pvr.Commit(commitmsg, isCheckpoint)
+			if part == "" {
+				return cli.NewExitError(errors.New("ERROR: no part provided; see --help"), 5)
+			}
+
+			includes := c.StringSlice("include")
+
+			if includes == nil {
+				return cli.NewExitError(errors.New("ERROR: includes must not be nil; see --help"), 5)
+			}
+
+			excludes := c.StringSlice("exclude")
+
+			if excludes == nil {
+				return cli.NewExitError(errors.New("ERROR: excludes must not be nil; see --help"), 5)
+			}
+
+			match := libpvr.PvsMatch{
+				Part:    part,
+				Include: includes,
+				Exclude: excludes,
+			}
+
+			ops := libpvr.PvsOptions{}
+
+			configDir := c.App.Metadata["PVR_CONFIG_DIR"].(string)
+			keyPath := path.Join(configDir, "secrets", "priv.pem")
+
+			err = pvr.JwsSign(keyPath, &match, &ops)
+
 			if err != nil {
 				return err
 			}
@@ -60,12 +90,18 @@ func CommandCommit() cli.Command {
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "message, m",
-				Usage: "provide a commit message",
+				Name:  "part, p",
+				Usage: "select elements of part",
 			},
-			cli.BoolFlag{
-				Name:  "checkpoint, c",
-				Usage: "commit an updated checkpoint token to ensure this revision will get properly tested and checkpointed as a fallback revision",
+			cli.StringSliceFlag{
+				Name:  "include, i",
+				Usage: "include files by glob pattern",
+				Value: &cli.StringSlice{"**"},
+			},
+			cli.StringSliceFlag{
+				Name:  "exclude, e",
+				Usage: "exclude files by glob patterns",
+				Value: &cli.StringSlice{"src.json"},
 			},
 		},
 	}

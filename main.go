@@ -162,6 +162,7 @@ func main() {
 		CommandDiff(),
 		CommandStatus(),
 		CommandCommit(),
+		CommandSig(),
 		CommandPut(),
 		CommandPost(),
 		CommandGet(),
