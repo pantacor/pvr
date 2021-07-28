@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -70,20 +69,11 @@ func CommandSigLs() cli.Command {
 				return cli.NewExitError(errors.New("ERROR: no part provided; see --help"), 5)
 			}
 
-			partPvs := path.Join(part, "pvs.json")
-
-			partPvsFs, err := os.Stat(partPvs)
-
-			if err != nil {
-				return cli.NewExitError(err, 13)
-			}
-
-			if partPvsFs.IsDir() {
-				return cli.NewExitError(errors.New("ERROR: pvs.json is a directory; see --help"), 13)
-			}
-
 			verifySummary, err := pvr.JwsVerify(pubkey, part)
 
+			if errors.Is(err, os.ErrNotExist) {
+				return cli.NewExitError("ERROR: pvs.json signature file does not exist; part "+part, 125)
+			}
 			if err != nil {
 				return cli.NewExitError(err, 13)
 			}

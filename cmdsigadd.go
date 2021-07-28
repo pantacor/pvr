@@ -83,7 +83,7 @@ func CommandSigAdd() cli.Command {
 			err = pvr.JwsSign(keyPath, &match, &ops)
 
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 126)
 			}
 
 			return nil
