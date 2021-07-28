@@ -1905,6 +1905,11 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 	shaMap := map[string]interface{}{}
 
 	for k := range jsonMap {
+		var req *grab.Request
+		var remoteObject ObjectWithAccess
+		var response *resty.Response
+		var uri string
+
 		if strings.HasSuffix(k, ".json") {
 			continue
 		}
@@ -1934,16 +1939,18 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 			continue
 		}
 
+		fmt.Fprintf(os.Stderr, "Getting object info for: "+k+" ... ")
+
 		// only add to downloads if we have not seen this sha already
 		if shaMap[v] != nil {
-			continue
+			goto cont
 		} else {
 			shaMap[v] = "seen"
 		}
 
-		uri := pvrRemote.ObjectsEndpointUrl + "/" + v
+		uri = pvrRemote.ObjectsEndpointUrl + "/" + v
 
-		response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
+		response, err = p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 			return req.Get(uri)
 		})
 
@@ -1956,7 +1963,6 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 				strconv.Itoa(response.StatusCode()) + "  " + response.Status())
 		}
 
-		remoteObject := ObjectWithAccess{}
 		err = json.Unmarshal(response.Body(), &remoteObject)
 
 		if err != nil {
@@ -1964,7 +1970,7 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 		}
 
 		// we grab them to .new file ... and rename them when completed
-		req, err := grab.NewRequest(fullPathV, remoteObject.SignedGetUrl)
+		req, err = grab.NewRequest(fullPathV, remoteObject.SignedGetUrl)
 		if err != nil {
 			return objectsCount, err
 		}
@@ -1973,6 +1979,9 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 		req.Label = remoteObject.ObjectName
 
 		grabs = append(grabs, req)
+
+	cont:
+		fmt.Fprintf(os.Stderr, "OK\n")
 	}
 
 	objectsCount, err = p.grabObjects(showFilenames, grabs...)
