@@ -28,7 +28,7 @@ import (
 
 	"github.com/bmatcuk/doublestar"
 	cjson "github.com/gibson042/canonicaljson-go"
-	gojose "gopkg.in/square/go-jose.v2"
+	gojose "github.com/go-jose/go-jose/v3"
 )
 
 type PvsMatch struct {

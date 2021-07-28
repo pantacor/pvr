@@ -26,6 +26,7 @@ require (
 	github.com/fluent/fluent-logger-golang v1.5.0 // indirect
 	github.com/genuinetools/reg v0.16.1
 	github.com/gibson042/canonicaljson-go v1.0.3
+	github.com/go-jose/go-jose/v3 v3.0.0-rc.1
 	github.com/go-resty/resty v1.12.0
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/lint v0.0.0-20190409202823-959b441ac422 // indirect
@@ -82,8 +83,6 @@ replace github.com/go-resty/resty => gopkg.in/resty.v1 v1.11.0
 
 replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190723064612-a9dc697fd2a5
 
-replace gopkg.in/square/go-jose.v2 => github.com/asac/go-jose v2.6.1-0.20210722212805-34060a372d8f+incompatible
-
 exclude github.com/Sirupsen/logrus v1.4.0
 
 exclude github.com/Sirupsen/logrus v1.3.0
@@ -95,3 +94,5 @@ exclude github.com/Sirupsen/logrus v1.1.1
 exclude github.com/Sirupsen/logrus v1.1.0
 
 replace github.com/golang/lint v0.0.0-20190409202823-959b441ac422 => github.com/golang/lint v0.0.0-20190301231843-5614ed5bae6f
+
+replace github.com/go-jose/go-jose/v3 => github.com/asac/go-jose/v3 v3.0.0-20210726220436-d8aa79561ce4
