@@ -1,5 +1,5 @@
 //
-// Copyright 2017-2021  Pantacor Ltd.
+// Copyright 2021  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package main
 import (
 	"errors"
 	"os"
-	"path"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -27,7 +26,7 @@ import (
 func CommandSigAdd() cli.Command {
 	return cli.Command{
 		Name:      "add",
-		Aliases:   []string{"ci"},
+		Aliases:   []string{"a"},
 		ArgsUsage: "",
 		Usage:     "embed a signature protecting the json document elements by matchrule",
 		Action: func(c *cli.Context) error {
@@ -77,8 +76,11 @@ func CommandSigAdd() cli.Command {
 
 			ops := libpvr.PvsOptions{}
 
-			configDir := c.App.Metadata["PVR_CONFIG_DIR"].(string)
-			keyPath := path.Join(configDir, "secrets", "priv.pem")
+			keyPath := c.Parent().String("key")
+
+			if keyPath == "" {
+				return cli.NewExitError("needs a --key argument; see --help.", 126)
+			}
 
 			err = pvr.JwsSign(keyPath, &match, &ops)
 
