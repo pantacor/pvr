@@ -141,6 +141,43 @@ func (p *Pvr) JwsSignAuto(keyPath string, part string, options *PvsOptions) erro
 	return errors.New("NOT IMPLEMENTED")
 }
 
+// JwsSignPvs will parse a pvs.json provided as argument and
+// use the included PvsMatch section to invoke JwsSign
+func (p *Pvr) JwsSignPvs(privKeyPath string,
+	pvsPath string,
+	options *PvsOptions) error {
+
+	buf := p.PristineJson
+	if buf == nil {
+		return errors.New("Empty state format")
+	}
+
+	fileBuf, err := ioutil.ReadFile(pvsPath)
+	if err != nil {
+		return err
+	}
+
+	sig, err := gojose.ParseSigned(string(fileBuf))
+	if err != nil {
+		return err
+	}
+
+	header := sig.Signatures[0].Protected
+	pvsHeader := header.ExtraHeaders[gojose.HeaderKey("pvs")]
+	jsonBuf, err := json.Marshal(pvsHeader)
+	if err != nil {
+		return err
+	}
+
+	var match *PvsMatch
+	err = json.Unmarshal(jsonBuf, &match)
+	if err != nil {
+		return err
+	}
+
+	return p.JwsSign(privKeyPath, match, options)
+}
+
 // JwsSign will add or update a signature based using a private
 // key provided.
 //

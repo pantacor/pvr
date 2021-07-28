@@ -27,6 +27,7 @@ func CommandSig() cli.Command {
 		Usage:     "manage sig usage",
 		Subcommands: []cli.Command{
 			CommandSigAdd(),
+			CommandSigUpdate(),
 			CommandSigLs(),
 		},
 		Flags: []cli.Flag{
