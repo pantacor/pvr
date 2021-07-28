@@ -283,6 +283,18 @@ type JwsVerifySummary struct {
 // in the Signature.
 func (p *Pvr) JwsVerify(keyPath string, part string) (*JwsVerifySummary, error) {
 
+	pvs := path.Join(part, "pvs.json")
+
+	_, err := ioutil.ReadFile(pvs)
+
+	if err != nil {
+		return nil, err
+	}
+	return p.JwsVerifyPvs(keyPath, pvs)
+}
+
+func (p *Pvr) JwsVerifyPvs(keyPath string, pvsPath string) (*JwsVerifySummary, error) {
+
 	var signKey *pem.Block
 	var summary JwsVerifySummary
 
@@ -333,11 +345,7 @@ func (p *Pvr) JwsVerify(keyPath string, part string) (*JwsVerifySummary, error) 
 		return nil, errors.New("ERROR: parsing private pem RSA key")
 	}
 
-	fileBuf, err = ioutil.ReadFile(path.Join(part, "pvs.json"))
-
-	if err != nil {
-		return nil, err
-	}
+	fileBuf, err = ioutil.ReadFile(pvsPath)
 
 	sig, err := gojose.ParseSigned(string(fileBuf))
 
