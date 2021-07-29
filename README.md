@@ -973,6 +973,37 @@ Follow this link to continue and after that come back and continue
 
 # PVR App Commands
 
+Since 022 pvr app commands are docker multi platform ready.
+
+By default pvr will look for a priority ordered list of platforms
+that the device supports running natively in `_hostconfig/docker/config.json`.
+
+The file structure is simple:
+
+```
+cat _hostconfig/pvr/docker.json
+{
+    "platforms": [
+        "linux/arm",
+        "linux/arm/v6"
+    ]
+}
+```
+
+If no matching architecture is found, pvr continues and falls back to the
+default that the docker_tag references.
+
+To overwrite the defaults provide in the `_hostconfig/pvr/docker.json` file
+in the pvr repo, one can pass the --plaform=linux/XXX option to pvr app add:
+
+```
+pvr app add --platform=linux/arm/v5 --from=nginx:latest nginx
+```
+
+Similar to add, developers can conveniently change platform selection
+through the same `--platform` argument when using the `pvr app update`
+operation.
+
 ## pvr app add <APP_NAME> --from=<DOCKER_IMAGE> --source=[remote|local],[remote|local]
 
 pvr app add creates a new application and generates files by pulling layers from a given docker image in either remote or local docker repo's.
