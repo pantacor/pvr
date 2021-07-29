@@ -58,6 +58,11 @@ lxc.init.cwd = {{ .Docker.WorkingDir }}
 lxc.environment = {{ . }}
 	{{- end }}
 {{- end }}
+{{- if .Source.args.PV_LXC_EXTRA_ENV }}
+	{{- range .Source.args.PV_LXC_EXTRA_ENV }}
+lxc.environment = {{ . }}
+	{{- end }}
+{{- end }}
 lxc.namespace.keep = user
 {{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
 {{- if eq .Source.args.PV_LXC_NETWORK_TYPE "host" -}}

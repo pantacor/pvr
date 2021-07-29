@@ -97,10 +97,15 @@ func (s *Session) DoAuthCall(withAnon bool, fn WrappableRestyCallFunc) (*resty.R
 	var err error
 	var response *resty.Response
 	var authHeader string
+	var anonTried bool
+	var interactive bool
 
-	for i := 0; i < 3; i++ {
-		bearer = s.GetApp().Metadata["PVR_AUTH"].(string)
+	bearer = s.GetApp().Metadata["PVR_AUTH"].(string)
+	if bearer == "" {
+		interactive = true
+	}
 
+	for {
 		var newAuthHeader string
 		// legacy flat -a from CLI will give a default token
 		response, err = fn(resty.R().SetAuthToken(bearer))
@@ -109,36 +114,42 @@ func (s *Session) DoAuthCall(withAnon bool, fn WrappableRestyCallFunc) (*resty.R
 		if err == nil &&
 			response.StatusCode() != http.StatusUnauthorized &&
 			response.StatusCode() != http.StatusForbidden {
-			return response, nil
+			break
+		}
+		if !interactive {
+			break
 		}
 		// if we see www-authenticate, we need to auth ...
 		newAuthHeader = response.Header().Get("www-authenticate")
+
 		// first try cached accesstoken or get a new one
 		if newAuthHeader != "" {
-
 			// if we already had one run with this auth header, evict from cache
 			if authHeader != "" {
 				s.auth.resetCachedAccessToken(authHeader)
 			}
 			authHeader = newAuthHeader
+
 			bearer, err = s.auth.getCachedAccessToken(authHeader)
 			if err != nil {
-				// server seems to not be compatible
-				return nil, err
+				break
 			}
 			if bearer == "" {
 				bearer, err = s.auth.getNewAccessToken(authHeader, true, withAnon)
+				anonTried = withAnon
 			}
 			if err != nil {
-				// getting new bearer token didnt go very well
-				return nil, err
+				break
 			}
-		} else if response.StatusCode() == http.StatusForbidden && authHeader != "" {
-			fmt.Fprintln(os.Stderr, "** ACCESS DENIED: user cannot access repository. **")
-			bearer, err = s.auth.getNewAccessToken(authHeader, false, withAnon)
+
+		} else if response.StatusCode() == http.StatusForbidden {
+			if anonTried {
+				fmt.Fprintln(os.Stderr, "** ACCESS DENIED: user cannot access repository. **")
+			}
+			bearer, err = s.auth.getNewAccessToken(authHeader, false, withAnon && !anonTried)
+			anonTried = withAnon
 			if err != nil {
-				// getting new bearer token didnt go very well
-				return nil, err
+				break
 			}
 		}
 
@@ -146,5 +157,5 @@ func (s *Session) DoAuthCall(withAnon bool, fn WrappableRestyCallFunc) (*resty.R
 		s.GetApp().Metadata["PVR_AUTH"] = bearer
 	}
 
-	return nil, errors.New("user cannot access repository")
+	return response, err
 }
