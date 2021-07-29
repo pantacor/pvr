@@ -92,8 +92,12 @@ func CommandClone() cli.Command {
 			if c.NArg() == 2 {
 				base = c.Args().Get(1)
 			}
+			if !path.IsAbs(base) {
+				base = path.Join(wd, base)
+			}
+			baseDir := path.Dir(base)
 
-			tempdir, err := ioutil.TempDir(wd, "pvr-clone-")
+			tempdir, err := ioutil.TempDir(baseDir, "pvr-clone-")
 			if err != nil {
 				return cli.NewExitError(err, 4)
 			}
