@@ -77,7 +77,6 @@ func CommandSigAdd() cli.Command {
 			ops := libpvr.PvsOptions{}
 
 			keyPath := c.Parent().String("key")
-
 			if keyPath == "" {
 				return cli.NewExitError("needs a --key argument; see --help.", 126)
 			}
@@ -103,7 +102,7 @@ func CommandSigAdd() cli.Command {
 			cli.StringSliceFlag{
 				Name:  "exclude, e",
 				Usage: "exclude files by glob patterns",
-				Value: &cli.StringSlice{"src.json"},
+				Value: &cli.StringSlice{"src.json", "pvs.json"},
 			},
 		},
 	}
