@@ -248,6 +248,7 @@ func (p *Pvr) JwsSign(privKeyPath string,
 	if match.Exclude == nil {
 		match.Exclude = []string{
 			"src.json",
+			"pvs.json",
 		}
 	}
 
