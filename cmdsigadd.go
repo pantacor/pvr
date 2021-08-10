@@ -28,7 +28,7 @@ func CommandSigAdd() cli.Command {
 		Name:      "add",
 		Aliases:   []string{"a"},
 		ArgsUsage: "",
-		Usage:     "embed a signature protecting the json document elements by matchrule",
+		Usage:     "embed a signature protecting the json document elements of the provided part using matchrule. By default we include all elements startings with _config/parts unless --noconfig is provided",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -69,9 +69,10 @@ func CommandSigAdd() cli.Command {
 			}
 
 			match := libpvr.PvsMatch{
-				Part:    part,
-				Include: includes,
-				Exclude: excludes,
+				Part:        part,
+				Include:     includes,
+				Exclude:     excludes,
+				MatchConfig: !c.Bool("noconfig"),
 			}
 
 			ops := libpvr.PvsOptions{}
@@ -103,6 +104,10 @@ func CommandSigAdd() cli.Command {
 				Name:  "exclude, e",
 				Usage: "exclude files by glob patterns",
 				Value: &cli.StringSlice{"src.json", "pvs.json"},
+			},
+			cli.BoolFlag{
+				Name:  "noconfig, n",
+				Usage: "exclude _config parts from signature",
 			},
 		},
 	}

@@ -32,9 +32,10 @@ import (
 )
 
 type PvsMatch struct {
-	Part    string   `json:"part"`
-	Include []string `json:"include"`
-	Exclude []string `json:"exclude"`
+	Part        string   `json:"part"`
+	Include     []string `json:"include"`
+	Exclude     []string `json:"exclude"`
+	MatchConfig bool     `json:"match_config"`
 }
 
 type PvsOptions struct {
@@ -91,6 +92,19 @@ func selectPayload(buf []byte, match *PvsMatch) (*PvsPartSelection, error) {
 			key = ""
 			break
 		}
+
+		if match.MatchConfig {
+			cp := path.Join("_config", match.Part, "**")
+			m, err := doublestar.Match(cp, k)
+			if err != nil {
+				return nil, err
+			}
+			if m {
+				key = k
+				found = v
+			}
+		}
+
 		if key != "" {
 			selection.Selected[key] = found
 		} else {
