@@ -2312,6 +2312,8 @@ func addToTar(writer *tar.Writer, archivePath, sourcePath string) error {
 	return nil
 }
 
+// Export will put the 'json' file first into the archive to allow for
+// stream parsing and validation of json before processing objects
 func (p *Pvr) Export(parts []string, dst string) error {
 
 	var file *os.File
@@ -2344,21 +2346,6 @@ func (p *Pvr) Export(parts []string, dst string) error {
 
 	tw := tar.NewWriter(fileWriter)
 	defer tw.Close()
-
-	filesAndObjects, err := p.listFilesAndObjects(parts)
-	if err != nil {
-		return err
-	}
-
-	for _, v := range filesAndObjects {
-		apath := "objects/" + v
-		ipath := filepath.Join(p.Objdir, v)
-		err := addToTar(tw, apath, ipath)
-
-		if err != nil {
-			return err
-		}
-	}
 
 	filteredMap := map[string]interface{}{}
 
@@ -2400,6 +2387,21 @@ func (p *Pvr) Export(parts []string, dst string) error {
 
 	if err := addToTar(tw, "json", jsonFile.Name()); err != nil {
 		return err
+	}
+
+	filesAndObjects, err := p.listFilesAndObjects(parts)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range filesAndObjects {
+		apath := "objects/" + v
+		ipath := filepath.Join(p.Objdir, v)
+		err := addToTar(tw, apath, ipath)
+
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
