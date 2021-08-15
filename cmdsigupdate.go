@@ -16,19 +16,21 @@
 package main
 
 import (
-	"errors"
+	"fmt"
 	"os"
+	"strings"
 
+	"github.com/bmatcuk/doublestar"
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandSigUpdate() cli.Command {
 	return cli.Command{
-		Name:      "update",
-		Aliases:   []string{"up"},
-		ArgsUsage: "",
-		Usage:     "update a pvs.json signature by using the encoded matchrule",
+		Name:    "update",
+		Aliases: []string{"up"},
+		ArgsUsage: "	",
+		Usage: "update a pvs.json signature by using the encoded matchrule",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -46,15 +48,13 @@ func CommandSigUpdate() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
-			commitmsg := c.String("message")
-			if commitmsg == "" {
-				commitmsg = "** No commit message **"
+			patterns := []string{}
+
+			for _, v := range c.Args() {
+				patterns = append(patterns, "_sigs/"+v+".json")
 			}
-
-			pvs := c.String("pvs")
-
-			if pvs == "" {
-				return cli.NewExitError(errors.New("ERROR: no pvs provided; see --help"), 5)
+			if len(patterns) == 0 {
+				patterns = append(patterns, "_sigs/*.json")
 			}
 
 			ops := libpvr.PvsOptions{}
@@ -64,19 +64,34 @@ func CommandSigUpdate() cli.Command {
 				return cli.NewExitError("needs a --key argument; see --help.", 126)
 			}
 
-			err = pvr.JwsSignPvs(keyPath, pvs, &ops)
+			for k, _ := range pvr.PristineJsonMap {
 
-			if err != nil {
-				return cli.NewExitError(err, 126)
+				if !strings.HasPrefix(k, "_sigs/") {
+					continue
+				}
+
+				for _, p := range patterns {
+					m, err := doublestar.Match(p, k)
+					if err != nil {
+						return cli.NewExitError(err, 123)
+					}
+					if m {
+						fmt.Print("Updating pvs signature @ " + k)
+						err = pvr.JwsSignPvs(keyPath, k, &ops)
+						if err != nil {
+							fmt.Print(" [ERROR]\n")
+							return cli.NewExitError(err, 126)
+						}
+						fmt.Print(" [DONE]\n")
+
+						break
+					}
+
+				}
+
 			}
 
 			return nil
-		},
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:  "pvs, p",
-				Usage: "path to pvs.json file to update",
-			},
 		},
 	}
 }

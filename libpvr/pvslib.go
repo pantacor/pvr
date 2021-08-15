@@ -32,10 +32,8 @@ import (
 )
 
 type PvsMatch struct {
-	Part        string   `json:"part"`
-	Include     []string `json:"include"`
-	Exclude     []string `json:"exclude"`
-	MatchConfig bool     `json:"match_config"`
+	Include []string `json:"include"`
+	Exclude []string `json:"exclude"`
 }
 
 type PvsOptions struct {
@@ -44,19 +42,18 @@ type PvsOptions struct {
 }
 
 type PvsPartSelection struct {
-	Part        string
 	Selected    map[string]interface{}
 	NotSelected map[string]interface{}
+	NotSeen     map[string]interface{}
 }
 
 func selectPayload(buf []byte, match *PvsMatch) (*PvsPartSelection, error) {
 	var bufMap map[string]interface{}
-	selection := PvsPartSelection{
-		Part: match.Part,
-	}
+	selection := PvsPartSelection{}
 
-	selection.NotSelected = map[string]interface{}{}
 	selection.Selected = map[string]interface{}{}
+	selection.NotSelected = map[string]interface{}{}
+	selection.NotSeen = map[string]interface{}{}
 
 	err := json.Unmarshal(buf, &bufMap)
 	if err != nil {
@@ -65,9 +62,10 @@ func selectPayload(buf []byte, match *PvsMatch) (*PvsPartSelection, error) {
 	for k, v := range bufMap {
 		var found interface{}
 		key := ""
+		var excludedMatch bool
+
 		for _, I := range match.Include {
-			p := path.Join(match.Part, I)
-			m, err := doublestar.Match(p, k)
+			m, err := doublestar.Match(I, k)
 			if err != nil {
 				return nil, err
 			}
@@ -79,9 +77,10 @@ func selectPayload(buf []byte, match *PvsMatch) (*PvsPartSelection, error) {
 			key = k
 			break
 		}
+
+		excludedMatch = false
 		for _, E := range match.Exclude {
-			p := path.Join(match.Part, E)
-			m, err := doublestar.Match(p, k)
+			m, err := doublestar.Match(E, k)
 			if err != nil {
 				return nil, err
 			}
@@ -90,25 +89,16 @@ func selectPayload(buf []byte, match *PvsMatch) (*PvsPartSelection, error) {
 			}
 			found = nil
 			key = ""
+			excludedMatch = true
 			break
-		}
-
-		if match.MatchConfig {
-			cp := path.Join("_config", match.Part, "**")
-			m, err := doublestar.Match(cp, k)
-			if err != nil {
-				return nil, err
-			}
-			if m {
-				key = k
-				found = v
-			}
 		}
 
 		if key != "" {
 			selection.Selected[key] = found
-		} else {
+		} else if excludedMatch {
 			selection.NotSelected[k] = v
+		} else {
+			selection.NotSeen[k] = v
 		}
 	}
 	return &selection, nil
@@ -155,7 +145,7 @@ func (p *Pvr) JwsSignAuto(keyPath string, part string, options *PvsOptions) erro
 	return errors.New("NOT IMPLEMENTED")
 }
 
-// JwsSignPvs will parse a pvs.json provided as argument and
+// JwsSignPvs will parse a pvs@s json provided as argument and
 // use the included PvsMatch section to invoke JwsSign
 func (p *Pvr) JwsSignPvs(privKeyPath string,
 	pvsPath string,
@@ -189,7 +179,12 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 		return err
 	}
 
-	return p.JwsSign(privKeyPath, match, options)
+	name := path.Base(pvsPath)
+	if strings.HasSuffix(name, ".json") {
+		name = name[0 : len(name)-5]
+	}
+
+	return p.JwsSign(name, privKeyPath, match, options)
 }
 
 // JwsSign will add or update a signature based using a private
@@ -200,7 +195,8 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 //
 // PvsOptions allow to pass additional JoseHeader options to include
 // in the Signature.
-func (p *Pvr) JwsSign(privKeyPath string,
+func (p *Pvr) JwsSign(name string,
+	privKeyPath string,
 	match *PvsMatch,
 	options *PvsOptions) error {
 
@@ -261,8 +257,8 @@ func (p *Pvr) JwsSign(privKeyPath string,
 
 	if match.Exclude == nil {
 		match.Exclude = []string{
-			"src.json",
-			"pvs.json",
+			path.Join("**", "src.json"),
+			path.Join("_sigs", name+".json"),
 		}
 	}
 
@@ -306,13 +302,13 @@ func (p *Pvr) JwsSign(privKeyPath string,
 		return err
 	}
 
-	sigMap["#spec"] = "pvs@1"
+	sigMap["#spec"] = "pvs@2"
 
 	newJson, err := cjson.Marshal(sigMap)
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(path.Join(match.Part, "pvs.json"), newJson, 0644)
+	err = ioutil.WriteFile(path.Join("_sigs", name+".json"), newJson, 0644)
 	if err != nil {
 		return err
 	}
@@ -321,8 +317,9 @@ func (p *Pvr) JwsSign(privKeyPath string,
 }
 
 type JwsVerifySummary struct {
-	Protected []string `json:"protected"`
-	Excluded  []string `json:"excluded"`
+	Protected []string `json:"protected,omitempty"`
+	Excluded  []string `json:"excluded,omitempty"`
+	NotSeen   []string `json:"notseen,omitempty"`
 }
 
 // JwsVerify will add or update a signature based using a private
@@ -335,7 +332,7 @@ type JwsVerifySummary struct {
 // in the Signature.
 func (p *Pvr) JwsVerify(keyPath string, part string) (*JwsVerifySummary, error) {
 
-	pvs := path.Join(part, "pvs.json")
+	pvs := path.Join("_sigs", part+".json")
 
 	_, err := ioutil.ReadFile(pvs)
 
@@ -399,6 +396,22 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, pvsPath string) (*JwsVerifySummary, e
 
 	fileBuf, err = ioutil.ReadFile(pvsPath)
 
+	var previewSig map[string]interface{}
+
+	err = json.Unmarshal(fileBuf, &previewSig)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := previewSig["#spec"]; !ok {
+		return nil, errors.New("ERROR: pvs signature does not have a #spec element")
+	}
+
+	if previewSig["#spec"].(string) != "pvs@2" {
+		return nil, errors.New("ERROR: pvs signature must be of #spec pvs@2")
+	}
+
 	sig, err := gojose.ParseSigned(string(fileBuf))
 
 	if err != nil {
@@ -439,6 +452,9 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, pvsPath string) (*JwsVerifySummary, e
 	}
 	for k, _ := range selection.NotSelected {
 		summary.Excluded = append(summary.Excluded, k)
+	}
+	for k, _ := range selection.NotSeen {
+		summary.NotSeen = append(summary.NotSeen, k)
 	}
 
 	return &summary, nil

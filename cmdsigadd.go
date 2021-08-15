@@ -18,6 +18,7 @@ package main
 import (
 	"errors"
 	"os"
+	"path"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -51,9 +52,19 @@ func CommandSigAdd() cli.Command {
 				commitmsg = "** No commit message **"
 			}
 			part := c.String("part")
+			raw := c.String("raw")
 
-			if part == "" {
-				return cli.NewExitError(errors.New("ERROR: no part provided; see --help"), 5)
+			if part == "" && raw == "" {
+				return cli.NewExitError(errors.New("ERROR: no part nor raw name provided; see --help"), 5)
+			}
+
+			if part != "" && raw != "" {
+				return cli.NewExitError(errors.New("ERROR: part and raw flag cannot be used at same time; see --help"), 5)
+			}
+
+			name := part
+			if name == "" {
+				name = raw
 			}
 
 			includes := c.StringSlice("include")
@@ -62,17 +73,34 @@ func CommandSigAdd() cli.Command {
 				return cli.NewExitError(errors.New("ERROR: includes must not be nil; see --help"), 5)
 			}
 
+			// in 'part' mode we append path; in 'raw' we dont ....
+			if name != raw {
+				for i, v := range includes {
+					includes[i] = path.Join(part, v)
+				}
+			}
+
 			excludes := c.StringSlice("exclude")
 
 			if excludes == nil {
 				return cli.NewExitError(errors.New("ERROR: excludes must not be nil; see --help"), 5)
 			}
 
+			// in 'part' mode we append path; in 'raw' we dont ....
+			if name != raw {
+				for i, v := range excludes {
+					excludes[i] = path.Join(part, v)
+				}
+			}
+
+			// in 'part' mode we support configs; in 'raw' we dont ....
+			if raw != name && !c.Bool("noconfig") {
+				includes = append(includes, path.Join("_config", part, "**"))
+			}
+
 			match := libpvr.PvsMatch{
-				Part:        part,
-				Include:     includes,
-				Exclude:     excludes,
-				MatchConfig: !c.Bool("noconfig"),
+				Include: includes,
+				Exclude: excludes,
 			}
 
 			ops := libpvr.PvsOptions{}
@@ -82,7 +110,7 @@ func CommandSigAdd() cli.Command {
 				return cli.NewExitError("needs a --key argument; see --help.", 126)
 			}
 
-			err = pvr.JwsSign(keyPath, &match, &ops)
+			err = pvr.JwsSign(name, keyPath, &match, &ops)
 
 			if err != nil {
 				return cli.NewExitError(err, 126)
@@ -94,6 +122,10 @@ func CommandSigAdd() cli.Command {
 			cli.StringFlag{
 				Name:  "part, p",
 				Usage: "select elements of part",
+			},
+			cli.StringFlag{
+				Name:  "raw, r",
+				Usage: "select elements using raw include/exclude; with this, noconfig does not apply",
 			},
 			cli.StringSliceFlag{
 				Name:  "include, i",
