@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"sort"
 	"strings"
 
@@ -124,19 +123,32 @@ func CommandSigLs() cli.Command {
 				return cli.NewExitError(("ERROR: signing key is not a file; see --help: " + err.Error()), 12)
 			}
 
-			args := c.Args()
-			if len(args) == 0 {
-				for k, _ := range pvr.PristineJsonMap {
-					if !strings.HasPrefix(k, "_sigs/") {
+			_args := c.Args()
+			var args []string
+			if len(_args) == 0 {
+				for k, v := range pvr.PristineJsonMap {
+					vmap, ok := v.(map[string]interface{})
+					if !ok {
 						continue
 					}
-					p := path.Base(k)
-					if !strings.HasSuffix(p, ".json") {
+					specV, ok := vmap["#spec"]
+					if !ok {
 						continue
 					}
-					p = strings.TrimSuffix(p, ".json")
-					if pvr.PristineJsonMap[path.Join("_sigs", p+".json")] != nil {
-						args = append(args, p)
+					specVString, ok := specV.(string)
+					if specVString != "pvs@2" {
+						continue
+					}
+
+					args = append(args, k)
+				}
+			} else {
+				for _, v := range _args {
+					// if we have a full path we use it as absolute pvs file
+					if strings.HasSuffix(v, ".json") {
+						args = append(args, v)
+					} else {
+						args = append(args, "_sigs/"+v+".json")
 					}
 				}
 			}
@@ -145,7 +157,7 @@ func CommandSigLs() cli.Command {
 			var verifySummary []libpvr.JwsVerifySummary
 
 			for _, v := range args {
-				w, err := pvr.JwsVerify(pubkey, v)
+				w, err := pvr.JwsVerifyPvs(pubkey, v)
 				if errors.Is(err, os.ErrNotExist) {
 					return cli.NewExitError("ERROR: signature file does not exist with name "+v, 125)
 				}
