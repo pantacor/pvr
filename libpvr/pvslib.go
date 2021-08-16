@@ -326,22 +326,7 @@ type JwsVerifySummary struct {
 // key provided.
 //
 // The payload will be assembled from the prinstine system state JSON
-// using the match rule provided in PvsMatch struct.
-//
-// PvsOptions allow to pass additional JoseHeader options to include
-// in the Signature.
-func (p *Pvr) JwsVerify(keyPath string, part string) (*JwsVerifySummary, error) {
-
-	pvs := path.Join("_sigs", part+".json")
-
-	_, err := ioutil.ReadFile(pvs)
-
-	if err != nil {
-		return nil, err
-	}
-	return p.JwsVerifyPvs(keyPath, pvs)
-}
-
+// using the match rule provided in PvsMatch struct included in the pvs.
 func (p *Pvr) JwsVerifyPvs(keyPath string, pvsPath string) (*JwsVerifySummary, error) {
 
 	var signKey *pem.Block
