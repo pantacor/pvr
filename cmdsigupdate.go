@@ -30,7 +30,7 @@ func CommandSigUpdate() cli.Command {
 		Name:    "update",
 		Aliases: []string{"up"},
 		ArgsUsage: "	",
-		Usage: "update a pvs.json signature by using the encoded matchrule",
+		Usage: "update a pvs@2 signature by using the encoded matchrule",
 		Action: func(c *cli.Context) error {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -51,8 +51,15 @@ func CommandSigUpdate() cli.Command {
 			patterns := []string{}
 
 			for _, v := range c.Args() {
-				patterns = append(patterns, "_sigs/"+v+".json")
+				// either a full pattern or a name in _sigs can be matched
+				if strings.HasSuffix(v, ".json") {
+					patterns = append(patterns, v)
+				} else {
+					patterns = append(patterns, "_sigs/"+v+".json")
+				}
 			}
+
+			// by default we match all in _sigs
 			if len(patterns) == 0 {
 				patterns = append(patterns, "_sigs/*.json")
 			}
@@ -64,12 +71,22 @@ func CommandSigUpdate() cli.Command {
 				return cli.NewExitError("needs a --key argument; see --help.", 126)
 			}
 
-			for k, _ := range pvr.PristineJsonMap {
-
-				if !strings.HasPrefix(k, "_sigs/") {
+			for k, v := range pvr.PristineJsonMap {
+				vmap, ok := v.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				specV, ok := vmap["#spec"]
+				if !ok {
+					continue
+				}
+				specVString, ok := specV.(string)
+				if specVString != "pvs@2" {
 					continue
 				}
 
+				// here we have a pvs@2 spec element at hands.
+				// now proceed if we have a match pattern.
 				for _, p := range patterns {
 					m, err := doublestar.Match(p, k)
 					if err != nil {
