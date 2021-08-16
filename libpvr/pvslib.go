@@ -308,7 +308,13 @@ func (p *Pvr) JwsSign(name string,
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(path.Join("_sigs", name+".json"), newJson, 0644)
+
+	err = os.MkdirAll(path.Join(p.Dir, "_sigs"), 0755)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(path.Join(p.Dir, "_sigs", name+".json"), newJson, 0644)
 	if err != nil {
 		return err
 	}
