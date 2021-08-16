@@ -135,7 +135,7 @@ func CommandSigAdd() cli.Command {
 			cli.StringSliceFlag{
 				Name:  "exclude, e",
 				Usage: "exclude files by glob patterns",
-				Value: &cli.StringSlice{"src.json", "pvs.json"},
+				Value: &cli.StringSlice{"src.json"},
 			},
 			cli.BoolFlag{
 				Name:  "noconfig, n",
