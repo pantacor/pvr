@@ -262,7 +262,7 @@ func (p *Pvr) JwsSign(name string,
 		}
 	}
 
-	signerOpts := &gojose.SignerOptions{}
+	signerOpts := &gojose.SignerOptions{EmbedJWK: true}
 	signerOpts = signerOpts.
 		WithHeader("pvs", match).
 		WithType("PVS")
