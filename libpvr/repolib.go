@@ -2361,6 +2361,9 @@ func (p *Pvr) Export(parts []string, dst string) error {
 			}
 			found = false
 		}
+		if k == "#spec" {
+			found = true
+		}
 		if found {
 			filteredMap[k] = v
 		}
