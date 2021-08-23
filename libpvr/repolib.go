@@ -618,7 +618,9 @@ func (p *Pvr) PutLocal(repoPath string) error {
 		return err
 	}
 
-	objectsPath := filepath.Join(repoPath, "objects")
+	tP, err := NewPvr(p.Session, repoPath)
+	objectsPath := tP.Pvrconfig.ObjectsDir
+
 	info, err := os.Stat(objectsPath)
 	if err == nil && !info.IsDir() {
 		return errors.New("PVR repo directory in inusable state (objects is not a directory)")
@@ -2246,7 +2248,19 @@ func (p *Pvr) resetInternal(hardlink bool) error {
 		}
 
 		if strings.HasSuffix(k, ".json") {
-			data, err := json.MarshalIndent(v, "", "    ")
+			var data []byte
+			var err error
+
+			// if ! hardlink then we checkout as developer copy
+			// lets make reading this a pleasure; if however
+			// we are in hardlink mode then it makes sense to
+			// assume that the user wants the checked out file
+			// to match exactly what is in the pvr json
+			if !hardlink {
+				data, err = json.MarshalIndent(v, "", "    ")
+			} else {
+				data, err = cjson.Marshal(v)
+			}
 			if err != nil {
 				return err
 			}
@@ -2312,6 +2326,8 @@ func addToTar(writer *tar.Writer, archivePath, sourcePath string) error {
 	return nil
 }
 
+// Export will put the 'json' file first into the archive to allow for
+// stream parsing and validation of json before processing objects
 func (p *Pvr) Export(parts []string, dst string) error {
 
 	var file *os.File
@@ -2345,21 +2361,6 @@ func (p *Pvr) Export(parts []string, dst string) error {
 	tw := tar.NewWriter(fileWriter)
 	defer tw.Close()
 
-	filesAndObjects, err := p.listFilesAndObjects(parts)
-	if err != nil {
-		return err
-	}
-
-	for _, v := range filesAndObjects {
-		apath := "objects/" + v
-		ipath := filepath.Join(p.Objdir, v)
-		err := addToTar(tw, apath, ipath)
-
-		if err != nil {
-			return err
-		}
-	}
-
 	filteredMap := map[string]interface{}{}
 
 	for k, v := range p.PristineJsonMap {
@@ -2373,6 +2374,9 @@ func (p *Pvr) Export(parts []string, dst string) error {
 				break
 			}
 			found = false
+		}
+		if k == "#spec" {
+			found = true
 		}
 		if found {
 			filteredMap[k] = v
@@ -2400,6 +2404,21 @@ func (p *Pvr) Export(parts []string, dst string) error {
 
 	if err := addToTar(tw, "json", jsonFile.Name()); err != nil {
 		return err
+	}
+
+	filesAndObjects, err := p.listFilesAndObjects(parts)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range filesAndObjects {
+		apath := "objects/" + v
+		ipath := filepath.Join(p.Objdir, v)
+		err := addToTar(tw, apath, ipath)
+
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -1113,3 +1113,16 @@ This command will create hardlinks of the objects to the objects pool so do not
 use this on a host where you intend the checkout to be edited.
 
 
+# PVR sig commands
+
+PVR sig commands offers support for maintaining pvs signatures inside your tree.
+
+For details see README.pvs.md
+
+Commands currently supported are:
+
+ * pvr sig add - adds a new signature to the _pvs/ hierarchy of the state
+ * pvr sig update - updates a committed signature from the _pvs/ hierarchy to be validate against committed state
+ * pvr sig ls - list files covered by signatures in _sigs/ hieararchy; by default sig ls will show signature info while considering _all_ signatures in the system state
+
+ 

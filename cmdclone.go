@@ -153,8 +153,9 @@ func CommandClone() cli.Command {
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "objects, o",
-				Usage: "Use `OBJECTS` directory for storing the file objects. Can be absolue or relative to working directory.",
+				Name:   "objects, o",
+				EnvVar: "PVR_OBJECTS_DIR",
+				Usage:  "Use `OBJECTS` directory for storing the file objects. Can be absolue or relative to working directory.",
 			},
 		},
 	}
