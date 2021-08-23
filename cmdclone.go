@@ -136,7 +136,7 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 7)
 			}
 
-			err = pvr.Reset()
+			err = pvr.Reset(c.Bool("canonical"))
 
 			if err != nil {
 				return cli.NewExitError(err, 8)
@@ -156,6 +156,11 @@ func CommandClone() cli.Command {
 				Name:   "objects, o",
 				EnvVar: "PVR_OBJECTS_DIR",
 				Usage:  "Use `OBJECTS` directory for storing the file objects. Can be absolue or relative to working directory.",
+			},
+			cli.BoolFlag{
+				Name:   "canonical, c",
+				Usage:  "clone working copy json files using canonical json format",
+				EnvVar: "PVR_CANONICAL_JSON",
 			},
 		},
 	}
