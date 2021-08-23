@@ -2248,7 +2248,19 @@ func (p *Pvr) resetInternal(hardlink bool) error {
 		}
 
 		if strings.HasSuffix(k, ".json") {
-			data, err := json.MarshalIndent(v, "", "    ")
+			var data []byte
+			var err error
+
+			// if ! hardlink then we checkout as developer copy
+			// lets make reading this a pleasure; if however
+			// we are in hardlink mode then it makes sense to
+			// assume that the user wants the checked out file
+			// to match exactly what is in the pvr json
+			if !hardlink {
+				data, err = json.MarshalIndent(v, "", "    ")
+			} else {
+				data, err = cjson.Marshal(v)
+			}
 			if err != nil {
 				return err
 			}
