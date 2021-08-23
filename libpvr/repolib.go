@@ -618,7 +618,9 @@ func (p *Pvr) PutLocal(repoPath string) error {
 		return err
 	}
 
-	objectsPath := filepath.Join(repoPath, "objects")
+	tP, err := NewPvr(p.Session, repoPath)
+	objectsPath := tP.Pvrconfig.ObjectsDir
+
 	info, err := os.Stat(objectsPath)
 	if err == nil && !info.IsDir() {
 		return errors.New("PVR repo directory in inusable state (objects is not a directory)")
