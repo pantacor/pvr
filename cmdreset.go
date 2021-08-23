@@ -49,7 +49,7 @@ func CommandReset() cli.Command {
 			if c.Bool("hardlink") {
 				err = pvr.ResetWithHardlink()
 			} else {
-				err = pvr.Reset()
+				err = pvr.Reset(c.Bool("canonical"))
 			}
 
 			if err != nil {
@@ -62,6 +62,11 @@ func CommandReset() cli.Command {
 			cli.BoolFlag{
 				Name:  "hardlink, hl",
 				Usage: "checkout working copy with harlinks to objects; change files to read only.",
+			},
+			cli.BoolFlag{
+				Name:   "canonical, c",
+				Usage:  "checkout working copy json files using canonical formatting; hardlink implies this option",
+				EnvVar: "PVR_CANONICAL_JSON",
 			},
 		},
 	}
