@@ -2205,15 +2205,15 @@ save:
 	return objectsCount, err
 }
 
-func (p *Pvr) Reset() error {
-	return p.resetInternal(false)
+func (p *Pvr) Reset(canonicalJson bool) error {
+	return p.resetInternal(false, canonicalJson)
 }
 
 func (p *Pvr) ResetWithHardlink() error {
-	return p.resetInternal(true)
+	return p.resetInternal(true, true)
 }
 
-func (p *Pvr) resetInternal(hardlink bool) error {
+func (p *Pvr) resetInternal(hardlink bool, canonicalJson bool) error {
 	data, err := ioutil.ReadFile(filepath.Join(p.Pvrdir, "json"))
 
 	if err != nil {
@@ -2256,7 +2256,7 @@ func (p *Pvr) resetInternal(hardlink bool) error {
 			// we are in hardlink mode then it makes sense to
 			// assume that the user wants the checked out file
 			// to match exactly what is in the pvr json
-			if !hardlink {
+			if !hardlink && !canonicalJson {
 				data, err = json.MarshalIndent(v, "", "    ")
 			} else {
 				data, err = cjson.Marshal(v)
