@@ -22,7 +22,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -67,20 +66,8 @@ func CommandClone() cli.Command {
 			if c.NArg() < 1 {
 				return cli.NewExitError("clone needs need repository argument. See --help", 2)
 			}
-			deviceString := c.Args().Get(0)
-			if !libpvr.IsValidUrl(deviceString) {
-				//Get owner nick & Device nick & make device repo URL
-				userNick := ""
-				deviceNick := ""
-				splits := strings.Split(deviceString, "/")
-				if len(splits) == 1 {
-					return cli.NewExitError("Device nick is missing.(syntax:pvr clone <USER_NICK>/<DEVICE_NICK>). See --help", 2)
-				} else if len(splits) == 2 {
-					userNick = splits[0]
-					deviceNick = splits[1]
-				}
-				deviceString = "https://pvr.pantahub.com/" + userNick + "/" + deviceNick
-			}
+
+			deviceString, err := libpvr.FixupRepoRef(c.Args().Get(0))
 
 			newURL, err := url.Parse(deviceString)
 			if err != nil {

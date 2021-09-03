@@ -19,10 +19,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -75,28 +73,9 @@ func CommandGet() cli.Command {
 			} else if c.NArg() == 0 {
 				repoUri = ""
 			} else {
-				repoUri = c.Args()[0]
-				uri, err := url.Parse(repoUri)
-				if err != nil {
-					return cli.NewExitError(err, 3)
-				}
-
-				pathExists, err := libpvr.IsFileExists(uri.Path)
+				repoUri, err = libpvr.FixupRepoRef(c.Args()[0])
 				if err != nil {
 					return cli.NewExitError(err, 1)
-				}
-				if !libpvr.IsValidUrl(repoUri) && !pathExists {
-					//Get owner nick & Device nick & make device repo URL
-					userNick := ""
-					deviceNick := ""
-					splits := strings.Split(repoUri, "/")
-					if len(splits) == 1 {
-						return cli.NewExitError("Device nick is missing. (syntax:pvr get <USER_NICK>/<DEVICE_NICK>[#<part>]). See --help", 2)
-					} else if len(splits) == 2 {
-						userNick = splits[0]
-						deviceNick = splits[1]
-					}
-					repoUri = "https://pvr.pantahub.com/" + userNick + "/" + deviceNick
 				}
 			}
 
