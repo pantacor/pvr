@@ -728,7 +728,14 @@ func listFilesAndObjectsFromJson(json map[string]interface{}, parts []string) (m
 
 		found := true
 		for _, e := range parts {
-			if strings.HasPrefix(k, e+"/") {
+			if k == e {
+				found = true
+				break
+			}
+			if !strings.HasSuffix(e, "/") {
+				e = e + "/"
+			}
+			if strings.HasPrefix(k, e) {
 				found = true
 				break
 			} else {
@@ -1550,9 +1557,6 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	if repoUri.Fragment != "" {
 		parsePrefixes := strings.Split(repoUri.Fragment, ",")
 		for _, v := range parsePrefixes {
-			if !strings.HasSuffix(v, "/") {
-				v = v + "/"
-			}
 			if !strings.HasPrefix(v, "-") {
 				partPrefixes = append(partPrefixes, v)
 			} else {
@@ -1603,6 +1607,13 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	for k := range jsonMap {
 		found := true
 		for _, v := range partPrefixes {
+			if k == v {
+				found = true
+				break
+			}
+			if !strings.HasSuffix(v, "/") {
+				v += "/"
+			}
 			if strings.HasPrefix(k, v) {
 				found = true
 				break
@@ -2026,9 +2037,6 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 	if url.Fragment != "" {
 		parsePrefixes := strings.Split(url.Fragment, ",")
 		for _, v := range parsePrefixes {
-			if !strings.HasSuffix(v, "/") {
-				v = v + "/"
-			}
 			if !strings.HasPrefix(v, "-") {
 				partPrefixes = append(partPrefixes, v)
 			} else {
@@ -2041,6 +2049,13 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 	for k := range jsonMap {
 		found := true
 		for _, v := range partPrefixes {
+			if k == v {
+				found = true
+				break
+			}
+			if !strings.HasSuffix(v, "/") {
+				v += "/"
+			}
 			if strings.HasPrefix(k, v) {
 				found = true
 				break
@@ -2366,7 +2381,13 @@ func (p *Pvr) Export(parts []string, dst string) error {
 	for k, v := range p.PristineJsonMap {
 		found := true
 		for _, p := range parts {
+			// full key match (explicit file part) is here
+			if k == p {
+				found = true
+				break
+			}
 			if !strings.HasSuffix(p, "/") {
+				// no full match lets ensure we only match full directories
 				p = p + "/"
 			}
 			if strings.HasPrefix(k, p) {
