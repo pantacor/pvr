@@ -16,6 +16,7 @@
 package libpvr
 
 import (
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
@@ -25,6 +26,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/bmatcuk/doublestar"
@@ -263,24 +265,43 @@ func (p *Pvr) JwsSign(name string,
 			break
 		}
 	}
-
 	if signKey == nil {
-		return errors.New("No valid PEM encoded RSA sign key found in " + privKeyPath)
+		return errors.New("No valid PEM encoded sign key found in " + privKeyPath)
 	}
 
+	var algo gojose.SignatureAlgorithm
 	var parsedKey interface{}
 	privPemBytes := signKey.Bytes
-	if parsedKey, err = x509.ParsePKCS1PrivateKey(privPemBytes); err != nil {
-		if parsedKey, err = x509.ParsePKCS8PrivateKey(privPemBytes); err != nil { // note this returns type `interface{}`
-			return err
-		}
+	if parsedKey, err = x509.ParsePKCS1PrivateKey(privPemBytes); err == nil {
+		goto found
+	}
+	if parsedKey, err = x509.ParsePKCS8PrivateKey(privPemBytes); err == nil { // note this returns type `interface{}`
+		goto found
 	}
 
-	//var privateKey *rsa.PrivateKey
+	return errors.New("Private key cannot be parsed." + err.Error())
+
+found:
 	var ok bool
-	privKey, ok := parsedKey.(*rsa.PrivateKey)
-	if !ok {
-		return errors.New("ERROR: parsing private pem RSA key")
+	var privKey interface{}
+	if privKey, ok = parsedKey.(*rsa.PrivateKey); ok {
+		ok = true
+		algo = gojose.RS256
+	} else if privKey, ok = parsedKey.(*ecdsa.PrivateKey); ok {
+		ok = true
+		ePK := privKey.(*ecdsa.PrivateKey)
+		switch ePK.Params().BitSize {
+		case 256:
+			algo = gojose.ES256
+		case 384:
+			algo = gojose.ES384
+		case 512:
+			algo = gojose.ES512
+		default:
+			return errors.New("Private key with unsupported bitsize for ESXXXX: " + string(ePK.Params().BitSize))
+		}
+	} else {
+		return errors.New("Not supported priv key of type " + reflect.TypeOf(parsedKey).Name())
 	}
 
 	if match.Include == nil {
@@ -321,7 +342,7 @@ func (p *Pvr) JwsSign(name string,
 	}
 
 	signer, err := gojose.NewSigner(gojose.SigningKey{
-		Algorithm: gojose.RS256,
+		Algorithm: algo,
 		Key:       privKey,
 	}, signerOpts)
 
@@ -429,7 +450,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 		}
 
 		if pubPems == nil {
-			return nil, errors.New("No valid PEM encoded RSA verify key found " + keyPath)
+			return nil, errors.New("No valid PEM encoded verify key found " + keyPath)
 		}
 
 		for _, pubPem := range pubPems {
@@ -442,7 +463,12 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 				}
 			}
 			var ok bool
-			pubKey, ok := parsedKey.(*rsa.PublicKey)
+			var pubKey interface{}
+			pubKey, ok = parsedKey.(*rsa.PublicKey)
+
+			if pubKey == nil {
+				pubKey, ok = parsedKey.(*ecdsa.PublicKey)
+			}
 			if !ok {
 				fmt.Fprintf(os.Stderr, "WARNING: casting pubey key\n")
 				continue
@@ -455,7 +481,6 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	} else if caCerts == "_system_" {
 		certPool, err = x509.SystemCertPool()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "ERR 1:"+err.Error())
 			return nil, err
 		}
 		fmt.Fprintln(os.Stderr, "Using system cert pool")
@@ -468,12 +493,12 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 		if err != nil {
 			return nil, err
 		}
+
 		ok := certPool.AppendCertsFromPEM(caCertsBuf)
 		if !ok {
 			fmt.Fprintln(os.Stderr, "WARNING: could not append cacerts to cert pool. Disabling cert pool.")
 			certPool = nil
 		}
-		fmt.Fprintln(os.Stderr, "Using custom cert pool")
 	}
 
 	fileBuf, err := ioutil.ReadFile(pvsPath)
@@ -548,16 +573,21 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 			})
 
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error setting up and validating certificates %w\n", err)
+			fmt.Fprintf(os.Stderr, "Error setting up and validating certificates %s\n", err.Error())
 		} else {
-			pubKey, ok := pemcerts[0][0].PublicKey.(*rsa.PublicKey)
+			var pubKey interface{}
+			var ok bool
+			pubKey, ok = pemcerts[0][0].PublicKey.(*rsa.PublicKey)
+			if !ok || pubKey == nil {
+				pubKey, ok = pemcerts[0][0].PublicKey.(*ecdsa.PublicKey)
+			}
 			if ok {
 				if IsDebugEnabled {
-					fmt.Fprintf(os.Stderr, "Validating payload: '%'\n", string(payloadBuf))
+					fmt.Fprintf(os.Stderr, "Validating payload: '%s'\n", string(payloadBuf))
 				}
 				err = sig.DetachedVerify(payloadBuf, pubKey)
 			} else {
-				err = errors.New("error retrieving RSA key")
+				err = errors.New("error retrieving public from certs key")
 			}
 		}
 
@@ -566,17 +596,22 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 		}
 	}
 
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR verifying: "+err.Error())
+	}
+
 	if !verified && err != nil && pubKeys != nil {
 		for _, pubKey := range pubKeys {
 			if err = sig.DetachedVerify(payloadBuf, pubKey); err == nil {
 				verified = true
+				fmt.Fprintf(os.Stderr, "ERROR verifying payload: "+err.Error())
 				break
 			}
 		}
 	}
 
 	if !verified {
-		return nil, errors.New("error validating signature from system cert pool and from provided but key file")
+		return nil, errors.New("error validating signature from system cert pool and from provided pubKey file.")
 	}
 
 	for k := range selection.Selected {
