@@ -98,13 +98,22 @@ func CommandDeploy() cli.Command {
 			merge := !c.Bool("nomerge")
 			if c.NArg() > 1 {
 				for _, repoPath = range c.Args()[1:] {
+					repoPath, err = libpvr.FixupRepoRef(repoPath)
+					if err != nil {
+						return cli.NewExitError(err, 7)
+					}
 					fmt.Println("   - deploying " + repoPath)
+
 					_, err = deployPvr.GetRepo(repoPath, merge, true)
 					if err != nil {
 						return cli.NewExitError(err, 6)
 					}
 				}
 			} else {
+				repoPath, err = libpvr.FixupRepoRef(repoPath)
+				if err != nil {
+					return cli.NewExitError(err, 7)
+				}
 				// wd repo gets deployed in this branch
 				fmt.Println("   - deploying " + repoPath)
 				_, err = deployPvr.GetRepo(repoPath, merge, true)
