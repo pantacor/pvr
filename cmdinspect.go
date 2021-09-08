@@ -59,6 +59,11 @@ func CommandInspect() cli.Command {
 				repoUri = c.Args()[0]
 			}
 
+			repoUri, err = libpvr.FixupRepoRef(repoUri)
+			if err != nil {
+				return cli.NewExitError(err, 7)
+			}
+
 			jsonMap, err := pvr.GetStateJson(repoUri)
 			if err != nil {
 				return cli.NewExitError(err, 1)
