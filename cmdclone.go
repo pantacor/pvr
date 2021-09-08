@@ -68,6 +68,9 @@ func CommandClone() cli.Command {
 			}
 
 			deviceString, err := libpvr.FixupRepoRef(c.Args().Get(0))
+			if err != nil {
+				return cli.NewExitError(err, 7)
+			}
 
 			newURL, err := url.Parse(deviceString)
 			if err != nil {
@@ -108,7 +111,9 @@ func CommandClone() cli.Command {
 				objectsDir = path.Join(c.GlobalString("config-dir"), "objects")
 			}
 
-			err = pvr.Init(objectsDir)
+			spec := c.String("spec")
+			initJson := fmt.Sprintf("{ \"#spec\": \"%s\" }", spec)
+			err = pvr.InitCustom(initJson, objectsDir)
 			if err != nil {
 				return cli.NewExitError(err, 6)
 			}
@@ -148,6 +153,11 @@ func CommandClone() cli.Command {
 				Name:   "canonical, c",
 				Usage:  "clone working copy json files using canonical json format",
 				EnvVar: "PVR_CANONICAL_JSON",
+			},
+			cli.StringFlag{
+				Name:  "spec, s",
+				Usage: "Use `SPEC` as state format (e.g. pantavisor-service-system@1 or pantavisor-multi-platform@1 (legacy)",
+				Value: "pantavisor-service-system@1",
 			},
 		},
 	}
