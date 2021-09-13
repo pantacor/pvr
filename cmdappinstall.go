@@ -79,7 +79,7 @@ func CommandAppInstall() cli.Command {
 
 			source := c.String("source")
 			if source == "" {
-				source = appManifest.DockerSource
+				source = appManifest.DockerSource.DockerSource
 			}
 
 			err = libpvr.ValidateSourceFlag(source)

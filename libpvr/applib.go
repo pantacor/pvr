@@ -42,21 +42,31 @@ var (
 	ErrNeedBeRoot          = errors.New("Please run this command as root or use fakeroot utility")
 )
 
+type DockerSource struct {
+	DockerName     string `json:"docker_name"`
+	DockerTag      string `json:"docker_tag"`
+	DockerDigest   string `json:"docker_digest"`
+	DockerSource   string `json:"docker_source"`
+	DockerPlatform string `json:"docker_platform,omitempty"`
+	FormatOptions  string `json:"format_options,omitempty"`
+}
+
+type PvrSource struct {
+	PvrUrl   string `json:"pvr_url,omitempty"`
+	PvrMerge bool   `json:"pvr_merge,omitempty"`
+}
+
 type Source struct {
-	Name           string                   `json:"name,omitempty"`
-	Spec           string                   `json:"#spec"`
-	Template       string                   `json:"template"`
-	TemplateArgs   map[string]interface{}   `json:"args"`
-	Logs           []map[string]interface{} `json:"logs,omitempty"`
-	Exports        []string                 `json:"exports,omitempty"`
-	Config         map[string]interface{}   `json:"config"`
-	DockerName     string                   `json:"docker_name"`
-	DockerTag      string                   `json:"docker_tag"`
-	DockerDigest   string                   `json:"docker_digest"`
-	DockerSource   string                   `json:"docker_source"`
-	DockerPlatform string                   `json:"docker_platform,omitempty"`
-	FormatOptions  string                   `json:"format_options,omitempty"`
-	Persistence    map[string]string        `json:"persistence"`
+	Name         string                   `json:"name,omitempty"`
+	Spec         string                   `json:"#spec"`
+	Template     string                   `json:"template"`
+	TemplateArgs map[string]interface{}   `json:"args"`
+	Logs         []map[string]interface{} `json:"logs,omitempty"`
+	Exports      []string                 `json:"exports,omitempty"`
+	Config       map[string]interface{}   `json:"config"`
+	DockerSource
+	PvrSource
+	Persistence map[string]string `json:"persistence"`
 }
 
 func (p *Pvr) isRunningAsRoot() bool {
@@ -100,7 +110,9 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 		Config:       map[string]interface{}{},
 		Logs:         []map[string]interface{}{},
 		Exports:      []string{},
-		DockerSource: "remote,local",
+		DockerSource: DockerSource{
+			DockerSource: "remote,local",
+		},
 	}
 
 	err = json.Unmarshal(js, &result)
@@ -253,7 +265,7 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 		return err
 	}
 	if app.Source == "" {
-		app.Source = appManifest.DockerSource
+		app.Source = appManifest.DockerSource.DockerSource
 	}
 	if app.Platform == "" {
 		app.Platform = appManifest.DockerPlatform
@@ -286,7 +298,7 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 
 	appManifest.DockerPlatform = dockerPlatform
 	appManifest.DockerDigest = dockerDigest
-	appManifest.DockerSource = app.Source
+	appManifest.DockerSource.DockerSource = app.Source
 
 	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
 	if err != nil {
@@ -344,13 +356,15 @@ func (p *Pvr) AddApplication(app AppData) error {
 	}
 
 	src := Source{
-		Spec:          SRC_SPEC,
-		Template:      TEMPLATE_BUILTIN_LXC_DOCKER,
-		TemplateArgs:  app.TemplateArgs,
-		Config:        map[string]interface{}{},
-		Persistence:   persistence,
-		DockerSource:  app.Source,
-		FormatOptions: app.FormatOptions,
+		Spec:         SRC_SPEC,
+		Template:     TEMPLATE_BUILTIN_LXC_DOCKER,
+		TemplateArgs: app.TemplateArgs,
+		Config:       map[string]interface{}{},
+		Persistence:  persistence,
+		DockerSource: DockerSource{
+			DockerSource:  app.Source,
+			FormatOptions: app.FormatOptions,
+		},
 	}
 
 	updateDockerFromFrom(&src, app.From)
