@@ -2532,12 +2532,16 @@ func (p *Pvr) DeployPvLinks() error {
 		return err
 	}
 
+	fitFileI := jsonMap["fit"]
 	kernelFileI := jsonMap["kernel"]
 	initrdFile := "pantavisor"
 	dtbFileI := jsonMap["fdt"]
 
 	var kernelFile string
-	if kernelFileI != nil {
+	var fitFile string
+	if fitFileI != nil {
+		fitFile = fitFileI.(string)
+	} else if kernelFileI != nil {
 		kernelFile = kernelFileI.(string)
 	} else {
 		kernelFile = "kernel.img"
@@ -2548,32 +2552,43 @@ func (p *Pvr) DeployPvLinks() error {
 		dtbFile = dtbFileI.(string)
 	}
 
-	kernelLink := path.Join(p.Dir, ".pv", "pv-kernel.img")
-	initrdLink := path.Join(p.Dir, ".pv", "pv-initrd.img")
-	dtbLink := ""
-	if dtbFile != "" {
-		dtbLink = path.Join(p.Dir, ".pv", "pv-fdt.dtb")
-	}
-	os.Mkdir(path.Join(p.Dir, ".pv"), 0755)
-	os.Remove(kernelLink)
-	os.Remove(initrdLink)
-	if dtbLink != "" {
-		os.Remove(dtbLink)
-	}
+	if fitFile != "" {
+		fitLink := path.Join(p.Dir, ".pv", "pantavisor.fit")
+		os.Mkdir(path.Join(p.Dir, ".pv"), 0755)
+		os.Remove(fitLink)
 
-	err = os.Link(path.Join(p.Dir, "bsp", kernelFile), kernelLink)
-	if err != nil {
-		return err
-	}
-	err = os.Link(path.Join(p.Dir, "bsp", initrdFile), initrdLink)
-	if err != nil {
-		return err
-	}
-
-	if dtbFile != "" {
-		err = os.Link(path.Join(p.Dir, "bsp", dtbFile), dtbLink)
+		err = os.Link(path.Join(p.Dir, "bsp", fitFile), fitLink)
 		if err != nil {
 			return err
+		}
+	} else {
+		kernelLink := path.Join(p.Dir, ".pv", "pv-kernel.img")
+		initrdLink := path.Join(p.Dir, ".pv", "pv-initrd.img")
+		dtbLink := ""
+		if dtbFile != "" {
+			dtbLink = path.Join(p.Dir, ".pv", "pv-fdt.dtb")
+		}
+		os.Mkdir(path.Join(p.Dir, ".pv"), 0755)
+		os.Remove(kernelLink)
+		os.Remove(initrdLink)
+		if dtbLink != "" {
+			os.Remove(dtbLink)
+		}
+
+		err = os.Link(path.Join(p.Dir, "bsp", kernelFile), kernelLink)
+		if err != nil {
+			return err
+		}
+		err = os.Link(path.Join(p.Dir, "bsp", initrdFile), initrdLink)
+		if err != nil {
+			return err
+		}
+
+		if dtbFile != "" {
+			err = os.Link(path.Join(p.Dir, "bsp", dtbFile), dtbLink)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
