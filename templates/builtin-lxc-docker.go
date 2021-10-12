@@ -105,6 +105,16 @@ lxc.mount.entry = tmpfs {{ .Source.args.PV_RUN_TMPFS_PATH | pvr_ifNull "run" }} 
 lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | replace "/" "-" }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
 {{- end -}}
 {{- end }}
+{{- if .Source.args.PV_LXC_CAPS_DROP }}
+{{- range $k,$v := .Source.args.PV_LXC_CAPS_DROP }}
+lxc.cap.drop = {{ $v | sprig_lower }}
+{{- end }}
+{{- end }}
+{{- if .Source.args.PV_LXC_CAPS_KEEP }}
+{{- range $k,$v := .Source.args.PV_LXC_CAPS_KEEP }}
+lxc.cap.keep = {{ $v | sprig_lower }}
+{{- end }}
+{{- end }}
 {{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
 {{- if eq .Source.args.PV_LXC_NETWORK_TYPE "veth" }}
 lxc.net.0.type = veth
