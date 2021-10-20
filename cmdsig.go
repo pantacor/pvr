@@ -37,9 +37,20 @@ func CommandSig() cli.Command {
 				Usage:  "private key in PEM format to use for signing",
 			},
 			cli.StringFlag{
+				Name:   "x5c, x",
+				EnvVar: "PVR_X5C_PATH",
+				Usage:  "path to cert chain to include in jws x5c header. Note: we will not validate that the actual signature can be validated with this one.",
+			},
+			cli.StringFlag{
 				Name:   "pubkey, p",
 				EnvVar: "PVR_SIG_PUBKEY",
-				Usage:  "pubkey in PEM format to use for signing",
+				Usage:  "use specific pubkey store to validate signatures.",
+			},
+			cli.StringFlag{
+				Name:   "cacerts, c",
+				EnvVar: "PVR_SIG_CACERTS",
+				Usage:  "initialize cert pool from file or directory provided in this argument. use __system__ to use system cert store",
+				Value:  "_system_",
 			},
 		},
 	}

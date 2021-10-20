@@ -108,19 +108,16 @@ func CommandSigLs() cli.Command {
 			}
 
 			pubkey := c.Parent().String("pubkey")
+			if pubkey != "" {
+				keyFs, err := os.Stat(pubkey)
 
-			if pubkey == "" {
-				return cli.NewExitError(errors.New("ERROR: no signing key provided; see --help"), 10)
-			}
+				if err != nil {
+					return cli.NewExitError(("ERROR: errors accessing signing key; see --help: " + err.Error()), 11)
+				}
 
-			keyFs, err := os.Stat(pubkey)
-
-			if err != nil {
-				return cli.NewExitError(("ERROR: errors accessing signing key; see --help: " + err.Error()), 11)
-			}
-
-			if keyFs.IsDir() {
-				return cli.NewExitError(("ERROR: signing key is not a file; see --help: " + err.Error()), 12)
+				if keyFs.IsDir() {
+					return cli.NewExitError(("ERROR: signing key is not a file; see --help: " + err.Error()), 12)
+				}
 			}
 
 			_args := c.Args()
@@ -156,8 +153,10 @@ func CommandSigLs() cli.Command {
 			var resultSummary libpvr.JwsVerifySummary
 			var verifySummary []libpvr.JwsVerifySummary
 
+			cacerts := c.Parent().String("cacerts")
+
 			for _, v := range args {
-				w, err := pvr.JwsVerifyPvs(pubkey, v)
+				w, err := pvr.JwsVerifyPvs(pubkey, cacerts, v)
 				if errors.Is(err, os.ErrNotExist) {
 					return cli.NewExitError("ERROR: signature file does not exist with name "+v, 125)
 				}
