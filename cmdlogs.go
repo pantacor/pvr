@@ -241,7 +241,7 @@ func CommandLogs() cli.Command {
 			},
 			cli.StringFlag{
 				Name:   "source,src",
-				Usage:  "source, e.g.: --source=pantavisor.log,updater,pvr-sdk-lxc",
+				Usage:  "source, e.g.: --source=/pantavisor.log,/updater,/pvr-sdk-lxc",
 				EnvVar: "PVR_LOGS_SOURCE",
 			},
 			cli.StringFlag{
