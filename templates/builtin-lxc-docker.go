@@ -116,6 +116,9 @@ lxc.cap.keep = {{ $v | sprig_lower }}
 {{- end }}
 {{- end }}
 {{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
+{{- if eq .Source.args.PV_LXC_NETWORK_TYPE "empty" }}
+lxc.net.0.type = empty
+{{- end }}
 {{- if eq .Source.args.PV_LXC_NETWORK_TYPE "veth" }}
 lxc.net.0.type = veth
 lxc.net.0.link = lxcbr0
