@@ -943,3 +943,64 @@ func SprintTmpl(format string, obj interface{}) (string, error) {
 
 	return buf.String(), nil
 }
+
+func FixupRepoRef(repoUri string) (string, error) {
+
+	var pathExists bool
+	var uri *url.URL
+	var err error
+
+	// uri recode things that are just for convenience allowed
+	// => http://URL#part##// is not a valid url so we transform it to http://URL#part%2F%2F%23%23
+	fixedUri := ""
+	// first split by #
+	poundParts := strings.Split(repoUri, "#")
+
+	fixedUri += poundParts[0]
+	if len(poundParts[1:]) == 0 {
+		goto out
+	}
+
+	fixedUri += "#"
+
+	// from here we are in the part after # where / is invalid; we replace
+	fixedUri += strings.ReplaceAll(poundParts[1], "/", "%2F")
+	if len(poundParts[2:]) == 0 {
+		goto out
+	}
+	for _, v := range poundParts[2:] {
+		fixedUri += "%23"
+		fixedUri += strings.ReplaceAll(v, "/", "%2F")
+	}
+
+	uri, err = url.Parse(fixedUri)
+	if err != nil {
+		return "", err
+	}
+
+	pathExists, err = IsFileExists(uri.Path)
+
+	if err != nil {
+		return "", err
+	}
+
+	// now we deal with special shorthand syntax nick/devicenick
+	if !IsValidUrl(fixedUri) && !pathExists {
+		//Get owner nick & Device nick & make device repo URL
+		userNick := ""
+		deviceNick := ""
+		splits := strings.Split(repoUri, "/")
+		if len(splits) == 1 {
+			return "", errors.New("Device nick is missing. (syntax:pvr get <USER_NICK>/<DEVICE_NICK>[#<part>]). See --help")
+		} else if len(splits) == 2 {
+			userNick = splits[0]
+			deviceNick = splits[1]
+		} else {
+			return "", errors.New("clone URL is not a valid URL, nor in pvr device ref format; see --help")
+		}
+		fixedUri = "https://pvr.pantahub.com/" + userNick + "/" + deviceNick
+	}
+
+out:
+	return fixedUri, nil
+}

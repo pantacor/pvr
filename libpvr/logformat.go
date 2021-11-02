@@ -56,6 +56,6 @@ func (s *LogFormatterTemplate) DoLog(v *logs.Entry) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(os.Stderr, r)
+	fmt.Fprintln(os.Stdout, r)
 	return nil
 }

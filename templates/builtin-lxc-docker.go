@@ -16,7 +16,9 @@
 package templates
 
 const (
-	LXC_CONTAINER_CONF = `{{ "" -}}
+	LXC_CONTAINER_CONF = `
+{{- if ne .Source.args.PV_RUNLEVEL "data" -}}
+	{{ "" -}}
 lxc.tty.max = {{ .Source.args.LXC_TTY_MAX | pvr_ifNull "8" }}
 lxc.pty.max = {{ .Source.args.LXC_PTY_MAX | pvr_ifNull "1024" }}
 {{- if .Source.args.PV_DEBUG_MODE }}
@@ -105,7 +107,24 @@ lxc.mount.entry = tmpfs {{ .Source.args.PV_RUN_TMPFS_PATH | pvr_ifNull "run" }} 
 lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | replace "/" "-" }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
 {{- end -}}
 {{- end }}
+{{- if .Source.args.PV_LXC_CAP_DROP }}
+{{- range $k,$v := .Source.args.PV_LXC_CAP_DROP }}
+lxc.cap.drop = {{ $v | sprig_lower }}
+{{- end }}
+{{- end }}
+{{- if .Source.args.PV_LXC_CAP_KEEP }}
+{{- range $k,$v := .Source.args.PV_LXC_CAP_KEEP }}
+lxc.cap.keep = {{ $v | sprig_lower }}
+{{- end }}
+{{- end }}
 {{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
+{{- if eq .Source.args.PV_LXC_NETWORK_TYPE "empty" }}
+lxc.net.0.type = empty
+{{- end }}
+{{- if eq .Source.args.PV_LXC_NETWORK_TYPE "phys" }}
+lxc.net.0.type = phys
+lxc.net.0.link = {{- .Source.args.PV_LXC_NETWORK_LINK }}
+{{- end }}
 {{- if eq .Source.args.PV_LXC_NETWORK_TYPE "veth" }}
 lxc.net.0.type = veth
 lxc.net.0.link = lxcbr0
@@ -130,6 +149,13 @@ lxc.net.0.ipv4.gateway = auto
 lxc.mount.entry = /exports/{{- $sourcePath }} {{ $targetPath }} none bind,rw,create=file 0 0
 	{{- end }}
 {{- end }}
+{{- if .Source.args.PV_IMPORT_CONFIGVOLUMES }}
+	{{- range $k,$v := splitList "," .Source.args.PV_IMPORT_CONFIGVOLUMES }}
+		{{- $sourceVol := splitList ":" $v | sprig_first }}
+		{{- $targetPath := splitList ":" $v | sprig_last }}
+lxc.mount.entry = /volumes/{{- $sourceVol }}/{{- $src.name}} {{ $targetPath }} none bind,rw,create=dir,optional,noexec 0 0
+	{{- end }}
+{{- end }}
 {{- if .Source.args.PV_VOLUME_MOUNTS }}
 {{- range $k,$v := splitList "," .Source.args.PV_VOLUME_MOUNTS }}
 {{- $volume := splitList ":" $v | sprig_first }}
@@ -137,16 +163,19 @@ lxc.mount.entry = /exports/{{- $sourcePath }} {{ $targetPath }} none bind,rw,cre
 lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} none bind,rw,create=dir 0 0
 {{- end }}
 {{- end }}
-`
+{{ end }}`
 
 	RUN_JSON = `{{ "" -}}
 {
 	"#spec": "service-manifest-run@1",
 	"config": "lxc.container.conf",
+	{{- if ne .Source.args.PV_RUNLEVEL "data" }}
 	"name":"{{- .Source.name -}}",
+	{{- end }}
 	{{- if .Source.args.PV_RUNLEVEL }}
 	"runlevel": "{{- .Source.args.PV_RUNLEVEL }}",
 	{{- end }}
+	{{- if ne .Source.args.PV_RUNLEVEL "data" }}
 	"storage":{
 		{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes .Source.persistence -}}
 		{{- if ne $key "lxc-overlay" }}
@@ -162,6 +191,7 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	"exports": {{  .Source.exports | sprig_toPrettyJson | sprig_indent 8 }},
 	"logs": {{  .Source.logs | sprig_toPrettyJson | sprig_indent 8 }},
 	"type":"lxc",
+	{{- end }}
 	"root-volume": "root.squashfs",
 	"volumes":[
 		{{- $v := sprig_list }}
@@ -187,7 +217,10 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 
 func BuiltinLXCDockerHandler(values map[string]interface{}) (files map[string][]byte, err error) {
 	files = make(map[string][]byte, 2)
-	files["lxc.container.conf"] = compileTemplate(LXC_CONTAINER_CONF, values)
+	lxcContainerBytes := compileTemplate(LXC_CONTAINER_CONF, values)
+	if len(lxcContainerBytes) > 0 {
+		files["lxc.container.conf"] = compileTemplate(LXC_CONTAINER_CONF, values)
+	}
 	files["run.json"] = compileTemplate(RUN_JSON, values)
 	return
 }

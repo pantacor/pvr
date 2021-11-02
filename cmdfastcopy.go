@@ -60,6 +60,14 @@ func CommandFastCopy() cli.Command {
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
+			src, err = libpvr.FixupRepoRef(src)
+			if err != nil {
+				return cli.NewExitError(err, 7)
+			}
+			dest, err = libpvr.FixupRepoRef(dest)
+			if err != nil {
+				return cli.NewExitError(err, 8)
+			}
 
 			err = pvr.RemoteCopy(src, dest, false, c.String("envelope"), c.String("commit-msg"),
 				c.Int("rev"), c.Bool("force"))
