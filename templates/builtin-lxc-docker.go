@@ -149,6 +149,13 @@ lxc.net.0.ipv4.gateway = auto
 lxc.mount.entry = /exports/{{- $sourcePath }} {{ $targetPath }} none bind,rw,create=file 0 0
 	{{- end }}
 {{- end }}
+{{- if .Source.args.PV_IMPORT_CONFIGVOLUMES }}
+	{{- range $k,$v := splitList "," .Source.args.PV_IMPORT_CONFIGVOLUMES }}
+		{{- $sourceVol := splitList ":" $v | sprig_first }}
+		{{- $targetPath := splitList ":" $v | sprig_last }}
+lxc.mount.entry = /volumes/{{- $sourceVol }}/{{- $src.name}} {{ $targetPath }} none bind,rw,create=dir,optional,noexec 0 0
+	{{- end }}
+{{- end }}
 {{- if .Source.args.PV_VOLUME_MOUNTS }}
 {{- range $k,$v := splitList "," .Source.args.PV_VOLUME_MOUNTS }}
 {{- $volume := splitList ":" $v | sprig_first }}
