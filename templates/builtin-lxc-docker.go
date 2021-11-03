@@ -193,6 +193,9 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	"type":"lxc",
 	{{- end }}
 	"root-volume": "root.squashfs",
+	{{- if .Source.args.PV_ROLES }}
+	"roles": {{- .Source.args.PV_ROLES | sprig_toPrettyJson | sprig_indent 8 }},
+	{{- end }}
 	"volumes":[
 		{{- $v := sprig_list }}
 		{{- if .Source.args.PV_EXTRA_VOLUMES }}
