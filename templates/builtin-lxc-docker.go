@@ -24,7 +24,14 @@ lxc.pty.max = {{ .Source.args.LXC_PTY_MAX | pvr_ifNull "1024" }}
 {{- if .Source.args.PV_DEBUG_MODE }}
 lxc.log.file = /pv/logs/{{ .Source.name }}.log
 {{- end }}
-lxc.cgroup.devices.allow = {{ .Source.args.LXC_CGROUP_DEVICES_ALLOW | pvr_ifNull "a" }}
+{{- if .Source.args.PVR_LXC_CGROUP_DEVICES_WHITE }}
+lxc.cgroup.devices.deny = a
+{{- range $i,$v := .Source.args.PVR_LXC_CGROUP_DEVICES_WHITE }}
+lxc.cgroup.devices.allow = {{ $v }}
+{{- end }}
+{{- else }}
+lxc.cgroup.devices.allow = a
+{{- end }}
 lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
 {{- if .Docker.Entrypoint }}
