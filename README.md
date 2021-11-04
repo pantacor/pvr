@@ -1125,4 +1125,56 @@ Commands currently supported are:
  * pvr sig update - updates a committed signature from the _pvs/ hierarchy to be validate against committed state
  * pvr sig ls - list files covered by signatures in _sigs/ hieararchy; by default sig ls will show signature info while considering _all_ signatures in the system state
 
- 
+
+## PVR sig with CA commands
+
+```
+commit c2d6f1450422b89d90948499c7cd6dd6949e5df3 (HEAD -> feature/pvs-ca, origin/feature/pvs-ca)
+Author: Alexander Sack <asac@pantacor.com>
+Date:   Wed Oct 20 17:58:50 2021 +0200
+
+    add support for using x509 cert chains using x5c jws header to determine trust in pvr signatures
+    
+    * introduce new --x5c argument pvr app sig command to provide the chain to include in pvr sig add and update commands
+    * introduce --cacerts argument to pvr sig commands to allow to post a trust CACERTS file to use to validate in pvr app ls;
+      using special value _system will use the system cert store to validate ca chain
+    * pubkey validation now allows to have multiple trusted pubkeys in the file referenced by --pubkey
+    * document this feature in README.md
+    
+    Example 1: "add signature with trust ca chain"
+    
+    Below statement injects the myKey.crt as the trust chain into the jws.
+    If you have intermediates your .crt file would need to include those
+    also in reverse order.
+    
+    ```
+    pvr sig --x5c ../ca/myKey.crt --key ../ca/myKey.key add --part nginx
+    ```
+    
+    Example 2: "update signatures with trustchain"
+    
+    Below will refresh the nginx.json signature and attach myKey.crt as
+    the trust ca cert chain to validate against root certificates
+    
+    ```
+    pvr sig --x5c ../ca/myKey.crt --key ../ca/myKey.key update _sigs/nginx.json
+    ```
+    
+    Example 3: "validate signatures with cert pool in file"
+    
+    Below you can see how to validate signature with ca cert pool in file myCA.pem.
+    
+    ```
+    pvr sig --cacerts ../ca/myCA.pem ls --part _sigs/nginx.json
+    ```
+    
+    Example 4: use system ca cert pool to validate signature
+    
+    For this you have to put your myCA.pem into one of the system folders for
+    trusted certificates. e.g. /etc/ssl/certs
+    
+    ```
+    pvr sig ls --part _sigs/nginx.json
+    ```
+```
+

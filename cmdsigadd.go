@@ -110,6 +110,8 @@ func CommandSigAdd() cli.Command {
 				return cli.NewExitError("needs a --key argument; see --help.", 126)
 			}
 
+			ops.X5cPath = c.Parent().String("x5c")
+
 			err = pvr.JwsSign(name, keyPath, &match, &ops)
 
 			if err != nil {

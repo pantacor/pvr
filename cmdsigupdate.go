@@ -65,6 +65,7 @@ func CommandSigUpdate() cli.Command {
 			}
 
 			ops := libpvr.PvsOptions{}
+			ops.X5cPath = c.Parent().String("x5c")
 
 			keyPath := c.Parent().String("key")
 			if keyPath == "" {
