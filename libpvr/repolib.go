@@ -280,6 +280,10 @@ func (p *Pvr) AddFile(globs []string) error {
 	return nil
 }
 
+func (p *Pvr) GetCPristineJson() ([]byte, error) {
+	return cjson.Marshal(p.PristineJsonMap)
+}
+
 // create the canonical json for the working directory
 func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 
@@ -408,11 +412,18 @@ func (p *Pvr) InitCustom(customInitJson string, objectsDir string) error {
 
 func (p *Pvr) Diff() (*[]byte, error) {
 	workingJson, _, err := p.GetWorkingJson()
+
 	if err != nil {
 		return nil, err
 	}
 
-	diff, err := jsonpatch.CreateMergePatch(p.PristineJson, workingJson)
+	cPristineJson, err := p.GetCPristineJson()
+
+	if err != nil {
+		return nil, err
+	}
+
+	diff, err := jsonpatch.CreateMergePatch(cPristineJson, workingJson)
 
 	if err != nil {
 		return nil, err
