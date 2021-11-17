@@ -322,7 +322,7 @@ func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 		}
 		// inline json
 		if strings.HasSuffix(filepath.Base(filePath), ".json") {
-			jsonFile := map[string]interface{}{}
+			var jsonFile interface{}
 
 			data, err := ioutil.ReadFile(filePath)
 			if err != nil {
