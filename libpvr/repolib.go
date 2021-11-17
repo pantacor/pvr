@@ -1016,41 +1016,50 @@ func (p *Pvr) putFiles(filePut ...FilePut) []FilePut {
 func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	var baselineState map[string]interface{}
+	var filePutResults []FilePut
+	var shaSeen map[string]interface{}
+	var filePuts []FilePut
+	var filesAndObjects, baselineFilesAndObjects map[string]string
+	var refObjects map[string]interface{}
+	var err error
 
 	// we have no getUrl in device create and pubobjects case
 	if pvrRemote.JsonGetUrl != "" {
+		fmt.Fprintf(os.Stderr, "Synching baseline state with device")
+
 		buf, err := p.getJSONBuf(pvrRemote)
 
 		if err != nil {
-			return err
+			goto errout
 		}
 
 		json.Unmarshal(buf, &baselineState)
 
 		if err != nil {
-			return err
+			goto errout
 		}
+		fmt.Fprintf(os.Stderr, " [OK]\n")
 	}
 
-	baselineFilesAndObjects, err := listFilesAndObjectsFromJson(baselineState, []string{})
+	baselineFilesAndObjects, err = listFilesAndObjectsFromJson(baselineState, []string{})
 
 	if err != nil {
 		return err
 	}
 
-	refObjects := map[string]interface{}{}
+	refObjects = map[string]interface{}{}
 	for _, v := range baselineFilesAndObjects {
 		refObjects[v] = true
 	}
 
-	filesAndObjects, err := p.listFilesAndObjects([]string{})
+	filesAndObjects, err = p.listFilesAndObjects([]string{})
 	if err != nil {
 		return err
 	}
 
-	filePuts := []FilePut{}
+	filePuts = []FilePut{}
 
-	shaSeen := map[string]interface{}{}
+	shaSeen = map[string]interface{}{}
 
 	// push all objects
 	for k, v := range filesAndObjects {
@@ -1077,16 +1086,24 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			uri += "/"
 		}
 
+		fmt.Fprintf(os.Stderr, "Posting object info for: "+k+" ... ")
+
 		response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
-			return req.SetBody(remoteObject).Post(uri)
+			res, err := req.SetBody(remoteObject).Post(uri)
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr, " [ERROR: "+err.Error()+"]")
+			}
+			return res, err
 		})
 
 		if err != nil {
-			return err
+			goto errout
 		}
 
 		if response == nil {
-			return errors.New("BAD STATE; no respo")
+			err = errors.New("BAD STATE; no respo")
+			goto errout
 		}
 
 		if shaSeen[remoteObject.Sha] != nil {
@@ -1098,7 +1115,8 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 		if response.StatusCode() != http.StatusOK &&
 			response.StatusCode() != http.StatusConflict {
-			return errors.New("Error posting object " + strconv.Itoa(response.StatusCode()))
+			err = errors.New("Error posting object " + strconv.Itoa(response.StatusCode()))
+			goto errout
 		}
 
 		if response.StatusCode() == http.StatusConflict {
@@ -1124,7 +1142,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 		err = json.Unmarshal(response.Body(), &remoteObject)
 		if err != nil {
-			return err
+			goto errout
 		}
 
 		fileName := filepath.Join(p.Objdir, v)
@@ -1144,21 +1162,28 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			filePut.objType = objects.ObjectTypeObject
 		}
 		filePuts = append(filePuts, filePut)
+		fmt.Fprintln(os.Stderr, " [OK]")
 	}
 
-	filePutResults := p.putFiles(filePuts...)
+	filePutResults = p.putFiles(filePuts...)
 
 	for _, v := range filePutResults {
 		if v.err != nil {
-			return fmt.Errorf("Error putting file %s: %s", v.objName, v.err.Error())
+			err = fmt.Errorf("Error putting file %s: %s", v.objName, v.err.Error())
+			goto errout
 		}
 		if 200 != v.res.StatusCode {
-			return errors.New("REST call failed. " +
+			err = errors.New("REST call failed. " +
 				strconv.Itoa(v.res.StatusCode) + "  " + v.res.Status)
+			goto errout
 		}
 	}
 
 	return nil
+
+errout:
+	fmt.Fprintf(os.Stderr, " [ERROR: "+err.Error()+"]")
+	return err
 }
 
 func (p *Pvr) PutRemote(repoPath *url.URL, force bool) error {
