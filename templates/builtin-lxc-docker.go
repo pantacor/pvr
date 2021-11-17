@@ -175,9 +175,9 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	RUN_JSON = `{{ "" -}}
 {
 	"#spec": "service-manifest-run@1",
-	"config": "lxc.container.conf",
-	{{- if ne .Source.args.PV_RUNLEVEL "data" }}
 	"name":"{{- .Source.name -}}",
+	{{- if ne .Source.args.PV_RUNLEVEL "data" }}
+	"config": "lxc.container.conf",
 	{{- end }}
 	{{- if .Source.args.PV_RUNLEVEL }}
 	"runlevel": "{{- .Source.args.PV_RUNLEVEL }}",
@@ -198,11 +198,11 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	"exports": {{  .Source.exports | sprig_toPrettyJson | sprig_indent 8 }},
 	"logs": {{  .Source.logs | sprig_toPrettyJson | sprig_indent 8 }},
 	"type":"lxc",
-	{{- end }}
-	"root-volume": "root.squashfs",
 	{{- if .Source.args.PV_ROLES }}
 	"roles": {{- .Source.args.PV_ROLES | sprig_toPrettyJson | sprig_indent 8 }},
 	{{- end }}
+	{{- end }}
+	"root-volume": "root.squashfs",
 	"volumes":[
 		{{- $v := sprig_list }}
 		{{- if .Source.args.PV_EXTRA_VOLUMES }}
