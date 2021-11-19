@@ -225,7 +225,7 @@ func (p *Pvr) JwsSign(name string,
 		if p == nil {
 			break
 		}
-		if strings.HasPrefix(p.Type, "RSA ") {
+		if strings.Index(p.Type, "PRIVATE KEY") >= 0 {
 			signKey = p
 			break
 		}
@@ -242,6 +242,7 @@ func (p *Pvr) JwsSign(name string,
 			return err
 		}
 	}
+
 	//var privateKey *rsa.PrivateKey
 	var ok bool
 	privKey, ok := parsedKey.(*rsa.PrivateKey)
