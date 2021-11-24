@@ -32,6 +32,11 @@ lxc.cgroup.devices.allow = {{ $v }}
 {{- else }}
 lxc.cgroup.devices.allow = a
 {{- end }}
+{{- if .Source.args.PVR_LXC_CGROUP_V1 }}
+{{- range $i,$v := .Source.args.PVR_LXC_CGROUP_V1 }}
+lxc.cgroup.{{ $v }}
+{{- end }}
+{{- end }}
 lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
 {{- if .Docker.Entrypoint }}
