@@ -429,7 +429,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 		}
 
 		if pubPems == nil {
-			return nil, errors.New("No valid PEM encoded RSA verify key found in " + keyPath)
+			return nil, errors.New("No valid PEM encoded RSA verify key found " + keyPath)
 		}
 
 		for _, pubPem := range pubPems {
