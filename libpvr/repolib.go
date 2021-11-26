@@ -700,8 +700,14 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 	pvrRemoteUrl := repoUrl
 	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
 
-	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
-		return req.Get(pvrRemoteUrl.String())
+	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (response *resty.Response, err error) {
+		fmt.Fprintf(os.Stderr, "Getting remote repositor info ... ")
+		if response, err = req.Get(pvrRemoteUrl.String()); err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR "+err.Error()+"]\n")
+			return response, err
+		}
+		fmt.Fprintf(os.Stderr, "[OK]\n")
+		return response, err
 	})
 
 	if err != nil {
@@ -1999,11 +2005,12 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 
 		uri = pvrRemote.ObjectsEndpointUrl + "/" + v
 
-		response, err = p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
-			return req.Get(uri)
-		})
+		fmt.Fprintf(os.Stderr, "[OK]\n")
 
-		if err != nil {
+		if response, err = p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
+			return req.Get(uri)
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR "+err.Error()+"]\n")
 			return objectsCount, err
 		}
 
@@ -2046,7 +2053,7 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 	objectsCount = 0
 
 	if url.Scheme == "" {
-		return objectsCount, errors.New("Post must be a remote REST endpoint, not: " + url.String())
+		return objectsCount, errors.New("Get must be a remote REST endpoint, not: " + url.String())
 	}
 
 	remotePvr, err := p.initializeRemote(url)
