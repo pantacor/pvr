@@ -186,6 +186,8 @@ func main() {
 		CommandLogin(),
 		CommandDevice(),
 		CommandCompletion(),
+		CommandDmApply(),
+		CommandDmConvert(),
 	}
 	app.Run(os.Args)
 }
