@@ -1178,3 +1178,58 @@ Date:   Wed Oct 20 17:58:50 2021 +0200
     ```
 ```
 
+# PVR dm commands (device-mapper)
+
+pvr device mapper support for container volumes allows for an easy way to
+postprocess the squashfs volumes produced by pvr app add etc. in a way that
+the pantavisor device mapper addon can mount volumes using device-mapper.
+
+For now dm-verity type device mapper entries are supported by pantavisor
+client and hence pvr supports that mode first and foremost for now.
+
+## PVR dm-convert
+
+This command allows you to convert any standard squashfs volume into a
+device-mapper mounted volume.
+
+For dm-verity this will create a manifest file in <container>/_dm/<volume>.json,
+e.g. os/_dm/root.squashfs.json.
+
+To convert a volume simply use the following command:
+
+```
+pvr dm-convert os root.squashfs
+
+```
+This will convert the root.squashfs volume of the container 'os' into
+a device mapper enabled one.
+
+It will create the os/_dm/root.squashfs.json manifest:
+
+```
+$ cat os/_dm/root.squashfs.json | jq .
+{
+  "type": "dm-verity"
+  "data_device": "root.squashfs",
+  "hash_device": "root.squashfs.hash",
+  "root_hash": "88298f349288e685ac2474134ef22bf8f77465cde250c9f698780b5b6d942b96",
+}
+```
+
+... and also the hash_device in `os/root.squashfs.hash`.
+
+Also it will convert the volume reference in run.json to "dm:<volume", e.g.
+`dm:rootfs.squashfs`. This syntax will ensure that pantavisor will not try to
+mount the squash himself, but rather delegate that to a device-mapper
+volume handler.
+
+You can then `pvr commit` this and post it to a pantavisor device-mapper
+enabled device
+
+## PVR dm-apply
+
+This command iterates through the whole committed pristine json of the repo
+and updates the hash and manifests for all dm-verity manifests.
+
+This is good if you updated a container and wnat to recalculate the hash file.
+
