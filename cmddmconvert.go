@@ -68,7 +68,7 @@ func CommandDmConvert() cli.Command {
 
 			err = pvr.DmCVerityConvert(container, volume)
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 4)
 			}
 
 			return nil
