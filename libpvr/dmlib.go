@@ -88,15 +88,15 @@ func (p *Pvr) dmifyRunJson(container, volume string) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(path.Join(p.Dir, runJsonPath)+".new", outB, 0644)
+	err = ioutil.WriteFile(runJsonPath+".new", outB, 0644)
 	if err != nil {
 		return err
 	}
-	err = os.Rename(path.Join(p.Dir, runJsonPath)+".new", path.Join(p.Dir, runJsonPath))
+	err = os.Rename(runJsonPath+".new", runJsonPath)
 	if err != nil {
 		return err
 	}
-	fmt.Println("- Updated " + path.Join(p.Dir, runJsonPath))
+	fmt.Println("- Updated " + runJsonPath)
 
 	return nil
 }
