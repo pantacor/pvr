@@ -26,7 +26,8 @@ build-tags:
     - tempdir=`mktemp -d`
     - docker run --rm $CONTAINER_IMAGE:$CI_BUILD_REF | tar -C $tempdir -x
     - tar -cvzf pvr-$CI_BUILD_TAG.linux.amd64.tar.gz -C $tempdir/bin/linux_amd64 pvr
-    - tar -cvzf pvr-$CI_BUILD_TAG.linux.armv6.tar.gz -C $tempdir/bin/linux_armv6 pvr
+    - tar -cvzf pvr-$CI_BUILD_TAG.linux.arm.tar.gz -C $tempdir/bin/linux_arm pvr
+    - tar -cvzf pvr-$CI_BUILD_TAG.linux.arm64.tar.gz -C $tempdir/bin/linux_arm64 pvr
     - tar -cvzf pvr-$CI_BUILD_TAG.darwin.amd64.tar.gz -C $tempdir/bin/darwin_amd64 pvr
     - echo CWD `pwd`
     - sh -c "cd $tempdir/bin/windows_386/; zip pvr-$CI_BUILD_TAG.windows.x32.zip pvr.exe"
@@ -36,7 +37,8 @@ build-tags:
   artifacts:
     paths:
     - pvr-$CI_BUILD_TAG.linux.amd64.tar.gz
-    - pvr-$CI_BUILD_TAG.linux.armv6.tar.gz
+    - pvr-$CI_BUILD_TAG.linux.arm.tar.gz
+    - pvr-$CI_BUILD_TAG.linux.arm64.tar.gz
     - pvr-$CI_BUILD_TAG.darwin.amd64.tar.gz
     - pvr-$CI_BUILD_TAG.windows.x32.zip
     - pvr-$CI_BUILD_TAG.windows.x64.zip
@@ -54,7 +56,8 @@ build-master:
     - tempdir=`mktemp -d`
     - docker run --rm $CONTAINER_IMAGE:$CI_BUILD_REF | tar -C $tempdir -x
     - tar -cvzf pvr.linux.amd64.tar.gz -C $tempdir/bin/linux_amd64 pvr
-    - tar -cvzf pvr.linux.armv6.tar.gz -C $tempdir/bin/linux_armv6 pvr
+    - tar -cvzf pvr.linux.arm.tar.gz -C $tempdir/bin/linux_arm pvr
+    - tar -cvzf pvr.linux.arm64.tar.gz -C $tempdir/bin/linux_arm64 pvr
     - tar -cvzf pvr.darwin.amd64.tar.gz -C $tempdir/bin/darwin_amd64 pvr
     - echo CWD `pwd`
     - sh -c "cd $tempdir/bin/windows_386/; zip pvr.windows.x32.zip pvr.exe"
@@ -64,7 +67,8 @@ build-master:
   artifacts:
     paths:
     - pvr.linux.amd64.tar.gz
-    - pvr.linux.armv6.tar.gz
+    - pvr.linux.arm.tar.gz
+    - pvr.linux.arm64.tar.gz
     - pvr.darwin.amd64.tar.gz
     - pvr.windows.x32.zip
     - pvr.windows.x64.zip
@@ -82,7 +86,8 @@ build:
     - tempdir=`mktemp -d`
     - docker run --rm $CONTAINER_IMAGE:$CI_BUILD_REF | tar -C $tempdir -x
     - tar -cvzf pvr.linux.amd64.tar.gz -C $tempdir/bin/linux_amd64 pvr
-    - tar -cvzf pvr.linux.armv6.tar.gz -C $tempdir/bin/linux_armv6 pvr
+    - tar -cvzf pvr.linux.arm.tar.gz -C $tempdir/bin/linux_arm pvr
+    - tar -cvzf pvr.linux.arm64.tar.gz -C $tempdir/bin/linux_arm64 pvr
     - tar -cvzf pvr.darwin.amd64.tar.gz -C $tempdir/bin/darwin_amd64 pvr
     - echo CWD `pwd`
     - sh -c "cd $tempdir/bin/windows_386/; zip pvr.windows.x32.zip pvr.exe"
@@ -92,7 +97,8 @@ build:
   artifacts:
     paths:
     - pvr.linux.amd64.tar.gz
-    - pvr.linux.armv6.tar.gz
+    - pvr.linux.arm.tar.gz
+    - pvr.linux.arm64.tar.gz
     - pvr.darwin.amd64.tar.gz
     - pvr.windows.x32.zip
     - pvr.windows.x64.zip
