@@ -15,7 +15,7 @@ RUN go get
 FROM src as linux_riscv64
 
 RUN apk update; apk add git
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -o /go/bin/linux_arm64/pvr -v .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -o /go/bin/linux_riscv64/pvr -v .
 
 
 # build amd64 linux static
@@ -30,7 +30,7 @@ FROM src as linux_arm
 RUN apk update; apk add git
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=5 go build -o /go/bin/linux_arm/pvr -v .
 
-# build armv6 linux static
+# build arm64 linux static
 FROM src as linux_arm64
 
 RUN apk update; apk add git
