@@ -1,5 +1,5 @@
 //
-// Copyright 2019  Pantacor Ltd.
+// Copyright 2021  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,13 +20,15 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
-	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/models"
 	"gitlab.com/pantacor/pvr/templates"
 )
 
@@ -37,38 +39,87 @@ const (
 )
 
 var (
-	ErrInvalidVolumeFormat = errors.New("Invalid volume format")
-	ErrEmptyAppName        = errors.New("Empty app name")
-	ErrEmptyFrom           = errors.New("Empty from")
-	ErrNeedBeRoot          = errors.New("Please run this command as root or use fakeroot utility")
+	ErrInvalidVolumeFormat = errors.New("invalid volume format")
+	ErrEmptyAppName        = errors.New("empty app name")
+	ErrEmptyFrom           = errors.New("empty from")
+	ErrEmptyPart           = errors.New("empty part on the pvr url PVR_URL#part")
+	ErrNeedBeRoot          = errors.New("please run this command as root or use fakeroot utility")
 )
 
 type DockerSource struct {
-	DockerName     string                 `json:"docker_name"`
-	DockerTag      string                 `json:"docker_tag"`
-	DockerDigest   string                 `json:"docker_digest"`
-	DockerSource   string                 `json:"docker_source"`
-	DockerConfig   map[string]interface{} `json:"docker_config"`
+	DockerName     string                 `json:"docker_name,omitempty"`
+	DockerTag      string                 `json:"docker_tag,omitempty"`
+	DockerDigest   string                 `json:"docker_digest,omitempty"`
+	DockerSource   string                 `json:"docker_source,omitempty"`
+	DockerConfig   map[string]interface{} `json:"docker_config,omitempty"`
 	DockerPlatform string                 `json:"docker_platform,omitempty"`
 	FormatOptions  string                 `json:"format_options,omitempty"`
 }
 
 type PvrSource struct {
-	PvrUrl   string `json:"pvr_url,omitempty"`
-	PvrMerge bool   `json:"pvr_merge,omitempty"`
+	PvrUrl    string `json:"pvr,omitempty"`
+	PvrDigest bool   `json:"pvr_digest,omitempty"`
+}
+
+type RootFsSource struct {
+	RootFsURL    string `json:"rootfs_url,omitempty"`
+	RootFsDigest string `json:"rootfs_digest,omitempty"`
 }
 
 type Source struct {
 	Name         string                   `json:"name,omitempty"`
 	Spec         string                   `json:"#spec"`
-	Template     string                   `json:"template"`
-	TemplateArgs map[string]interface{}   `json:"args"`
+	Template     string                   `json:"template,omitempty"`
+	TemplateArgs map[string]interface{}   `json:"args,omitempty"`
 	Logs         []map[string]interface{} `json:"logs,omitempty"`
 	Exports      []string                 `json:"exports,omitempty"`
-	Config       map[string]interface{}   `json:"config"`
+	Config       map[string]interface{}   `json:"config,omitempty"`
 	DockerSource
 	PvrSource
+	RootFsSource
 	Persistence map[string]string `json:"persistence"`
+}
+
+// InstallApplication : Install Application from any type of source
+func (p *Pvr) InstallApplication(app AppData) error {
+	switch app.SourceType {
+	case models.SourceTypeDocker:
+		return InstallDockerApp(p, app)
+	case models.SourceTypeRootFs:
+		return InstallRootFsApp(p, app)
+	case models.SourceTypePvr:
+		return InstallPVApp(p, app)
+	default:
+		return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
+	}
+}
+
+// UpdateApplication : Update any application and any type
+func (p *Pvr) UpdateApplication(app AppData) error {
+	switch app.SourceType {
+	case models.SourceTypeDocker:
+		return UpdateDockerApp(p, app)
+	case models.SourceTypeRootFs:
+		return UpdateRootFSApp(p, app)
+	case models.SourceTypePvr:
+		return UpdatePvApp(p, app)
+	default:
+		return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
+	}
+}
+
+// AddApplication : Add application from several types of sources
+func (p *Pvr) AddApplication(app AppData) error {
+	switch app.SourceType {
+	case models.SourceTypeDocker:
+		return AddDockerApp(p, app)
+	case models.SourceTypeRootFs:
+		return AddRootFsApp(p, app)
+	case models.SourceTypePvr:
+		return AddPvApp(p, app)
+	default:
+		return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
+	}
 }
 
 func (p *Pvr) isRunningAsRoot() bool {
@@ -100,6 +151,33 @@ func (p *Pvr) RunAsRoot() error {
 	return errors.New("cannot find fakeroot in PATH. Install fakeroot or run ```pvr app``` as root: " + err.Error())
 }
 
+func (p *Pvr) SetSourceTypeFromManifest(app *AppData, options *models.GetSTOptions) error {
+	if options == nil {
+		options = &models.GetSTOptions{Force: false}
+	}
+
+	if app.SourceType != "" && !options.Force {
+		return nil
+	}
+
+	appManifest, err := p.GetApplicationManifest(app.Appname)
+	if err != nil {
+		return err
+	}
+
+	app.SourceType = models.SourceTypeDocker
+
+	if appManifest.PvrUrl != "" {
+		app.SourceType = models.SourceTypePvr
+	}
+
+	if appManifest.RootFsURL != "" {
+		app.SourceType = models.SourceTypeRootFs
+	}
+
+	return nil
+}
+
 func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 	appManifestFile := filepath.Join(p.Dir, appname, SRC_FILE)
 	js, err := ioutil.ReadFile(appManifestFile)
@@ -127,7 +205,7 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 
 func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[string]interface{}, appManifest *Source) error {
 	appConfig := appManifest.Config
-	for k, _ := range appConfig {
+	for k := range appConfig {
 		value := appConfig[k]
 		if value != nil {
 			dockerConfig[k] = value
@@ -207,141 +285,6 @@ func (p *Pvr) GetAppDockerDigest(appname string) (string, error) {
 	return appManifest.DockerDigest, nil
 }
 
-// InstallApplication : Install Application
-func (p *Pvr) InstallApplication(app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
-
-	if appManifest.DockerName == "" {
-		return err
-	}
-
-	trackURL := appManifest.DockerName
-	if appManifest.DockerTag != "" {
-		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
-	}
-
-	app.DockerURL = trackURL
-
-	dockerConfig := map[string]interface{}{}
-
-	// src.json's generated by new pvr's will remember the DockerConfig
-	// to support reapplying templates without having knowledge about the
-	// the docker itself (e.g. on a plane of if the docker was never uploaded
-	// to a registry). The "else" codepath exists for src.json's that were
-	// generated previously. For those we will need to get dockerconfig from
-	// local or remote registry still.....
-	if appManifest.DockerConfig != nil {
-		dockerConfig = appManifest.DockerConfig
-	} else {
-		err = p.FindDockerImage(&app)
-
-		if err != nil {
-			fmt.Println("\nSeems like you have an invalid docker digest value in your " + app.Appname + "/src.json file\n")
-			fmt.Println("\nPlease run \"pvr app update " + app.Appname + " --source=" + app.Source + "\" to auto fix it or update docker_digest field by editing " + app.Appname + "/src.json  to fix it manually\n")
-			return cli.NewExitError(err, 3)
-		}
-
-		fmt.Println("WARNING: The src.json for " + appManifest.Name + " has been genrated by old pvr; run pvr update " + appManifest.Name + " to get rid of this warning.")
-		//	Exists flag is true only if the image got loaded which will depend on
-		//  priority order provided in --source=local,remote
-		if app.LocalImage.Exists {
-			dockerConfig = app.LocalImage.DockerConfig
-		} else if app.RemoteImage.Exists {
-			dockerConfig = app.RemoteImage.DockerConfig
-		} else {
-			return cli.NewExitError(errors.New("Docker Name can not be resolved either from local docker or remote registries."), 4)
-		}
-	}
-
-	app.Appmanifest = appManifest
-	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
-	if err != nil {
-		return err
-	}
-	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
-
-	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
-	if err != nil {
-		return err
-	}
-	if appManifest.DockerDigest == squashFSDigest {
-		fmt.Println("Application already up to date. Will skip generating new root.squashfs")
-		return nil
-	}
-
-	return p.GenerateApplicationSquashFS(app)
-}
-
-func (p *Pvr) UpdateApplication(app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
-	if app.Source == "" {
-		app.Source = appManifest.DockerSource.DockerSource
-	}
-	if app.Platform == "" {
-		app.Platform = appManifest.DockerPlatform
-	}
-
-	if app.From != "" {
-		updateDockerFromFrom(appManifest, app.From)
-	}
-
-	err = p.FindDockerImage(&app)
-	if err != nil {
-		return err
-	}
-
-	trackURL := appManifest.DockerName
-	if appManifest.DockerTag != "" {
-		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
-	}
-
-	dockerDigest := ""
-	dockerPlatform := ""
-	var dockerConfig map[string]interface{}
-	//	Exists flag is true only if the image got loaded which will depend on
-	//  priority order provided in --source=local,remote
-	if app.LocalImage.Exists {
-		dockerDigest = app.LocalImage.DockerDigest
-		dockerConfig = app.LocalImage.DockerConfig
-	} else if app.RemoteImage.Exists {
-		dockerDigest = app.RemoteImage.DockerDigest
-		dockerPlatform = app.RemoteImage.DockerPlatform
-		dockerConfig = app.RemoteImage.DockerConfig
-	}
-
-	appManifest.DockerPlatform = dockerPlatform
-	appManifest.DockerDigest = dockerDigest
-	appManifest.DockerSource.DockerSource = app.Source
-	appManifest.DockerConfig = dockerConfig
-
-	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
-	if err != nil {
-		return err
-	}
-
-	srcFilePath := filepath.Join(p.Dir, app.Appname, SRC_FILE)
-	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
-	if err != nil {
-		return err
-	}
-
-	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
-	if err != nil {
-		return err
-	}
-	if dockerDigest == squashFSDigest {
-		fmt.Println("Application already up to date.")
-		return nil
-	}
-	return p.InstallApplication(app)
-}
-
 func updateDockerFromFrom(src *Source, from string) {
 	components := strings.Split(from, ":")
 	if len(components) < 2 {
@@ -352,99 +295,61 @@ func updateDockerFromFrom(src *Source, from string) {
 	src.DockerName = strings.Replace(from, ":"+src.DockerTag, "", 1)
 }
 
-func (p *Pvr) AddApplication(app AppData) error {
-	if app.Appname == "" {
-		return ErrEmptyAppName
-	}
-
-	appPath := filepath.Join(p.Dir, app.Appname)
-	if _, err := os.Stat(appPath); !os.IsNotExist(err) {
-		return nil
-	}
-
+func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 	if app.From == "" {
-		return ErrEmptyFrom
-	}
-	persistence := map[string]string{}
-	for _, volume := range app.Volumes {
-		split := strings.Split(volume, ":")
-		if len(split) < 2 {
-			return ErrInvalidVolumeFormat
-		}
-
-		persistence[split[0]] = split[1]
+		return "", nil, ErrEmptyFrom
 	}
 
-	src := Source{
-		Spec:         SRC_SPEC,
-		Template:     TEMPLATE_BUILTIN_LXC_DOCKER,
-		TemplateArgs: app.TemplateArgs,
-		Config:       map[string]interface{}{},
-		Persistence:  persistence,
-		DockerSource: DockerSource{
-			DockerSource:  app.Source,
-			FormatOptions: app.FormatOptions,
-		},
-	}
-
-	updateDockerFromFrom(&src, app.From)
-
-	dockerConfig := map[string]interface{}{}
-	//	Exists flag is true only if the image got loaded which will depend on
-	//  priority order provided in --source=local,remote
-	if app.LocalImage.Exists {
-		//docker config
-		src.DockerDigest = app.LocalImage.DockerDigest
-		dockerConfig = app.LocalImage.DockerConfig
-	} else if app.RemoteImage.Exists {
-		// Remote repo.
-		src.DockerDigest = app.RemoteImage.DockerDigest
-		src.DockerPlatform = app.RemoteImage.DockerPlatform
-		dockerConfig = app.RemoteImage.DockerConfig
-	}
-
-	if app.ConfigFile != "" {
-		var config map[string]interface{}
-		content, err := ioutil.ReadFile(app.ConfigFile)
-		if err != nil {
-			return err
-		}
-
-		err = json.Unmarshal(content, &config)
-		if err != nil {
-			return err
-		}
-
-		for k, v := range config {
-			dockerConfig[k] = v
-		}
-		//	Exists flag is true only if the image got loaded which will depend on
-		//  priority order provided in --source=local,remote
-		if app.LocalImage.Exists {
-			app.LocalImage.DockerConfig = dockerConfig
-		} else if app.RemoteImage.Exists {
-			app.RemoteImage.DockerConfig = dockerConfig
-		}
-
-	}
-
-	srcContent, err := json.MarshalIndent(src, " ", " ")
+	url, err := url.Parse(app.From)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 
-	err = os.Mkdir(appPath, 0777)
+	part := url.Fragment
+	if part == "" {
+		return "", nil, ErrEmptyPart
+	}
+
+	objectsCount, err := p.GetRepo(app.From, true, true)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
-
-	srcFilePath := filepath.Join(appPath, SRC_FILE)
-	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
+	p.Pvrconfig.DefaultGetUrl = p.Pvrconfig.DefaultPostUrl
+	err = p.SaveConfig()
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 
-	return p.InstallApplication(app)
+	fmt.Println("\nImported " + strconv.Itoa(objectsCount) + " objects to " + p.Objdir)
+
+	err = p.Reset(false)
+	if err != nil {
+		return "", nil, err
+	}
+
+	srcAppPath := filepath.Join(p.Dir, part)
+	destAppPath := filepath.Join(p.Dir, app.Appname)
+	if srcAppPath != destAppPath {
+		if err = os.Rename(srcAppPath, destAppPath); err != nil {
+			return "", nil, err
+		}
+	}
+
+	srcContent, err := ioutil.ReadFile(filepath.Join(destAppPath, SRC_FILE))
+	if err != nil {
+		return "", nil, err
+	}
+
+	srcJson := Source{}
+	if err = json.Unmarshal(srcContent, &srcJson); err != nil {
+		return "", nil, err
+	}
+
+	srcJson.PvrSource = PvrSource{
+		PvrUrl: app.From,
+	}
+
+	return destAppPath, &srcJson, nil
 }
 
 // ListApplications : List Applications
@@ -502,4 +407,86 @@ func ReportDockerManifestError(err error, image string) error {
 		"The docker image "+image+" has to exist in local docker or in a remote registry; try docker pull "+image,
 		"if the image is not public please use the --user and --password parameters or use docker login command",
 	)
+}
+
+func MakeSquash(rootfsPath string, app *AppData) error {
+	makeSquashfsPath, err := exec.LookPath(MAKE_SQUASHFS_CMD)
+	if err != nil {
+		return err
+	}
+
+	if makeSquashfsPath == "" {
+		return ErrMakeSquashFSNotFound
+	}
+
+	tempSquashFile := filepath.Join(app.DestinationPath, SQUASH_FILE+".new")
+	squashFile := filepath.Join(app.DestinationPath, SQUASH_FILE)
+
+	squashExist, err := IsFileExists(squashFile)
+	if err != nil {
+		return err
+	}
+	// make sure the squashfs file did not exists
+	if squashExist {
+		err := Remove(squashFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	var comp []string
+	if app.Appmanifest.FormatOptions == "" {
+		comp = []string{"-comp", "xz"}
+	} else {
+		comp = strings.Split(app.Appmanifest.FormatOptions, " ")
+	}
+
+	args := []string{makeSquashfsPath, rootfsPath, tempSquashFile}
+	args = append(args, comp...)
+
+	fmt.Println("Generating squashfs file: " + strings.Join(args, " "))
+	makeSquashfs := exec.Command(args[0], args[1:]...)
+	err = makeSquashfs.Run()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Generating squashfs digest")
+
+	return os.Rename(tempSquashFile, squashFile)
+}
+
+func GetPersistence(app *AppData) (map[string]string, error) {
+	persistence := map[string]string{}
+	for _, volume := range app.Volumes {
+		split := strings.Split(volume, ":")
+		if len(split) < 2 {
+			return nil, ErrInvalidVolumeFormat
+		}
+
+		persistence[split[0]] = split[1]
+	}
+
+	return persistence, nil
+}
+
+func GetDockerConfigFile(p *Pvr, app *AppData) (map[string]interface{}, error) {
+	dockerConfig := map[string]interface{}{}
+	if app.ConfigFile != "" {
+		configFile, err := ExpandPath(app.ConfigFile)
+		if err != nil {
+			return nil, err
+		}
+
+		config, err := ioutil.ReadFile(configFile)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(config, &dockerConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return dockerConfig, nil
 }

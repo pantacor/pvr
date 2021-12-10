@@ -30,6 +30,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -400,7 +401,7 @@ func ExtractFiles(files []string, extractPath string) error {
 	}
 
 	for _, file := range files {
-		err := Untar(extractPath, file)
+		err := Untar(extractPath, file, []string{})
 		if err != nil {
 			return err
 		}
@@ -1003,4 +1004,83 @@ func FixupRepoRef(repoUri string) (string, error) {
 
 out:
 	return fixedUri, nil
+}
+
+func ExpandPath(path string) (string, error) {
+	if len(path) == 0 || path[0] != '~' {
+		return filepath.Abs(path)
+	}
+
+	usr, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Abs(filepath.Join(usr.HomeDir, path[1:]))
+}
+
+// Untar : Untar a file or folder
+func Untar(dst string, src string, options []string) error {
+	contentType, err := GetFileContentType(src)
+	if err != nil {
+		return err
+	}
+	tarPath, err := exec.LookPath(TAR_CMD)
+	if err != nil {
+		return err
+	}
+	args := []string{tarPath, "xzvf", src, "-C", dst}
+	if contentType == "application/octet-stream" {
+		args = []string{tarPath, "xvf", src, "-C", dst}
+	}
+
+	args = append(args, options...)
+	PrintDebugln(args)
+	untar := exec.Command(args[0], args[1:]...)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	untar.Stdout = &out
+	untar.Stderr = &stderr
+	err = untar.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+	}
+	return err
+}
+
+// GetFileContentType : Get File Content Type of a file
+func GetFileContentType(src string) (string, error) {
+	file, err := os.Open(src)
+	if err != nil {
+		return "", err
+	}
+
+	defer file.Close()
+	buffer := make([]byte, 512)
+	_, err = file.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+	contentType := http.DetectContentType(buffer)
+	return contentType, nil
+}
+
+func DownloadFile(uri *url.URL) (string, error) {
+	tempfile, err := ioutil.TempFile(os.TempDir(), "download-rootfs-")
+	if err != nil {
+		return "", err
+	}
+	defer tempfile.Close()
+	resp, err := http.Get(uri.String())
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	_, err = io.Copy(tempfile, resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Abs(filepath.Dir(tempfile.Name()))
 }

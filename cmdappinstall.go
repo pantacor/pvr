@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
+	"gitlab.com/pantacor/pvr/models"
 
 	"github.com/urfave/cli"
 )
@@ -101,8 +102,11 @@ func CommandAppInstall() cli.Command {
 				Source:       source,
 				Username:     username,
 				Password:     password,
+				SourceType:   c.String("type"),
 				TemplateArgs: map[string]interface{}{},
 			}
+
+			pvr.SetSourceTypeFromManifest(&app, nil)
 
 			err = pvr.InstallApplication(app)
 			if err != nil {
@@ -125,6 +129,11 @@ func CommandAppInstall() cli.Command {
 			Name:   "password, p",
 			Usage:  "Use `PVR_REGISTRY_PASSWORD` for authorization with docker registrar",
 			EnvVar: "PVR_REGISTRY_PASSWORD",
+		},
+		cli.StringFlag{
+			Name:   "type, t",
+			Usage:  fmt.Sprintf("Type of source. available types [%s, %s, %s]", models.SourceTypeDocker, models.SourceTypePvr, models.SourceTypeRootFs),
+			EnvVar: "PVR_SOURCE_TYPE",
 		},
 		cli.StringFlag{
 			Name:   "source",

@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
+	"gitlab.com/pantacor/pvr/models"
 
 	"github.com/urfave/cli"
 )
@@ -101,6 +102,7 @@ func CommandAppAdd() cli.Command {
 				ConfigFile:    c.String("config-json"),
 				Volumes:       c.StringSlice("volume"),
 				FormatOptions: c.String("format-options"),
+				SourceType:    c.String("type"),
 				TemplateArgs:  templateArgs,
 			}
 
@@ -108,17 +110,12 @@ func CommandAppAdd() cli.Command {
 				app.TemplateArgs["PV_RUNLEVEL"] = c.String("runlevel")
 			}
 
-			err = pvr.FindDockerImage(&app)
-			if err != nil {
-				return cli.NewExitError(err, 3)
-			}
 			err = pvr.AddApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
 
 			fmt.Println("Application added")
-
 			return nil
 		},
 	}
@@ -149,6 +146,12 @@ func CommandAppAdd() cli.Command {
 			Usage:  SourceFlagUsage,
 			EnvVar: "PVR_SOURCE",
 			Value:  "remote,local",
+		},
+		cli.StringFlag{
+			Name:   "type, t",
+			Usage:  fmt.Sprintf("Type of source. available types [%s, %s, %s]", models.SourceTypeDocker, models.SourceTypePvr, models.SourceTypeRootFs),
+			EnvVar: "PVR_SOURCE_TYPE",
+			Value:  models.SourceTypeDocker,
 		},
 		cli.StringFlag{
 			Name:   "runlevel",
