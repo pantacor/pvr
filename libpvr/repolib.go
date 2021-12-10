@@ -701,7 +701,7 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
 
 	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (response *resty.Response, err error) {
-		fmt.Fprintf(os.Stderr, "Getting remote repository info ... ")
+		fmt.Fprintf(os.Stderr, "Getting remote repositor info ... ")
 		if response, err = req.Get(pvrRemoteUrl.String()); err != nil {
 			fmt.Fprintf(os.Stderr, "[ERROR "+err.Error()+"]\n")
 			return response, err
@@ -1189,7 +1189,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			err = fmt.Errorf("Error putting file %s: %s", v.objName, v.err.Error())
 			goto errout
 		}
-		if 200 != v.res.StatusCode {
+		if v.res.StatusCode != 200 {
 			err = errors.New("REST call failed. " +
 				strconv.Itoa(v.res.StatusCode) + "  " + v.res.Status)
 			goto errout
@@ -1239,7 +1239,7 @@ func (p *Pvr) PutRemote(repoPath *url.URL, force bool) error {
 		return err
 	}
 
-	if 200 != response.StatusCode() {
+	if response.StatusCode() != 200 {
 		return errors.New("REST call failed. " +
 			strconv.Itoa(response.StatusCode()) + "  " + response.Status() + "\n\n   " + string(response.Body()))
 	}
@@ -1489,9 +1489,8 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	return nil
 }
 
-func (p *Pvr) UnpackRepo(repoPath string, outDir string) error {
-
-	err := Untar(outDir, repoPath)
+func (p *Pvr) UnpackRepo(repoPath, outDir string, options []string) error {
+	err := Untar(outDir, repoPath, options)
 	return err
 }
 
@@ -1535,7 +1534,7 @@ func (p *Pvr) GetStateJson(uri string) (
 			}
 			defer os.RemoveAll(repoPath)
 
-			err = p.UnpackRepo(uri, repoPath)
+			err = p.UnpackRepo(uri, repoPath, []string{})
 			if err != nil {
 				return
 			}
@@ -1621,7 +1620,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		}
 		defer os.RemoveAll(repoPath)
 
-		err = p.UnpackRepo(repoUri.Path, repoPath)
+		err = p.UnpackRepo(repoUri.Path, repoPath, []string{})
 		if err != nil {
 			return objectsCount, err
 		}

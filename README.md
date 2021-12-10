@@ -1029,6 +1029,63 @@ Application added
 
 ```
 
+## How to use rootfs type
+
+We now can create an app, install an app, and update an app using as source a root filesystem, that filesystem could be as a tar in local for the computer is running the PVR, could be a plain folder with the filesystem inside, or could be an URL where the tar is to be downloaded.
+
+#### Add app from rootfs
+
+```
+pvr app add --from=~/Desktop/pvwebstatus -t rootfs pvwebstatus
+```
+
+This will create a new application folder with these files:
+
+```
+pvwebstatus/
+├── lxc.container.conf
+├── root.squashfs
+├── root.squashfs.rootfs-digest
+├── run.json
+└── src.json
+```
+
+The Source file will have a rootfs_url argument and rootfs_digest to track the filesystem digest.
+
+If you need to add some docker_config on creation to the app, you could use all the parameters supported. Example:
+
+```
+pvr app add --from=~/Desktop/pvwebstatus --config-json=pvwebstatus.config.json -t rootfs pvwebstatus
+```
+
+Where the `pvwebstatus.config.json` is a JSON configuration.
+
+
+```json
+{
+  "ArgsEscaped": true,
+  "Cmd": [
+    "/app/pantavisor-web-status"
+  ],
+  "Env": [
+    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  ],
+  "WorkingDir": "/app"
+}
+```
+
+## How to use pvr type
+
+Another source that could be used as a source for an application is a device description inside your computer or from a PV repository URL.
+
+#### Add app from pvr
+
+You could use any PVR repository compatible URL, which could be a local .pvr folder or a remote repository URL.
+
+```
+pvr app add -t pvr --from https://pvr.pantahub.com/highercomve/one_marketplace_production#tailscale tailscale
+```
+
 ## pvr app info <APP_NAME>
 
 pvr app info <appname> :output info and state of appname
@@ -1091,6 +1148,21 @@ pvr app update :update an existing application.
 example1$ $ pvr app update nginx-app
 Application updated
 
+```
+
+#### Update app from rootfs
+
+Here you can update like a normal docker container:
+
+```
+pvr app update pvwebstatus
+```
+
+But  you can update from another tar or an URL
+
+
+```
+pvr app update --from=~/Desktop/pvwebstatus.tar pvwebstatus
 ```
 
 
