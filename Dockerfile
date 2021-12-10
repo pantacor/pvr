@@ -63,6 +63,7 @@ RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
 WORKDIR /work
 COPY --from=linux_amd64 /go/bin /pkg/bin
 COPY --from=linux_arm /go/bin /pkg/bin
+COPY --from=linux_arm64 /go/bin /pkg/bin
 COPY --from=windows_386 /go/bin /pkg/bin
 COPY --from=windows_amd64 /go/bin /pkg/bin
 COPY --from=darwin_amd64 /go/bin /pkg/bin
