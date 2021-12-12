@@ -64,21 +64,22 @@ func AddDockerApp(p *Pvr, app AppData) error {
 
 	updateDockerFromFrom(&src, app.From)
 
-	dockerConfig := map[string]interface{}{}
-	//	Exists flag is true only if the image got loaded which will depend on
+	// Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
 		//docker config
 		src.DockerDigest = app.LocalImage.DockerDigest
-		dockerConfig = app.LocalImage.DockerConfig
+		src.DockerConfig = app.LocalImage.DockerConfig
 	} else if app.RemoteImage.Exists {
 		// Remote repo.
 		src.DockerDigest = app.RemoteImage.DockerDigest
 		src.DockerPlatform = app.RemoteImage.DockerPlatform
-		dockerConfig = app.RemoteImage.DockerConfig
+		src.DockerConfig = app.RemoteImage.DockerConfig
 	}
 
 	if app.ConfigFile != "" {
+		dockerConfig := map[string]interface{}{}
+
 		config, err := GetDockerConfigFile(p, &app)
 		if err != nil {
 			return err

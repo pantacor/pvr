@@ -261,6 +261,9 @@ func (p *Pvr) FindDockerImage(app *AppData) error {
 
 // LoadRemoteImage : To check whether Image Exist In Remote Docker Or Not
 func (p *Pvr) LoadRemoteImage(app *AppData) error {
+
+	var dockerManifest *schema2.Manifest
+
 	app.RemoteImage = DockerImage{
 		Exists: false,
 	}
@@ -270,20 +273,6 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 	}
 	auth, err := p.AuthConfig(app.Username, app.Password, image.Domain)
 	if err != nil {
-		return err
-	}
-	dockerManifest, err := p.GetDockerManifest(image, auth)
-	if err != nil {
-		manifestErr := ReportDockerManifestError(err, app.From)
-		if err.Error() == "image not found or you do not have access" {
-			fmt.Printf(manifestErr.Error() + "\n")
-			return nil
-		}
-		return manifestErr
-	}
-	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, auth)
-	if err != nil {
-		err = ReportDockerManifestError(err, app.From)
 		return err
 	}
 	dockerRegistry, err := p.GetDockerRegistry(image, auth)
@@ -336,11 +325,33 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 				if err != nil {
 					return err
 				}
+				fmt.Fprintf(os.Stderr, "Found Manifest for platform %s\n",
+					dockerPlatform)
+
 				break
 			} else {
 				dockerPlatform = ""
 			}
 		}
+	}
+
+	if dockerManifest == nil {
+		dockerManifest, err = p.GetDockerManifest(image, auth)
+		if err != nil {
+			manifestErr := ReportDockerManifestError(err, app.From)
+			if err.Error() == "image not found or you do not have access" {
+				fmt.Fprintf(os.Stderr, manifestErr.Error()+"\n")
+				return nil
+			}
+			return manifestErr
+		}
+		fmt.Fprintf(os.Stderr, "Found Manifest for default platform.\n")
+	}
+
+	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, auth)
+	if err != nil {
+		err = ReportDockerManifestError(err, app.From)
+		return err
 	}
 
 	// if we cannot find our arch we go the old direct way of retrieving repo
