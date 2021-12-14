@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
+	"gitlab.com/pantacor/pvr/models"
 
 	"github.com/urfave/cli"
 )
@@ -101,15 +102,12 @@ func CommandAppInstall() cli.Command {
 				Source:       source,
 				Username:     username,
 				Password:     password,
+				SourceType:   c.String("type"),
 				TemplateArgs: map[string]interface{}{},
 			}
 
-			err = pvr.FindDockerImage(&app)
-			if err != nil {
-				fmt.Println("\nSeems like you have an invalid docker digest value in your " + appname + "/src.json file\n")
-				fmt.Println("\nPlease run \"pvr app update " + appname + " --source=" + c.String("source") + "\" to auto fix it or update docker_digest field by editing " + appname + "/src.json  to fix it manually\n")
-				return cli.NewExitError(err, 3)
-			}
+			pvr.SetSourceTypeFromManifest(&app, nil)
+
 			err = pvr.InstallApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
@@ -131,6 +129,11 @@ func CommandAppInstall() cli.Command {
 			Name:   "password, p",
 			Usage:  "Use `PVR_REGISTRY_PASSWORD` for authorization with docker registrar",
 			EnvVar: "PVR_REGISTRY_PASSWORD",
+		},
+		cli.StringFlag{
+			Name:   "type, t",
+			Usage:  fmt.Sprintf("Type of source. available types [%s, %s, %s]", models.SourceTypeDocker, models.SourceTypePvr, models.SourceTypeRootFs),
+			EnvVar: "PVR_SOURCE_TYPE",
 		},
 		cli.StringFlag{
 			Name:   "source",

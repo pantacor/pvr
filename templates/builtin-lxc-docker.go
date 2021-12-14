@@ -24,7 +24,19 @@ lxc.pty.max = {{ .Source.args.LXC_PTY_MAX | pvr_ifNull "1024" }}
 {{- if .Source.args.PV_DEBUG_MODE }}
 lxc.log.file = /pv/logs/{{ .Source.name }}.log
 {{- end }}
-lxc.cgroup.devices.allow = {{ .Source.args.LXC_CGROUP_DEVICES_ALLOW | pvr_ifNull "a" }}
+{{- if .Source.args.PVR_LXC_CGROUP_DEVICES_WHITE }}
+lxc.cgroup.devices.deny = a
+{{- range $i,$v := .Source.args.PVR_LXC_CGROUP_DEVICES_WHITE }}
+lxc.cgroup.devices.allow = {{ $v }}
+{{- end }}
+{{- else }}
+lxc.cgroup.devices.allow = a
+{{- end }}
+{{- if .Source.args.PVR_LXC_CGROUP_V1 }}
+{{- range $i,$v := .Source.args.PVR_LXC_CGROUP_V1 }}
+lxc.cgroup.{{ $v }}
+{{- end }}
+{{- end }}
 lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
 {{- if .Docker.Entrypoint }}
@@ -168,9 +180,9 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	RUN_JSON = `{{ "" -}}
 {
 	"#spec": "service-manifest-run@1",
-	"config": "lxc.container.conf",
-	{{- if ne .Source.args.PV_RUNLEVEL "data" }}
 	"name":"{{- .Source.name -}}",
+	{{- if ne .Source.args.PV_RUNLEVEL "data" }}
+	"config": "lxc.container.conf",
 	{{- end }}
 	{{- if .Source.args.PV_RUNLEVEL }}
 	"runlevel": "{{- .Source.args.PV_RUNLEVEL }}",
@@ -191,6 +203,9 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	"exports": {{  .Source.exports | sprig_toPrettyJson | sprig_indent 8 }},
 	"logs": {{  .Source.logs | sprig_toPrettyJson | sprig_indent 8 }},
 	"type":"lxc",
+	{{- if .Source.args.PV_ROLES }}
+	"roles": {{- .Source.args.PV_ROLES | sprig_toPrettyJson | sprig_indent 8 }},
+	{{- end }}
 	{{- end }}
 	"root-volume": "root.squashfs",
 	"volumes":[

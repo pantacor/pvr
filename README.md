@@ -1029,6 +1029,63 @@ Application added
 
 ```
 
+## How to use rootfs type
+
+We now can create an app, install an app, and update an app using as source a root filesystem, that filesystem could be as a tar in local for the computer is running the PVR, could be a plain folder with the filesystem inside, or could be an URL where the tar is to be downloaded.
+
+#### Add app from rootfs
+
+```
+pvr app add --from=~/Desktop/pvwebstatus -t rootfs pvwebstatus
+```
+
+This will create a new application folder with these files:
+
+```
+pvwebstatus/
+├── lxc.container.conf
+├── root.squashfs
+├── root.squashfs.rootfs-digest
+├── run.json
+└── src.json
+```
+
+The Source file will have a rootfs_url argument and rootfs_digest to track the filesystem digest.
+
+If you need to add some docker_config on creation to the app, you could use all the parameters supported. Example:
+
+```
+pvr app add --from=~/Desktop/pvwebstatus --config-json=pvwebstatus.config.json -t rootfs pvwebstatus
+```
+
+Where the `pvwebstatus.config.json` is a JSON configuration.
+
+
+```json
+{
+  "ArgsEscaped": true,
+  "Cmd": [
+    "/app/pantavisor-web-status"
+  ],
+  "Env": [
+    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  ],
+  "WorkingDir": "/app"
+}
+```
+
+## How to use pvr type
+
+Another source that could be used as a source for an application is a device description inside your computer or from a PV repository URL.
+
+#### Add app from pvr
+
+You could use any PVR repository compatible URL, which could be a local .pvr folder or a remote repository URL.
+
+```
+pvr app add -t pvr --from https://pvr.pantahub.com/highercomve/one_marketplace_production#tailscale tailscale
+```
+
 ## pvr app info <APP_NAME>
 
 pvr app info <appname> :output info and state of appname
@@ -1093,6 +1150,21 @@ Application updated
 
 ```
 
+#### Update app from rootfs
+
+Here you can update like a normal docker container:
+
+```
+pvr app update pvwebstatus
+```
+
+But  you can update from another tar or an URL
+
+
+```
+pvr app update --from=~/Desktop/pvwebstatus.tar pvwebstatus
+```
+
 
 ## pvr deploy <deploy-dir> [source-repos]+
 
@@ -1125,4 +1197,111 @@ Commands currently supported are:
  * pvr sig update - updates a committed signature from the _pvs/ hierarchy to be validate against committed state
  * pvr sig ls - list files covered by signatures in _sigs/ hieararchy; by default sig ls will show signature info while considering _all_ signatures in the system state
 
- 
+
+## PVR sig with CA commands
+
+```
+commit c2d6f1450422b89d90948499c7cd6dd6949e5df3 (HEAD -> feature/pvs-ca, origin/feature/pvs-ca)
+Author: Alexander Sack <asac@pantacor.com>
+Date:   Wed Oct 20 17:58:50 2021 +0200
+
+    add support for using x509 cert chains using x5c jws header to determine trust in pvr signatures
+    
+    * introduce new --x5c argument pvr app sig command to provide the chain to include in pvr sig add and update commands
+    * introduce --cacerts argument to pvr sig commands to allow to post a trust CACERTS file to use to validate in pvr app ls;
+      using special value _system will use the system cert store to validate ca chain
+    * pubkey validation now allows to have multiple trusted pubkeys in the file referenced by --pubkey
+    * document this feature in README.md
+    
+    Example 1: "add signature with trust ca chain"
+    
+    Below statement injects the myKey.crt as the trust chain into the jws.
+    If you have intermediates your .crt file would need to include those
+    also in reverse order.
+    
+    ```
+    pvr sig --x5c ../ca/myKey.crt --key ../ca/myKey.key add --part nginx
+    ```
+    
+    Example 2: "update signatures with trustchain"
+    
+    Below will refresh the nginx.json signature and attach myKey.crt as
+    the trust ca cert chain to validate against root certificates
+    
+    ```
+    pvr sig --x5c ../ca/myKey.crt --key ../ca/myKey.key update _sigs/nginx.json
+    ```
+    
+    Example 3: "validate signatures with cert pool in file"
+    
+    Below you can see how to validate signature with ca cert pool in file myCA.pem.
+    
+    ```
+    pvr sig --cacerts ../ca/myCA.pem ls --part _sigs/nginx.json
+    ```
+    
+    Example 4: use system ca cert pool to validate signature
+    
+    For this you have to put your myCA.pem into one of the system folders for
+    trusted certificates. e.g. /etc/ssl/certs
+    
+    ```
+    pvr sig ls --part _sigs/nginx.json
+    ```
+```
+
+# PVR dm commands (device-mapper)
+
+pvr device mapper support for container volumes allows for an easy way to
+postprocess the squashfs volumes produced by pvr app add etc. in a way that
+the pantavisor device mapper addon can mount volumes using device-mapper.
+
+For now dm-verity type device mapper entries are supported by pantavisor
+client and hence pvr supports that mode first and foremost for now.
+
+## PVR dm-convert
+
+This command allows you to convert any standard squashfs volume into a
+device-mapper mounted volume.
+
+For dm-verity this will create a manifest file in <container>/_dm/<volume>.json,
+e.g. os/_dm/root.squashfs.json.
+
+To convert a volume simply use the following command:
+
+```
+pvr dm-convert os root.squashfs
+
+```
+This will convert the root.squashfs volume of the container 'os' into
+a device mapper enabled one.
+
+It will create the os/_dm/root.squashfs.json manifest:
+
+```
+$ cat os/_dm/root.squashfs.json | jq .
+{
+  "type": "dm-verity"
+  "data_device": "root.squashfs",
+  "hash_device": "root.squashfs.hash",
+  "root_hash": "88298f349288e685ac2474134ef22bf8f77465cde250c9f698780b5b6d942b96",
+}
+```
+
+... and also the hash_device in `os/root.squashfs.hash`.
+
+Also it will convert the volume reference in run.json to "dm:<volume", e.g.
+`dm:rootfs.squashfs`. This syntax will ensure that pantavisor will not try to
+mount the squash himself, but rather delegate that to a device-mapper
+volume handler.
+
+You can then `pvr commit` this and post it to a pantavisor device-mapper
+enabled device
+
+## PVR dm-apply
+
+This command iterates through the whole committed pristine json of the repo
+and updates the hash and manifests for all dm-verity manifests.
+
+This is good if you updated a container and wnat to recalculate the hash file.
+

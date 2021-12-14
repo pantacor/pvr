@@ -18,7 +18,6 @@ package libpvr
 import (
 	"archive/tar"
 	"bufio"
-	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/base64"
@@ -51,6 +50,7 @@ const (
 	MAKE_SQUASHFS_CMD              = "mksquashfs"
 	SQUASH_FILE                    = "root.squashfs"
 	DOCKER_DIGEST_FILE             = "root.squashfs.docker-digest"
+	ROOTFS_DIGEST_FILE             = "root.squashfs.rootfs-digest"
 	DOCKER_DOMAIN                  = "docker.io"
 	DOCKER_DOMAIN_URL              = "https://" + DOCKER_DOMAIN
 	DOCKER_REGISTRY                = "https://index.docker.io/v1/"
@@ -261,6 +261,9 @@ func (p *Pvr) FindDockerImage(app *AppData) error {
 
 // LoadRemoteImage : To check whether Image Exist In Remote Docker Or Not
 func (p *Pvr) LoadRemoteImage(app *AppData) error {
+
+	var dockerManifest *schema2.Manifest
+
 	app.RemoteImage = DockerImage{
 		Exists: false,
 	}
@@ -270,20 +273,6 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 	}
 	auth, err := p.AuthConfig(app.Username, app.Password, image.Domain)
 	if err != nil {
-		return err
-	}
-	dockerManifest, err := p.GetDockerManifest(image, auth)
-	if err != nil {
-		manifestErr := ReportDockerManifestError(err, app.From)
-		if err.Error() == "image not found or you do not have access" {
-			fmt.Printf(manifestErr.Error() + "\n")
-			return nil
-		}
-		return manifestErr
-	}
-	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, auth)
-	if err != nil {
-		err = ReportDockerManifestError(err, app.From)
 		return err
 	}
 	dockerRegistry, err := p.GetDockerRegistry(image, auth)
@@ -336,11 +325,33 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 				if err != nil {
 					return err
 				}
+				fmt.Fprintf(os.Stderr, "Found Manifest for platform %s\n",
+					dockerPlatform)
+
 				break
 			} else {
 				dockerPlatform = ""
 			}
 		}
+	}
+
+	if dockerManifest == nil {
+		dockerManifest, err = p.GetDockerManifest(image, auth)
+		if err != nil {
+			manifestErr := ReportDockerManifestError(err, app.From)
+			if err.Error() == "image not found or you do not have access" {
+				fmt.Fprintf(os.Stderr, manifestErr.Error()+"\n")
+				return nil
+			}
+			return manifestErr
+		}
+		fmt.Fprintf(os.Stderr, "Found Manifest for default platform.\n")
+	}
+
+	dockerConfig, err := p.GetDockerConfig(dockerManifest, image, auth)
+	if err != nil {
+		err = ReportDockerManifestError(err, app.From)
+		return err
 	}
 
 	// if we cannot find our arch we go the old direct way of retrieving repo
@@ -424,49 +435,6 @@ func LoadLocalImage(app *AppData) error {
 	return nil
 }
 
-// GetFileContentType : Get File Content Type of a file
-func GetFileContentType(src string) (string, error) {
-	file, err := os.Open(src)
-	defer file.Close()
-	if err != nil {
-		return "", err
-	}
-	buffer := make([]byte, 512)
-	_, err = file.Read(buffer)
-	if err != nil {
-		return "", err
-	}
-	contentType := http.DetectContentType(buffer)
-	return contentType, nil
-}
-
-// Untar : Untar a file or folder
-func Untar(dst string, src string) error {
-	contentType, err := GetFileContentType(src)
-	if err != nil {
-		return err
-	}
-	tarPath, err := exec.LookPath(TAR_CMD)
-	if err != nil {
-		return err
-	}
-	args := []string{tarPath, "xzvf", src, "-C", dst, "--exclude", ".wh.*"}
-	if contentType == "application/octet-stream" {
-		args = []string{tarPath, "xvf", src, "-C", dst, "--exclude", ".wh.*"}
-	}
-	PrintDebugln(args)
-	untar := exec.Command(args[0], args[1:]...)
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	untar.Stdout = &out
-	untar.Stderr = &stderr
-	err = untar.Run()
-	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-	}
-	return err
-}
-
 // AppData : To hold all required App Information
 type AppData struct {
 	Appname         string
@@ -484,6 +452,7 @@ type AppData struct {
 	ConfigFile      string
 	Volumes         []string
 	FormatOptions   string
+	SourceType      string
 }
 
 func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
@@ -558,7 +527,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		}
 
 		MkdirAll(tempdir+"/layers", 0777)
-		err = Untar(tempdir+"/layers", filename)
+		err = Untar(tempdir+"/layers", filename, []string{"--exclude", ".wh.*"})
 		if err != nil {
 			return err
 		}
@@ -636,7 +605,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 			log.Println("Error processing whiteouts.")
 			return err
 		}
-		err = Untar(extractPath, file)
+		err = Untar(extractPath, file, []string{"--exclude", ".wh.*"})
 		if err != nil {
 			return err
 		}
@@ -654,53 +623,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		PrintDebugf("Deleted %s file\n", fileToDelete)
 	}
 
-	makeSquashfsPath, err := exec.LookPath(MAKE_SQUASHFS_CMD)
-	if err != nil {
-		return err
-	}
-
-	if makeSquashfsPath == "" {
-		return ErrMakeSquashFSNotFound
-	}
-
-	tempSquashFile := filepath.Join(app.DestinationPath, SQUASH_FILE+".new")
-	squashFile := filepath.Join(app.DestinationPath, SQUASH_FILE)
-
-	squashExist, err := IsFileExists(squashFile)
-	if err != nil {
-		return err
-	}
-	// make sure the squashfs file did not exists
-	if squashExist {
-		err := Remove(squashFile)
-		if err != nil {
-			return err
-		}
-	}
-
-	comp := []string{}
-	if app.Appmanifest.FormatOptions == "" {
-		comp = []string{"-comp", "xz"}
-	} else {
-		comp = strings.Split(app.Appmanifest.FormatOptions, " ")
-	}
-
-	args := []string{makeSquashfsPath, extractPath, tempSquashFile}
-	args = append(args, comp...)
-
-	fmt.Println("Generating squashfs file: " + strings.Join(args, " "))
-	makeSquashfs := exec.Command(args[0], args[1:]...)
-	err = makeSquashfs.Run()
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("Generating squashfs digest")
-
-	err = os.Rename(tempSquashFile, squashFile)
-	if err != nil {
-		return err
-	}
+	MakeSquash(extractPath, &app)
 	return ioutil.WriteFile(digestFile, []byte(digest), 0644)
 }
 

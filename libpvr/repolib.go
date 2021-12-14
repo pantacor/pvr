@@ -280,6 +280,10 @@ func (p *Pvr) AddFile(globs []string) error {
 	return nil
 }
 
+func (p *Pvr) GetCPristineJson() ([]byte, error) {
+	return cjson.Marshal(p.PristineJsonMap)
+}
+
 // create the canonical json for the working directory
 func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 
@@ -318,7 +322,7 @@ func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 		}
 		// inline json
 		if strings.HasSuffix(filepath.Base(filePath), ".json") {
-			jsonFile := map[string]interface{}{}
+			var jsonFile interface{}
 
 			data, err := ioutil.ReadFile(filePath)
 			if err != nil {
@@ -408,11 +412,18 @@ func (p *Pvr) InitCustom(customInitJson string, objectsDir string) error {
 
 func (p *Pvr) Diff() (*[]byte, error) {
 	workingJson, _, err := p.GetWorkingJson()
+
 	if err != nil {
 		return nil, err
 	}
 
-	diff, err := jsonpatch.CreateMergePatch(p.PristineJson, workingJson)
+	cPristineJson, err := p.GetCPristineJson()
+
+	if err != nil {
+		return nil, err
+	}
+
+	diff, err := jsonpatch.CreateMergePatch(cPristineJson, workingJson)
 
 	if err != nil {
 		return nil, err
@@ -689,8 +700,14 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 	pvrRemoteUrl := repoUrl
 	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
 
-	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
-		return req.Get(pvrRemoteUrl.String())
+	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (response *resty.Response, err error) {
+		fmt.Fprintf(os.Stderr, "Getting remote repositor info ... ")
+		if response, err = req.Get(pvrRemoteUrl.String()); err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR "+err.Error()+"]\n")
+			return response, err
+		}
+		fmt.Fprintf(os.Stderr, "[OK]\n")
+		return response, err
 	})
 
 	if err != nil {
@@ -1016,41 +1033,50 @@ func (p *Pvr) putFiles(filePut ...FilePut) []FilePut {
 func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	var baselineState map[string]interface{}
+	var filePutResults []FilePut
+	var shaSeen map[string]interface{}
+	var filePuts []FilePut
+	var filesAndObjects, baselineFilesAndObjects map[string]string
+	var refObjects map[string]interface{}
+	var err error
 
 	// we have no getUrl in device create and pubobjects case
 	if pvrRemote.JsonGetUrl != "" {
+		fmt.Fprintf(os.Stderr, "Synching baseline state with device")
+
 		buf, err := p.getJSONBuf(pvrRemote)
 
 		if err != nil {
-			return err
+			goto errout
 		}
 
 		json.Unmarshal(buf, &baselineState)
 
 		if err != nil {
-			return err
+			goto errout
 		}
+		fmt.Fprintf(os.Stderr, " [OK]\n")
 	}
 
-	baselineFilesAndObjects, err := listFilesAndObjectsFromJson(baselineState, []string{})
+	baselineFilesAndObjects, err = listFilesAndObjectsFromJson(baselineState, []string{})
 
 	if err != nil {
 		return err
 	}
 
-	refObjects := map[string]interface{}{}
+	refObjects = map[string]interface{}{}
 	for _, v := range baselineFilesAndObjects {
 		refObjects[v] = true
 	}
 
-	filesAndObjects, err := p.listFilesAndObjects([]string{})
+	filesAndObjects, err = p.listFilesAndObjects([]string{})
 	if err != nil {
 		return err
 	}
 
-	filePuts := []FilePut{}
+	filePuts = []FilePut{}
 
-	shaSeen := map[string]interface{}{}
+	shaSeen = map[string]interface{}{}
 
 	// push all objects
 	for k, v := range filesAndObjects {
@@ -1077,16 +1103,24 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			uri += "/"
 		}
 
+		fmt.Fprintf(os.Stderr, "Posting object info for: "+k+" ... ")
+
 		response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
-			return req.SetBody(remoteObject).Post(uri)
+			res, err := req.SetBody(remoteObject).Post(uri)
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr, " [ERROR: "+err.Error()+"]")
+			}
+			return res, err
 		})
 
 		if err != nil {
-			return err
+			goto errout
 		}
 
 		if response == nil {
-			return errors.New("BAD STATE; no respo")
+			err = errors.New("BAD STATE; no respo")
+			goto errout
 		}
 
 		if shaSeen[remoteObject.Sha] != nil {
@@ -1098,7 +1132,8 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 		if response.StatusCode() != http.StatusOK &&
 			response.StatusCode() != http.StatusConflict {
-			return errors.New("Error posting object " + strconv.Itoa(response.StatusCode()))
+			err = errors.New("Error posting object " + strconv.Itoa(response.StatusCode()))
+			goto errout
 		}
 
 		if response.StatusCode() == http.StatusConflict {
@@ -1124,7 +1159,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 		err = json.Unmarshal(response.Body(), &remoteObject)
 		if err != nil {
-			return err
+			goto errout
 		}
 
 		fileName := filepath.Join(p.Objdir, v)
@@ -1144,21 +1179,28 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 			filePut.objType = objects.ObjectTypeObject
 		}
 		filePuts = append(filePuts, filePut)
+		fmt.Fprintln(os.Stderr, " [OK]")
 	}
 
-	filePutResults := p.putFiles(filePuts...)
+	filePutResults = p.putFiles(filePuts...)
 
 	for _, v := range filePutResults {
 		if v.err != nil {
-			return fmt.Errorf("Error putting file %s: %s", v.objName, v.err.Error())
+			err = fmt.Errorf("Error putting file %s: %s", v.objName, v.err.Error())
+			goto errout
 		}
-		if 200 != v.res.StatusCode {
-			return errors.New("REST call failed. " +
+		if v.res.StatusCode != 200 {
+			err = errors.New("REST call failed. " +
 				strconv.Itoa(v.res.StatusCode) + "  " + v.res.Status)
+			goto errout
 		}
 	}
 
 	return nil
+
+errout:
+	fmt.Fprintf(os.Stderr, " [ERROR: "+err.Error()+"]")
+	return err
 }
 
 func (p *Pvr) PutRemote(repoPath *url.URL, force bool) error {
@@ -1197,7 +1239,7 @@ func (p *Pvr) PutRemote(repoPath *url.URL, force bool) error {
 		return err
 	}
 
-	if 200 != response.StatusCode() {
+	if response.StatusCode() != 200 {
 		return errors.New("REST call failed. " +
 			strconv.Itoa(response.StatusCode()) + "  " + response.Status() + "\n\n   " + string(response.Body()))
 	}
@@ -1447,9 +1489,8 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	return nil
 }
 
-func (p *Pvr) UnpackRepo(repoPath string, outDir string) error {
-
-	err := Untar(outDir, repoPath)
+func (p *Pvr) UnpackRepo(repoPath, outDir string, options []string) error {
+	err := Untar(outDir, repoPath, options)
 	return err
 }
 
@@ -1493,7 +1534,7 @@ func (p *Pvr) GetStateJson(uri string) (
 			}
 			defer os.RemoveAll(repoPath)
 
-			err = p.UnpackRepo(uri, repoPath)
+			err = p.UnpackRepo(uri, repoPath, []string{})
 			if err != nil {
 				return
 			}
@@ -1579,7 +1620,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		}
 		defer os.RemoveAll(repoPath)
 
-		err = p.UnpackRepo(repoUri.Path, repoPath)
+		err = p.UnpackRepo(repoUri.Path, repoPath, []string{})
 		if err != nil {
 			return objectsCount, err
 		}
@@ -1963,11 +2004,12 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 
 		uri = pvrRemote.ObjectsEndpointUrl + "/" + v
 
-		response, err = p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
-			return req.Get(uri)
-		})
+		fmt.Fprintf(os.Stderr, "[OK]\n")
 
-		if err != nil {
+		if response, err = p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
+			return req.Get(uri)
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR "+err.Error()+"]\n")
 			return objectsCount, err
 		}
 
@@ -2010,7 +2052,7 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 	objectsCount = 0
 
 	if url.Scheme == "" {
-		return objectsCount, errors.New("Post must be a remote REST endpoint, not: " + url.String())
+		return objectsCount, errors.New("Get must be a remote REST endpoint, not: " + url.String())
 	}
 
 	remotePvr, err := p.initializeRemote(url)

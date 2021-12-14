@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -38,6 +39,7 @@ type PvsMatch struct {
 
 type PvsOptions struct {
 	Algorithm    gojose.SignatureAlgorithm
+	X5cPath      string
 	ExtraHeaders map[string]interface{}
 }
 
@@ -59,6 +61,7 @@ func selectPayload(buf []byte, match *PvsMatch) (*PvsPartSelection, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	for k, v := range bufMap {
 		var found interface{}
 		key := ""
@@ -101,6 +104,7 @@ func selectPayload(buf []byte, match *PvsMatch) (*PvsPartSelection, error) {
 			selection.NotSeen[k] = v
 		}
 	}
+
 	return &selection, nil
 }
 
@@ -134,6 +138,38 @@ func stripPayloadFromRawJSON(buf []byte) ([]byte, error) {
 	delete(m, "payload")
 
 	return cjson.Marshal(m)
+}
+
+func parseCertsFromPEMFile(path string) ([]*x509.Certificate, error) {
+
+	var certs []*x509.Certificate
+
+	pemCerts, err := ioutil.ReadFile(path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for len(pemCerts) > 0 {
+		var block *pem.Block
+		block, pemCerts = pem.Decode(pemCerts)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			continue
+		}
+
+		certBytes := block.Bytes
+		cert, err := x509.ParseCertificate(certBytes)
+		if err != nil {
+			continue
+		}
+
+		certs = append(certs, cert)
+	}
+
+	return certs, nil
 }
 
 func (p *Pvr) Verify(keyPath string) error {
@@ -225,7 +261,7 @@ func (p *Pvr) JwsSign(name string,
 		if p == nil {
 			break
 		}
-		if strings.HasPrefix(p.Type, "RSA ") {
+		if strings.Index(p.Type, "PRIVATE KEY") >= 0 {
 			signKey = p
 			break
 		}
@@ -242,6 +278,7 @@ func (p *Pvr) JwsSign(name string,
 			return err
 		}
 	}
+
 	//var privateKey *rsa.PrivateKey
 	var ok bool
 	privKey, ok := parsedKey.(*rsa.PrivateKey)
@@ -266,6 +303,21 @@ func (p *Pvr) JwsSign(name string,
 	signerOpts = signerOpts.
 		WithHeader("pvs", match).
 		WithType("PVS")
+
+	if options.X5cPath != "" {
+		certs, err := parseCertsFromPEMFile(options.X5cPath)
+		if err != nil {
+			return err
+		}
+
+		var certsRaw [][]byte
+
+		for _, c := range certs {
+			certsRaw = append(certsRaw, c.Raw)
+		}
+
+		signerOpts.WithHeader("x5c", certsRaw)
+	}
 
 	for k, v := range options.ExtraHeaders {
 		signerOpts = signerOpts.WithHeader(gojose.HeaderKey(k), v)
@@ -333,10 +385,14 @@ type JwsVerifySummary struct {
 //
 // The payload will be assembled from the prinstine system state JSON
 // using the match rule provided in PvsMatch struct included in the pvs.
-func (p *Pvr) JwsVerifyPvs(keyPath string, pvsPath string) (*JwsVerifySummary, error) {
+//
+// special value for caCerts "_system_" hints at using the system cacert
+// store. Can be configured using SSH_CERT_FILE and SSH_CERTS_DIR on linux
+//
+func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*JwsVerifySummary, error) {
 
-	var signKey *pem.Block
 	var summary JwsVerifySummary
+	var err error
 
 	buf := p.PristineJson
 
@@ -344,51 +400,85 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, pvsPath string) (*JwsVerifySummary, e
 		return nil, errors.New("Empty state format")
 	}
 
-	f, err := os.Open(keyPath)
+	var pubKeys []interface{}
+	var certPool *x509.CertPool
 
-	if err != nil {
-		return nil, err
-	}
+	if keyPath != "" {
+		f, err := os.Open(keyPath)
 
-	fileBuf, err := ioutil.ReadAll(f)
-	if err != nil {
-		return nil, err
-	}
-	rest := fileBuf
-	for {
-		var p *pem.Block
-		p, rest = pem.Decode(rest)
-		if p == nil {
-			break
-		}
-		if strings.HasPrefix(p.Type, "PUBLIC ") {
-			signKey = p
-			break
-		}
-	}
-
-	if signKey == nil {
-		return nil, errors.New("No valid PEM encoded RSA sign key found in " + keyPath)
-	}
-
-	var parsedKey interface{}
-	pemBytes := signKey.Bytes
-	if parsedKey, err = x509.ParsePKCS1PublicKey(pemBytes); err != nil {
-		if parsedKey, err = x509.ParsePKIXPublicKey(pemBytes); err != nil {
+		if err != nil {
 			return nil, err
 		}
+
+		fileBuf, err := ioutil.ReadAll(f)
+		if err != nil {
+			return nil, err
+		}
+		rest := fileBuf
+		var pubPems []*pem.Block
+
+		for rest != nil {
+			var p *pem.Block
+			p, rest = pem.Decode(rest)
+			if p == nil {
+				break
+			}
+			if strings.HasPrefix(p.Type, "PUBLIC ") {
+				pubPems = append(pubPems, p)
+			}
+		}
+
+		if pubPems == nil {
+			return nil, errors.New("No valid PEM encoded RSA verify key found " + keyPath)
+		}
+
+		for _, pubPem := range pubPems {
+			var parsedKey interface{}
+			pemBytes := pubPem.Bytes
+			if parsedKey, err = x509.ParsePKCS1PublicKey(pemBytes); err != nil {
+				if parsedKey, err = x509.ParsePKIXPublicKey(pemBytes); err != nil {
+					fmt.Printf("WARNING: Error Parsing Public key from PEM: %s\n", err.Error())
+					continue
+				}
+			}
+			var ok bool
+			pubKey, ok := parsedKey.(*rsa.PublicKey)
+			if !ok {
+				fmt.Printf("WARNING: casting pubey key\n")
+				continue
+			}
+			pubKeys = append(pubKeys, pubKey)
+			fmt.Printf("INFO: added pubey: %d\n", len(pubKeys))
+		}
+	} else if caCerts == "_system_" {
+		certPool, err = x509.SystemCertPool()
+		if err != nil {
+			fmt.Println("ERR 1:" + err.Error())
+			return nil, err
+		}
+		fmt.Println("using system cert pool")
+	} else if caCerts != "" {
+		certPool = x509.NewCertPool()
+		if err != nil {
+			return nil, err
+		}
+		caCertsBuf, err := ioutil.ReadFile(caCerts)
+		if err != nil {
+			return nil, err
+		}
+		ok := certPool.AppendCertsFromPEM(caCertsBuf)
+		if !ok {
+			fmt.Println("WARNING: could not append cacerts to cert pool. Disabling cert pool.")
+			certPool = nil
+		}
 	}
 
-	var ok bool
-	pubKey, ok := parsedKey.(*rsa.PublicKey)
-	if !ok {
-		return nil, errors.New("ERROR: parsing private pem RSA key")
+	fileBuf, err := ioutil.ReadFile(pvsPath)
+	if err != nil {
+		return nil, err
 	}
-
-	fileBuf, err = ioutil.ReadFile(pvsPath)
 
 	var previewSig map[string]interface{}
-
 	err = json.Unmarshal(fileBuf, &previewSig)
 
 	if err != nil {
@@ -410,7 +500,6 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, pvsPath string) (*JwsVerifySummary, e
 	}
 
 	header := sig.Signatures[0].Protected
-
 	pvsHeader := header.ExtraHeaders[gojose.HeaderKey("pvs")]
 
 	jsonBuf, err := json.Marshal(pvsHeader)
@@ -432,10 +521,48 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, pvsPath string) (*JwsVerifySummary, e
 
 	payloadBuf, err := selectPayloadBuf(buf, match)
 
-	err = sig.DetachedVerify(payloadBuf, pubKey)
+	var verified bool
 
-	if err != nil {
-		return nil, err
+	for _, pk := range pubKeys {
+		err = sig.DetachedVerify(payloadBuf, pk)
+		if err != nil {
+			continue
+		}
+	}
+
+	var pemcerts [][]*x509.Certificate
+
+	if !verified && certPool != nil {
+		pemcerts, err = sig.Signatures[0].Header.
+			Certificates(x509.VerifyOptions{
+				Roots: certPool,
+			})
+
+		if err == nil {
+			pubKey, ok := pemcerts[0][0].PublicKey.(*rsa.PublicKey)
+			if ok {
+				err = sig.DetachedVerify(payloadBuf, pubKey)
+			} else {
+				err = errors.New("Error retrieving RSA key")
+			}
+		}
+
+		if err == nil {
+			verified = true
+		}
+	}
+
+	if !verified && err != nil && pubKeys != nil {
+		for _, pubKey := range pubKeys {
+			if err = sig.DetachedVerify(payloadBuf, pubKey); err == nil {
+				verified = true
+				break
+			}
+		}
+	}
+
+	if !verified {
+		return nil, errors.New("Error validating signature from system cert pool and from provided but key file")
 	}
 
 	for k, _ := range selection.Selected {

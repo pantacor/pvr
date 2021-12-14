@@ -1,0 +1,246 @@
+//
+// Copyright 2021  Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+package libpvr
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
+	"github.com/urfave/cli"
+)
+
+func AddDockerApp(p *Pvr, app AppData) error {
+	err := p.FindDockerImage(&app)
+	if err != nil {
+		return cli.NewExitError(err, 3)
+	}
+
+	if app.Appname == "" {
+		return ErrEmptyAppName
+	}
+
+	appPath := filepath.Join(p.Dir, app.Appname)
+	if _, err := os.Stat(appPath); !os.IsNotExist(err) {
+		return nil
+	}
+
+	if app.From == "" {
+		return ErrEmptyFrom
+	}
+
+	persistence, err := GetPersistence(&app)
+	if err != nil {
+		return err
+	}
+
+	src := Source{
+		Spec:         SRC_SPEC,
+		Template:     TEMPLATE_BUILTIN_LXC_DOCKER,
+		TemplateArgs: app.TemplateArgs,
+		Config:       map[string]interface{}{},
+		Persistence:  persistence,
+		DockerSource: DockerSource{
+			DockerSource:  app.Source,
+			FormatOptions: app.FormatOptions,
+		},
+	}
+
+	updateDockerFromFrom(&src, app.From)
+
+	// Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
+	if app.LocalImage.Exists {
+		//docker config
+		src.DockerDigest = app.LocalImage.DockerDigest
+		src.DockerConfig = app.LocalImage.DockerConfig
+	} else if app.RemoteImage.Exists {
+		// Remote repo.
+		src.DockerDigest = app.RemoteImage.DockerDigest
+		src.DockerPlatform = app.RemoteImage.DockerPlatform
+		src.DockerConfig = app.RemoteImage.DockerConfig
+	}
+
+	if app.ConfigFile != "" {
+		dockerConfig := map[string]interface{}{}
+
+		config, err := GetDockerConfigFile(p, &app)
+		if err != nil {
+			return err
+		}
+
+		for k, v := range config {
+			dockerConfig[k] = v
+		}
+		//	Exists flag is true only if the image got loaded which will depend on
+		//  priority order provided in --source=local,remote
+		if app.LocalImage.Exists {
+			app.LocalImage.DockerConfig = dockerConfig
+		} else if app.RemoteImage.Exists {
+			app.RemoteImage.DockerConfig = dockerConfig
+		}
+	}
+
+	srcContent, err := json.MarshalIndent(src, " ", " ")
+	if err != nil {
+		return err
+	}
+
+	err = os.Mkdir(appPath, 0777)
+	if err != nil {
+		return err
+	}
+
+	srcFilePath := filepath.Join(appPath, SRC_FILE)
+	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
+	if err != nil {
+		return err
+	}
+
+	return p.InstallApplication(app)
+}
+
+func UpdateDockerApp(p *Pvr, app AppData) error {
+	appManifest, err := p.GetApplicationManifest(app.Appname)
+	if err != nil {
+		return err
+	}
+
+	if app.Source == "" {
+		app.Source = appManifest.DockerSource.DockerSource
+	}
+	if app.Platform == "" {
+		app.Platform = appManifest.DockerPlatform
+	}
+
+	if app.From != "" {
+		updateDockerFromFrom(appManifest, app.From)
+	}
+
+	err = p.FindDockerImage(&app)
+	if err != nil {
+		return err
+	}
+
+	trackURL := appManifest.DockerName
+	if appManifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
+	}
+
+	//	Exists flag is true only if the image got loaded which will depend on
+	//  priority order provided in --source=local,remote
+	if app.LocalImage.Exists {
+		appManifest.DockerDigest = app.LocalImage.DockerDigest
+		appManifest.DockerConfig = app.LocalImage.DockerConfig
+	} else if app.RemoteImage.Exists {
+		appManifest.DockerDigest = app.RemoteImage.DockerDigest
+		appManifest.DockerPlatform = app.RemoteImage.DockerPlatform
+		appManifest.DockerConfig = app.RemoteImage.DockerConfig
+	}
+
+	appManifest.DockerSource.DockerSource = app.Source
+	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
+	if err != nil {
+		return err
+	}
+
+	srcFilePath := filepath.Join(p.Dir, app.Appname, SRC_FILE)
+	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
+	if err != nil {
+		return err
+	}
+
+	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	if err != nil {
+		return err
+	}
+	if appManifest.DockerDigest == squashFSDigest {
+		fmt.Println("Application already up to date.")
+		return nil
+	}
+	return p.InstallApplication(app)
+}
+
+func InstallDockerApp(p *Pvr, app AppData) error {
+	appManifest, err := p.GetApplicationManifest(app.Appname)
+	if err != nil {
+		return err
+	}
+
+	if appManifest.DockerName == "" {
+		return err
+	}
+
+	trackURL := appManifest.DockerName
+	if appManifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
+	}
+
+	app.DockerURL = trackURL
+
+	var dockerConfig map[string]interface{}
+
+	// src.json's generated by new pvr's will remember the DockerConfig
+	// to support reapplying templates without having knowledge about the
+	// the docker itself (e.g. on a plane of if the docker was never uploaded
+	// to a registry). The "else" codepath exists for src.json's that were
+	// generated previously. For those we will need to get dockerconfig from
+	// local or remote registry still.....
+	if appManifest.DockerConfig != nil {
+		dockerConfig = appManifest.DockerConfig
+	} else {
+		err = p.FindDockerImage(&app)
+
+		if err != nil {
+			fmt.Println("\nSeems like you have an invalid docker digest value in your " + app.Appname + "/src.json file\n")
+			fmt.Println("\nPlease run \"pvr app update " + app.Appname + " --source=" + app.Source + "\" to auto fix it or update docker_digest field by editing " + app.Appname + "/src.json  to fix it manually\n")
+			return cli.NewExitError(err, 3)
+		}
+
+		fmt.Println("WARNING: The src.json for " + appManifest.Name + " has been genrated by old pvr; run pvr update " + appManifest.Name + " to get rid of this warning.")
+		//	Exists flag is true only if the image got loaded which will depend on
+		//  priority order provided in --source=local,remote
+		if app.LocalImage.Exists {
+			dockerConfig = app.LocalImage.DockerConfig
+		} else if app.RemoteImage.Exists {
+			dockerConfig = app.RemoteImage.DockerConfig
+		} else {
+			return cli.NewExitError(errors.New("docker Name can not be resolved either from local docker or remote registries"), 4)
+		}
+	}
+
+	app.Appmanifest = appManifest
+	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
+	if err != nil {
+		return err
+	}
+	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
+
+	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	if err != nil {
+		return err
+	}
+
+	if appManifest.DockerDigest == squashFSDigest {
+		fmt.Println("Application already up to date. Will skip generating new root.squashfs")
+		return nil
+	}
+
+	return p.GenerateApplicationSquashFS(app)
+}
