@@ -97,10 +97,18 @@ func AddDockerApp(p *Pvr, app AppData) error {
 		}
 	}
 
-	srcContent, err := json.MarshalIndent(src, " ", " ")
+	srcContentRaw, err := json.MarshalIndent(src, " ", " ")
 	if err != nil {
 		return err
 	}
+
+	var iSrc map[string]interface{}
+	err = json.Unmarshal(srcContentRaw, &iSrc)
+	if err != nil {
+		return err
+	}
+
+	srcContentNormalized, err := json.MarshalIndent(iSrc, " ", " ")
 
 	err = os.Mkdir(appPath, 0777)
 	if err != nil {
@@ -108,7 +116,7 @@ func AddDockerApp(p *Pvr, app AppData) error {
 	}
 
 	srcFilePath := filepath.Join(appPath, SRC_FILE)
-	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
+	err = ioutil.WriteFile(srcFilePath, srcContentNormalized, 0644)
 	if err != nil {
 		return err
 	}
@@ -155,13 +163,24 @@ func UpdateDockerApp(p *Pvr, app AppData) error {
 	}
 
 	appManifest.DockerSource.DockerSource = app.Source
-	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
+	srcContentRaw, err := json.MarshalIndent(appManifest, " ", " ")
+	if err != nil {
+		return err
+	}
+
+	var iSrc interface{}
+	err = json.Unmarshal(srcContentRaw, &iSrc)
+	if err != nil {
+		return err
+	}
+
+	srcContentNormalized, err := json.MarshalIndent(iSrc, " ", " ")
 	if err != nil {
 		return err
 	}
 
 	srcFilePath := filepath.Join(p.Dir, app.Appname, SRC_FILE)
-	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
+	err = ioutil.WriteFile(srcFilePath, srcContentNormalized, 0644)
 	if err != nil {
 		return err
 	}

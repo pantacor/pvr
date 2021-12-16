@@ -426,7 +426,6 @@ func (p *Pvr) Diff() (*[]byte, error) {
 	}
 
 	diff, err := jsonpatch.CreateMergePatch(cPristineJson, workingJson)
-
 	if err != nil {
 		return nil, err
 	}
