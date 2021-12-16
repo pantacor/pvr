@@ -373,12 +373,14 @@ func (p *Pvr) LoadRemoteImage(app *AppData) error {
 		}
 	}
 
-	splits := make([]string, 2)
 	li := strings.LastIndex(app.From, ":")
-	splits[0] = app.From[:li]
-	splits[1] = app.From[li+1:]
-
-	imageName := splits[0]
+	var imageName string
+	if li < 0 {
+		imageName = app.From
+	} else {
+		splits := []string{app.From[:li], app.From[li+1:]}
+		imageName = splits[0]
+	}
 
 	//Extract image name from repo digest. eg: Extract "busybox" from "busybox@sha256:afe605d272837ce1732f390966166c2afff5391208ddd57de10942748694049d"
 	if strings.Contains(imageName, "@sha256") {
