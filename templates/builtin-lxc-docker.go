@@ -17,7 +17,8 @@ package templates
 
 const (
 	LXC_CONTAINER_CONF = `
-{{- if ne .Source.args.PV_RUNLEVEL "data" -}}
+{{- $runlevel := .Source.args.PV_RUNLEVEL }}
+{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" -}}
 	{{ "" -}}
 lxc.tty.max = {{ .Source.args.LXC_TTY_MAX | pvr_ifNull "8" }}
 lxc.pty.max = {{ .Source.args.LXC_PTY_MAX | pvr_ifNull "1024" }}
@@ -181,13 +182,13 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 {
 	"#spec": "service-manifest-run@1",
 	"name":"{{- .Source.name -}}",
-	{{- if ne .Source.args.PV_RUNLEVEL "data" }}
+	{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" }}
 	"config": "lxc.container.conf",
 	{{- end }}
 	{{- if .Source.args.PV_RUNLEVEL }}
 	"runlevel": "{{- .Source.args.PV_RUNLEVEL }}",
 	{{- end }}
-	{{- if ne .Source.args.PV_RUNLEVEL "data" }}
+	{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" }}
 	"storage":{
 		{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes .Source.persistence -}}
 		{{- if ne $key "lxc-overlay" }}
