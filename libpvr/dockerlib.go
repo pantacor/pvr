@@ -65,6 +65,15 @@ var (
 	stripFilesList             = []string{
 		"usr/bin/qemu-arm-static",
 	}
+	structureDirs = []string{
+		"proc",
+		"sys",
+		"dev",
+		"tmp",
+		"var/tmp",
+		"run",
+		"var/run",
+	}
 )
 
 type DockerManifest map[string]interface{}
@@ -621,6 +630,12 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		}
 
 		PrintDebugf("Deleted %s file\n", fileToDelete)
+	}
+
+	fmt.Println("Adding essential structural dirs to operate RO containers")
+	for _, file := range structureDirs {
+		dirToMake := filepath.Join(extractPath, file)
+		os.MkdirAll(dirToMake, 0755)
 	}
 
 	MakeSquash(extractPath, &app)
