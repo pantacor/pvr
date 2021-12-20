@@ -41,8 +41,7 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 		return err
 	}
 	if !srcURL.IsAbs() {
-		var repoURL *url.URL
-		repoURL = p.Session.GetApp().Metadata["PVR_REPO_BASEURL_url"].(*url.URL)
+		repoURL := p.Session.GetApp().Metadata["PVR_REPO_BASEURL_url"].(*url.URL)
 		srcURL = repoURL.ResolveReference(srcURL)
 	}
 
@@ -51,8 +50,7 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 		return err
 	}
 	if !destURL.IsAbs() {
-		var repoURL *url.URL
-		repoURL = p.Session.GetApp().Metadata["PVR_REPO_BASEURL_url"].(*url.URL)
+		repoURL := p.Session.GetApp().Metadata["PVR_REPO_BASEURL_url"].(*url.URL)
 		destURL = repoURL.ResolveReference(destURL)
 	}
 
@@ -105,7 +103,7 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 
 	// reduce destJson if we are not merging
 	if !merge {
-		for k, _ := range destJson {
+		for k := range destJson {
 			if destFrag != "" && strings.HasPrefix(k, destFrag+"/") {
 				delete(destJson, k)
 			} else if destFrag == "" && strings.Contains(k, "/") {

@@ -189,7 +189,7 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 
 	buf := p.PristineJson
 	if buf == nil {
-		return errors.New("Empty state format")
+		return errors.New("empty state format")
 	}
 
 	fileBuf, err := ioutil.ReadFile(pvsPath)
@@ -216,10 +216,7 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 	}
 
 	name := path.Base(pvsPath)
-	if strings.HasSuffix(name, ".json") {
-		name = name[0 : len(name)-5]
-	}
-
+	name = strings.TrimSuffix(name, ".json")
 	return p.JwsSign(name, privKeyPath, match, options)
 }
 
@@ -241,7 +238,7 @@ func (p *Pvr) JwsSign(name string,
 	buf := p.PristineJson
 
 	if buf == nil {
-		return errors.New("Empty state format")
+		return errors.New("empty state format")
 	}
 
 	f, err := os.Open(privKeyPath)
@@ -261,7 +258,7 @@ func (p *Pvr) JwsSign(name string,
 		if p == nil {
 			break
 		}
-		if strings.Index(p.Type, "PRIVATE KEY") >= 0 {
+		if strings.Contains(p.Type, "PRIVATE KEY") {
 			signKey = p
 			break
 		}
@@ -339,6 +336,9 @@ func (p *Pvr) JwsSign(name string,
 	}
 
 	sig, err := signer.Sign(payloadBuf)
+	if err != nil {
+		return err
+	}
 
 	strippedBuf, err := stripPayloadFromRawJSON([]byte(sig.FullSerialize()))
 
@@ -397,7 +397,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	buf := p.PristineJson
 
 	if buf == nil {
-		return nil, errors.New("Empty state format")
+		return nil, errors.New("empty state format")
 	}
 
 	var pubKeys []interface{}
@@ -543,7 +543,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 			if ok {
 				err = sig.DetachedVerify(payloadBuf, pubKey)
 			} else {
-				err = errors.New("Error retrieving RSA key")
+				err = errors.New("error retrieving RSA key")
 			}
 		}
 
@@ -562,16 +562,16 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	}
 
 	if !verified {
-		return nil, errors.New("Error validating signature from system cert pool and from provided but key file")
+		return nil, errors.New("error validating signature from system cert pool and from provided but key file")
 	}
 
-	for k, _ := range selection.Selected {
+	for k := range selection.Selected {
 		summary.Protected = append(summary.Protected, k)
 	}
-	for k, _ := range selection.NotSelected {
+	for k := range selection.NotSelected {
 		summary.Excluded = append(summary.Excluded, k)
 	}
-	for k, _ := range selection.NotSeen {
+	for k := range selection.NotSeen {
 		summary.NotSeen = append(summary.NotSeen, k)
 	}
 

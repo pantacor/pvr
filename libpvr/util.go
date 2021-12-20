@@ -267,12 +267,12 @@ func Max(x, y int) int {
 func GetPhAuthHeaderTokenKey(authHeader string) (string, error) {
 	// no auth header; nothing we can do magic here...
 	if authHeader == "" {
-		return "", errors.New("Bad Parameter (authHeader empty)")
+		return "", errors.New("bad Parameter (authHeader empty)")
 	}
 
 	authType, opts := getWwwAuthenticateInfo(authHeader)
 	if authType != "JWT" && authType != "Bearer" {
-		return "", errors.New("Invalid www-authenticate header retrieved")
+		return "", errors.New("invalid www-authenticate header retrieved")
 	}
 
 	realm := opts["realm"]
@@ -284,7 +284,7 @@ func GetPhAuthHeaderTokenKey(authHeader string) (string, error) {
 	}
 
 	if len(authEps) == 0 || len(realm) == 0 {
-		return "", errors.New("Bad Server Behaviour. Need ph-aeps and realm token in Www-Authenticate header. Check your server version")
+		return "", errors.New("bad Server Behaviour. Need ph-aeps and realm token in Www-Authenticate header. Check your server version")
 	}
 
 	return authEps[0] + " realm=" + realm, nil
@@ -306,13 +306,13 @@ func ReadOrCreateFile(filePath string) (*[]byte, error) {
 	}
 
 	if err != nil {
-		return nil, errors.New("OS error getting stats for: " + err.Error())
+		return nil, errors.New("oS error getting stats for: " + err.Error())
 	}
 
 	content, err := ioutil.ReadFile(filePath)
 
 	if err != nil {
-		return nil, errors.New("OS error reading file: " + err.Error())
+		return nil, errors.New("oS error reading file: " + err.Error())
 	}
 
 	return &content, nil
@@ -479,7 +479,7 @@ func (s *Session) CreateDevice(baseURL string, deviceNick string) (
 	if err != nil {
 		return response, err
 	}
-	return response, errors.New("Error creating device")
+	return response, errors.New("error creating device")
 }
 
 // LoginDevice : Login Device
@@ -513,7 +513,7 @@ func LoginDevice(
 	if err != nil {
 		return "", err
 	}
-	return "", errors.New("Error login device")
+	return "", errors.New("error login device")
 }
 
 // CreateTrail : Create Trail
@@ -537,7 +537,7 @@ func CreateTrail(baseURL string,
 	if err != nil {
 		return response, err
 	}
-	return response, errors.New("Error creating trail")
+	return response, errors.New("error creating trail")
 }
 
 // LogPrettyJSON : Pretty print Json content
@@ -606,7 +606,7 @@ func (s *Session) GetUserProfiles(baseURL string,
 	if err != nil {
 		return response, err
 	}
-	return response, errors.New("Error getting user profile details")
+	return response, errors.New("error getting user profile details")
 }
 
 // GetDevices : Get Devices
@@ -636,7 +636,7 @@ func (s *Session) GetDevices(baseURL string,
 	if err != nil {
 		return response, err
 	}
-	return response, errors.New("Error getting device details")
+	return response, errors.New("error getting device details")
 }
 
 // GetDevice : Get Device
@@ -666,7 +666,7 @@ func (s *Session) GetDevice(baseURL string,
 	if err != nil {
 		return response, err
 	}
-	return response, errors.New("Error getting device details")
+	return response, errors.New("error getting device details")
 }
 
 // SliceContainsItem : checks if an item exists in a string array or not
@@ -723,7 +723,7 @@ func (s *Session) UpdateDevice(
 	if err != nil {
 		return response, err
 	}
-	return response, errors.New("Error Updating " + updateField + " field")
+	return response, errors.New("error Updating " + updateField + " field")
 }
 
 // GetAuthStatus : Get Auth Status, GET /auth/auth_status
@@ -745,7 +745,7 @@ func (s *Session) GetAuthStatus(baseURL string) (
 	if err != nil {
 		return response, err
 	}
-	return response, errors.New("Error getting auth status")
+	return response, errors.New("error getting auth status")
 }
 
 //ValidateSourceFlag : Validate Source Flag
@@ -756,7 +756,7 @@ func ValidateSourceFlag(source string) error {
 	splits := strings.Split(source, ",")
 	for _, v := range splits {
 		if v != "remote" && v != "local" {
-			return errors.New("Source flag only accepts remote / local, (e.g. --source=remote,local)")
+			return errors.New("source flag only accepts remote / local, (e.g. --source=remote,local)")
 		}
 	}
 	return nil
@@ -992,7 +992,7 @@ func FixupRepoRef(repoUri string) (string, error) {
 		deviceNick := ""
 		splits := strings.Split(repoUri, "/")
 		if len(splits) == 1 {
-			return "", errors.New("Device nick is missing. (syntax:pvr get <USER_NICK>/<DEVICE_NICK>[#<part>]). See --help")
+			return "", errors.New("device nick is missing. (syntax:pvr get <USER_NICK>/<DEVICE_NICK>[#<part>]). See --help")
 		} else if len(splits) == 2 {
 			userNick = splits[0]
 			deviceNick = splits[1]

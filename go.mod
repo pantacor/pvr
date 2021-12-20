@@ -19,7 +19,7 @@ require (
 	github.com/coreos/clair v2.0.8+incompatible // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/docker/distribution v2.7.1+incompatible
-	github.com/docker/docker v1.13.1
+	github.com/docker/docker v20.10.12+incompatible
 	github.com/docker/docker-ce v0.0.0-20190724010320-53720a99f3c5 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/fatih/color v1.7.0 // indirect
@@ -50,6 +50,7 @@ require (
 	github.com/miolini/datacounter v1.0.2 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
+	github.com/moby/moby v20.10.12+incompatible // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/opencontainers/go-digest v1.0.0-rc1
@@ -69,6 +70,7 @@ require (
 	golang.org/x/mobile v0.0.0-20190415191353-3e0bab5405d6 // indirect
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a // indirect
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a // indirect
+	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 // indirect
 	google.golang.org/genproto v0.0.0-20200413115906-b5235f65be36 // indirect
 	google.golang.org/grpc v1.28.1 // indirect
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
