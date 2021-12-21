@@ -437,26 +437,28 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 			pemBytes := pubPem.Bytes
 			if parsedKey, err = x509.ParsePKCS1PublicKey(pemBytes); err != nil {
 				if parsedKey, err = x509.ParsePKIXPublicKey(pemBytes); err != nil {
-					fmt.Printf("WARNING: Error Parsing Public key from PEM: %s\n", err.Error())
+					fmt.Fprintf(os.Stderr, "WARNING: Error Parsing Public key from PEM: %s\n", err.Error())
 					continue
 				}
 			}
 			var ok bool
 			pubKey, ok := parsedKey.(*rsa.PublicKey)
 			if !ok {
-				fmt.Printf("WARNING: casting pubey key\n")
+				fmt.Fprintf(os.Stderr, "WARNING: casting pubey key\n")
 				continue
 			}
 			pubKeys = append(pubKeys, pubKey)
-			fmt.Printf("INFO: added pubey: %d\n", len(pubKeys))
+			if IsDebugEnabled {
+				fmt.Fprintf(os.Stderr, "INFO: added pubey: %d\n", len(pubKeys))
+			}
 		}
 	} else if caCerts == "_system_" {
 		certPool, err = x509.SystemCertPool()
 		if err != nil {
-			fmt.Println("ERR 1:" + err.Error())
+			fmt.Fprintln(os.Stderr, "ERR 1:"+err.Error())
 			return nil, err
 		}
-		fmt.Println("using system cert pool")
+		fmt.Fprintln(os.Stderr, "Using system cert pool")
 	} else if caCerts != "" {
 		certPool = x509.NewCertPool()
 		if err != nil {
@@ -468,9 +470,10 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 		}
 		ok := certPool.AppendCertsFromPEM(caCertsBuf)
 		if !ok {
-			fmt.Println("WARNING: could not append cacerts to cert pool. Disabling cert pool.")
+			fmt.Fprintln(os.Stderr, "WARNING: could not append cacerts to cert pool. Disabling cert pool.")
 			certPool = nil
 		}
+		fmt.Fprintln(os.Stderr, "Using custom cert pool")
 	}
 
 	fileBuf, err := ioutil.ReadFile(pvsPath)
@@ -524,6 +527,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	var verified bool
 
 	for _, pk := range pubKeys {
+
 		err = sig.DetachedVerify(payloadBuf, pk)
 		if err != nil {
 			continue
@@ -533,14 +537,24 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	var pemcerts [][]*x509.Certificate
 
 	if !verified && certPool != nil {
+		ku := []x509.ExtKeyUsage{
+			x509.ExtKeyUsageCodeSigning,
+		}
+
 		pemcerts, err = sig.Signatures[0].Header.
 			Certificates(x509.VerifyOptions{
-				Roots: certPool,
+				Roots:     certPool,
+				KeyUsages: ku,
 			})
 
-		if err == nil {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error setting up and validating certificates %w\n", err)
+		} else {
 			pubKey, ok := pemcerts[0][0].PublicKey.(*rsa.PublicKey)
 			if ok {
+				if IsDebugEnabled {
+					fmt.Fprintf(os.Stderr, "Validating payload: '%'\n", string(payloadBuf))
+				}
 				err = sig.DetachedVerify(payloadBuf, pubKey)
 			} else {
 				err = errors.New("error retrieving RSA key")
