@@ -81,21 +81,21 @@ type EncryptedAccountData struct {
 // GetEncryptedAccount encrypt account data in order to open the browser to finish the registration process
 func GetEncryptedAccount(authEp, email, username, password string) (*EncryptedAccountData, error) {
 	if authEp == "" {
-		return nil, errors.New("GetEncryptedAccount: no authentication endpoint provided.")
+		return nil, errors.New("getEncryptedAccount: no authentication endpoint provided")
 	}
 	if email == "" {
-		return nil, errors.New("GetEncryptedAccount: no email provided.")
+		return nil, errors.New("getEncryptedAccount: no email provided")
 	}
 	if username == "" {
-		return nil, errors.New("GetEncryptedAccount: no username provided.")
+		return nil, errors.New("getEncryptedAccount: no username provided")
 	}
 	if password == "" {
-		return nil, errors.New("GetEncryptedAccount: no password provided.")
+		return nil, errors.New("getEncryptedAccount: no password provided")
 	}
 
 	u1, err := url.Parse(authEp)
 	if err != nil {
-		return nil, errors.New("GetEncryptedAccount: error parsing EP url.")
+		return nil, errors.New("getEncryptedAccount: error parsing EP url")
 	}
 
 	accountsEp := u1.Scheme + "://" + u1.Hostname() + ":" + u1.Port() + PhAccountsEp
@@ -228,12 +228,12 @@ func (p *Session) DoLogs(
 	res, err := p.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 		burl, err := url.Parse(baseurl)
 		if err != nil {
-			return nil, errors.New("Cannot parse baseurl '" + baseurl + "': " + err.Error())
+			return nil, errors.New("cannot parse baseurl '" + baseurl + "': " + err.Error())
 		}
 
 		logsEpURL, err := url.Parse(PhLogsEp)
 		if err != nil {
-			return nil, errors.New("Cannot parse PhLogsEp '" + PhLogsEp + "': " + err.Error())
+			return nil, errors.New("cannot parse PhLogsEp '" + PhLogsEp + "': " + err.Error())
 		}
 
 		fullURL := burl.ResolveReference(logsEpURL)

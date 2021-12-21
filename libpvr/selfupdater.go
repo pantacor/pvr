@@ -112,7 +112,7 @@ func (pvr *Pvr) UpdatePvr(username, password string, silent bool) error {
 	}
 
 	if currentDigest == previousDigest {
-		if silent != true {
+		if !silent {
 			fmt.Fprintln(os.Stderr, "You already have the latest version of PVR :) \n\r")
 		}
 		return nil
@@ -383,7 +383,6 @@ func downloadlayers(layerdata *layerData) {
 		err:      nil,
 		cached:   false,
 	}
-	return
 }
 
 func daysSinceLastUpdate(lastCheckedPath string) (*float64, error) {
@@ -413,7 +412,7 @@ func daysSinceLastUpdate(lastCheckedPath string) (*float64, error) {
 		}
 	}
 
-	daysSinceLastModify := time.Now().Sub(lastChecked).Hours() / 24
+	daysSinceLastModify := time.Since(lastChecked).Hours() / 24
 
 	return &daysSinceLastModify, nil
 }

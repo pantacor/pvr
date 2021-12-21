@@ -62,20 +62,20 @@ func LoadConfig(filePath string) (*PvrAuthConfig, error) {
 	}
 
 	if err != nil {
-		return nil, errors.New("OS error getting stats for file in LoadConfig: " + err.Error())
+		return nil, errors.New("oS error getting stats for file in LoadConfig: " + err.Error())
 	}
 
 	byteJson, err := ioutil.ReadFile(filePath)
 
 	if err != nil {
-		return nil, errors.New("OS error reading config file LoadConfig: " + err.Error())
+		return nil, errors.New("oS error reading config file LoadConfig: " + err.Error())
 	}
 
 	var authConfig PvrAuthConfig
 
 	err = json.Unmarshal(byteJson, &authConfig)
 	if err != nil {
-		return nil, errors.New("JSON Unmarshal error parsing config file in LoadConfig (" + filePath + "): " + err.Error())
+		return nil, errors.New("jSON Unmarshal error parsing config file in LoadConfig (" + filePath + "): " + err.Error())
 	}
 
 	authConfig.path = filePath
@@ -88,16 +88,18 @@ func (p *PvrAuthConfig) DoRefresh(authEp, token string) (string, string, error) 
 	}
 
 	if token == "" {
-		return "", "", errors.New("DoRefresh: no token provided.")
+		return "", "", errors.New("doRefresh: no token provided")
 	}
 	if authEp == "" {
-		return "", "", errors.New("doAuthenticate: no authentication endpoint provided.")
+		return "", "", errors.New("doAuthenticate: no authentication endpoint provided")
 	}
 
 	response, err := resty.R().SetBody(m).
 		SetAuthToken(token).
 		Get(authEp + "/login")
-
+	if err != nil {
+		return "", "", err
+	}
 	m1 := map[string]interface{}{}
 	err = json.Unmarshal(response.Body(), &m1)
 
@@ -128,6 +130,9 @@ func (p *PvrAuthConfig) Save() error {
 		if os.IsNotExist(err) {
 			// lets mkdir a personal dir if it does not exists.
 			err = os.MkdirAll(d, 0700)
+			if err != nil {
+				return err
+			}
 		} else if err != nil {
 			return err
 		} else {
@@ -166,13 +171,13 @@ func doAuthenticate(authEp, username, password, scopes string) (string, string, 
 	}
 
 	if username == "" {
-		return "", "", errors.New("doAuthenticate: no username provided.")
+		return "", "", errors.New("doAuthenticate: no username provided")
 	}
 	if password == "" {
-		return "", "", errors.New("doAuthenticate: no password provided.")
+		return "", "", errors.New("doAuthenticate: no password provided")
 	}
 	if authEp == "" {
-		return "", "", errors.New("doAuthenticate: no authentication endpoint provided.")
+		return "", "", errors.New("doAuthenticate: no authentication endpoint provided")
 	}
 
 	response, err := resty.R().SetBody(m).Post(authEp + "/login")
@@ -188,13 +193,13 @@ func doAuthenticate(authEp, username, password, scopes string) (string, string, 
 	}
 
 	if response.StatusCode() != 200 {
-		return "", "", errors.New("Failed to Login: " + string(response.Body()))
+		return "", "", errors.New("failed to Login: " + string(response.Body()))
 	}
 
 	_, ok := m1["token"]
 
 	if !ok {
-		return "", "", errors.New("Illegal response: " + string(response.Body()))
+		return "", "", errors.New("illegal response: " + string(response.Body()))
 	}
 	return m1["token"].(string), m1["token"].(string), nil
 }
@@ -250,7 +255,7 @@ func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh, withAno
 
 	authType, opts := getWwwAuthenticateInfo(authHeader)
 	if authType != "JWT" && authType != "Bearer" {
-		return "", errors.New("Invalid www-authenticate header retrieved")
+		return "", errors.New("invalid www-authenticate header retrieved")
 	}
 	realm := opts["realm"]
 	authEpString := opts["ph-aeps"]
@@ -258,7 +263,7 @@ func (p *PvrAuthConfig) getNewAccessToken(authHeader string, tryRefresh, withAno
 	authEps := strings.Split(authEpString, ",")
 
 	if len(authEps) == 0 {
-		return "", errors.New("Bad Server Behaviour. Need ph-aeps token in Www-Authenticate header. Check your server version")
+		return "", errors.New("bad Server Behaviour. Need ph-aeps token in Www-Authenticate header. Check your server version")
 	}
 
 	authEp := authEps[0]
