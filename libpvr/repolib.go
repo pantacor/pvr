@@ -375,7 +375,7 @@ func (p *Pvr) InitCustom(customInitJson string, objectsDir string) error {
 		return errors.New("pvr init: .pvr directory/file found (" + p.Pvrdir + "). Cannot initialize an existing repository.")
 	}
 
-	err = os.Mkdir(p.Pvrdir, 0755)
+	err = os.MkdirAll(p.Pvrdir, 0755)
 	if err != nil {
 		return err
 	}
@@ -392,7 +392,7 @@ func (p *Pvr) InitCustom(customInitJson string, objectsDir string) error {
 		p.SaveConfig()
 	}
 
-	err = os.Mkdir(p.Objdir, 0755)
+	err = os.MkdirAll(p.Objdir, 0755)
 	if err != nil {
 		return err
 	}
@@ -2617,7 +2617,7 @@ func (p *Pvr) DeployPvLinks() error {
 
 	if fitFile != "" {
 		fitLink := path.Join(p.Dir, ".pv", "pantavisor.fit")
-		os.Mkdir(path.Join(p.Dir, ".pv"), 0755)
+		os.MkdirAll(path.Join(p.Dir, ".pv"), 0755)
 		os.Remove(fitLink)
 
 		err = os.Link(path.Join(p.Dir, "bsp", fitFile), fitLink)
@@ -2631,7 +2631,7 @@ func (p *Pvr) DeployPvLinks() error {
 		if dtbFile != "" {
 			dtbLink = path.Join(p.Dir, ".pv", "pv-fdt.dtb")
 		}
-		os.Mkdir(path.Join(p.Dir, ".pv"), 0755)
+		os.MkdirAll(path.Join(p.Dir, ".pv"), 0755)
 		os.Remove(kernelLink)
 		os.Remove(initrdLink)
 		if dtbLink != "" {
