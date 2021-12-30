@@ -393,7 +393,7 @@ func (p *Pvr) InitCustom(customInitJson string, objectsDir string) error {
 	}
 
 	err = os.MkdirAll(p.Objdir, 0755)
-	if err != nil {
+	if err != nil && !os.IsExist(err) {
 		return err
 	}
 
@@ -646,7 +646,7 @@ func (p *Pvr) PutLocal(repoPath string) error {
 	} else if err != nil {
 		err = os.MkdirAll(objectsPath, 0755)
 	}
-	if err != nil {
+	if err != nil && !os.IsExist(err) {
 		return err
 	}
 
