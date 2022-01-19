@@ -172,7 +172,15 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 			return nil, err
 		}
 
-		token := tokenResponse["token"].(string)
+		tokenData, ok := tokenResponse["token"]
+		if !ok {
+			tokenData, ok = tokenResponse["access_token"]
+			if !ok {
+				return nil, fmt.Errorf("can't get a access token for %s", tokenURL)
+			}
+		}
+
+		token := tokenData.(string)
 		req, err = http.NewRequest(http.MethodGet, blobsURL, nil)
 		if err != nil {
 			return nil, err
