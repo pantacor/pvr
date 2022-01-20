@@ -172,7 +172,15 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 			return nil, err
 		}
 
-		token := tokenResponse["token"].(string)
+		tokenData, ok := tokenResponse["token"]
+		if !ok {
+			tokenData, ok = tokenResponse["access_token"]
+			if !ok {
+				return nil, fmt.Errorf("can't get a access token for %s", tokenURL)
+			}
+		}
+
+		token := tokenData.(string)
 		req, err = http.NewRequest(http.MethodGet, blobsURL, nil)
 		if err != nil {
 			return nil, err
@@ -201,6 +209,9 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 
 	var blob map[string]interface{}
 	err = json.Unmarshal(blobContent, &blob)
+	if err != nil {
+		return nil, err
+	}
 
 	config := blob["config"].(map[string]interface{})
 
@@ -210,7 +221,10 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 // DownloadLayersFromLocalDocker : Download Layers From Local Docker
 func DownloadLayersFromLocalDocker(digest string) (io.ReadCloser, error) {
 	ctx := context.Background()
-	cli, err := client.NewEnvClient()
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return nil, err
+	}
 	cli.NegotiateAPIVersion(ctx)
 	httpClient := cli.HTTPClient()
 
@@ -412,7 +426,7 @@ func LoadLocalImage(app *AppData) error {
 		Exists: false,
 	}
 	ctx := context.Background()
-	cli, err := client.NewEnvClient()
+	cli, err := client.NewClientWithOpts(client.FromEnv)
 	cli.NegotiateAPIVersion(ctx)
 	defer cli.Close()
 	if err != nil {
@@ -491,7 +505,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	err = CreateFolder(cacheDir)
 
 	if err != nil {
-		return fmt.Errorf("Couldnt create cache folder %v", err)
+		return fmt.Errorf("couldn't create cache folder %v", err)
 	}
 
 	fmt.Println("Generating squashfs...")

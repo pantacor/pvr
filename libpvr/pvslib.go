@@ -189,7 +189,7 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 
 	buf := p.PristineJson
 	if buf == nil {
-		return errors.New("Empty state format")
+		return errors.New("empty state format")
 	}
 
 	fileBuf, err := ioutil.ReadFile(pvsPath)
@@ -216,10 +216,7 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 	}
 
 	name := path.Base(pvsPath)
-	if strings.HasSuffix(name, ".json") {
-		name = name[0 : len(name)-5]
-	}
-
+	name = strings.TrimSuffix(name, ".json")
 	return p.JwsSign(name, privKeyPath, match, options)
 }
 
@@ -241,7 +238,7 @@ func (p *Pvr) JwsSign(name string,
 	buf := p.PristineJson
 
 	if buf == nil {
-		return errors.New("Empty state format")
+		return errors.New("empty state format")
 	}
 
 	f, err := os.Open(privKeyPath)
@@ -261,7 +258,7 @@ func (p *Pvr) JwsSign(name string,
 		if p == nil {
 			break
 		}
-		if strings.Index(p.Type, "PRIVATE KEY") >= 0 {
+		if strings.Contains(p.Type, "PRIVATE KEY") {
 			signKey = p
 			break
 		}
@@ -339,6 +336,9 @@ func (p *Pvr) JwsSign(name string,
 	}
 
 	sig, err := signer.Sign(payloadBuf)
+	if err != nil {
+		return err
+	}
 
 	strippedBuf, err := stripPayloadFromRawJSON([]byte(sig.FullSerialize()))
 
@@ -397,7 +397,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	buf := p.PristineJson
 
 	if buf == nil {
-		return nil, errors.New("Empty state format")
+		return nil, errors.New("empty state format")
 	}
 
 	var pubKeys []interface{}
@@ -437,26 +437,28 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 			pemBytes := pubPem.Bytes
 			if parsedKey, err = x509.ParsePKCS1PublicKey(pemBytes); err != nil {
 				if parsedKey, err = x509.ParsePKIXPublicKey(pemBytes); err != nil {
-					fmt.Printf("WARNING: Error Parsing Public key from PEM: %s\n", err.Error())
+					fmt.Fprintf(os.Stderr, "WARNING: Error Parsing Public key from PEM: %s\n", err.Error())
 					continue
 				}
 			}
 			var ok bool
 			pubKey, ok := parsedKey.(*rsa.PublicKey)
 			if !ok {
-				fmt.Printf("WARNING: casting pubey key\n")
+				fmt.Fprintf(os.Stderr, "WARNING: casting pubey key\n")
 				continue
 			}
 			pubKeys = append(pubKeys, pubKey)
-			fmt.Printf("INFO: added pubey: %d\n", len(pubKeys))
+			if IsDebugEnabled {
+				fmt.Fprintf(os.Stderr, "INFO: added pubey: %d\n", len(pubKeys))
+			}
 		}
 	} else if caCerts == "_system_" {
 		certPool, err = x509.SystemCertPool()
 		if err != nil {
-			fmt.Println("ERR 1:" + err.Error())
+			fmt.Fprintln(os.Stderr, "ERR 1:"+err.Error())
 			return nil, err
 		}
-		fmt.Println("using system cert pool")
+		fmt.Fprintln(os.Stderr, "Using system cert pool")
 	} else if caCerts != "" {
 		certPool = x509.NewCertPool()
 		if err != nil {
@@ -468,9 +470,10 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 		}
 		ok := certPool.AppendCertsFromPEM(caCertsBuf)
 		if !ok {
-			fmt.Println("WARNING: could not append cacerts to cert pool. Disabling cert pool.")
+			fmt.Fprintln(os.Stderr, "WARNING: could not append cacerts to cert pool. Disabling cert pool.")
 			certPool = nil
 		}
+		fmt.Fprintln(os.Stderr, "Using custom cert pool")
 	}
 
 	fileBuf, err := ioutil.ReadFile(pvsPath)
@@ -524,6 +527,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	var verified bool
 
 	for _, pk := range pubKeys {
+
 		err = sig.DetachedVerify(payloadBuf, pk)
 		if err != nil {
 			continue
@@ -533,17 +537,27 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	var pemcerts [][]*x509.Certificate
 
 	if !verified && certPool != nil {
+		ku := []x509.ExtKeyUsage{
+			x509.ExtKeyUsageCodeSigning,
+		}
+
 		pemcerts, err = sig.Signatures[0].Header.
 			Certificates(x509.VerifyOptions{
-				Roots: certPool,
+				Roots:     certPool,
+				KeyUsages: ku,
 			})
 
-		if err == nil {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error setting up and validating certificates %w\n", err)
+		} else {
 			pubKey, ok := pemcerts[0][0].PublicKey.(*rsa.PublicKey)
 			if ok {
+				if IsDebugEnabled {
+					fmt.Fprintf(os.Stderr, "Validating payload: '%'\n", string(payloadBuf))
+				}
 				err = sig.DetachedVerify(payloadBuf, pubKey)
 			} else {
-				err = errors.New("Error retrieving RSA key")
+				err = errors.New("error retrieving RSA key")
 			}
 		}
 
@@ -562,16 +576,16 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	}
 
 	if !verified {
-		return nil, errors.New("Error validating signature from system cert pool and from provided but key file")
+		return nil, errors.New("error validating signature from system cert pool and from provided but key file")
 	}
 
-	for k, _ := range selection.Selected {
+	for k := range selection.Selected {
 		summary.Protected = append(summary.Protected, k)
 	}
-	for k, _ := range selection.NotSelected {
+	for k := range selection.NotSelected {
 		summary.Excluded = append(summary.Excluded, k)
 	}
-	for k, _ := range selection.NotSeen {
+	for k := range selection.NotSeen {
 		summary.NotSeen = append(summary.NotSeen, k)
 	}
 

@@ -1,4 +1,3 @@
-//
 // Copyright 2017-2021  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,7 +40,7 @@ import (
 	"github.com/go-resty/resty"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	pvrapi "gitlab.com/pantacor/pvr/api"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 	"gopkg.in/cheggaaa/pb.v1"
 )
 
@@ -144,7 +143,7 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 	fileInfo, err = os.Stat(filepath.Join(pvr.Pvrdir, "json"))
 
 	if err == nil && fileInfo.IsDir() {
-		return nil, errors.New("Repo is in bad state. .pvr/json is a directory")
+		return nil, errors.New("repo is in bad state. .pvr/json is a directory")
 	}
 
 	if err != nil {
@@ -182,22 +181,22 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 	}
 
 	if err != nil {
-		return &pvr, errors.New("Repo in bad state. JSON Unmarshal (" + strings.TrimPrefix(filepath.Join(pvr.Pvrdir, "json"), pvr.Dir) + ") Not possible. Make a copy of the repository for forensics, file a bug and maybe delete that file manually to try to recover: " + err.Error())
+		return &pvr, errors.New("repo in bad state. JSON Unmarshal (" + strings.TrimPrefix(filepath.Join(pvr.Pvrdir, "json"), pvr.Dir) + ") Not possible. Make a copy of the repository for forensics, file a bug and maybe delete that file manually to try to recover: " + err.Error())
 	}
 
 	fileInfo, err = os.Stat(filepath.Join(pvr.Pvrdir, "config"))
 
 	if err == nil && fileInfo.IsDir() {
-		return nil, errors.New("Repo is in bad state. .pvr/json is a directory")
+		return nil, errors.New("repo is in bad state. .pvr/json is a directory")
 	} else if err == nil {
 		byteJson, err := ioutil.ReadFile(filepath.Join(pvr.Pvrdir, "config"))
-
+		if err != nil {
+			return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(filepath.Join(pvr.Pvrdir, "json"), pvr.Dir) + "): " + err.Error())
+		}
 		err = json.Unmarshal(byteJson, &pvr.Pvrconfig)
 		if err != nil {
 			return nil, errors.New("JSON Unmarshal (" + strings.TrimPrefix(filepath.Join(pvr.Pvrdir, "json"), pvr.Dir) + "): " + err.Error())
 		}
-	} else {
-		// not exist
 	}
 
 	if pvr.Pvrconfig.ObjectsDir != "" {
@@ -376,7 +375,7 @@ func (p *Pvr) InitCustom(customInitJson string, objectsDir string) error {
 		return errors.New("pvr init: .pvr directory/file found (" + p.Pvrdir + "). Cannot initialize an existing repository.")
 	}
 
-	err = os.Mkdir(p.Pvrdir, 0755)
+	err = os.MkdirAll(p.Pvrdir, 0755)
 	if err != nil {
 		return err
 	}
@@ -393,7 +392,10 @@ func (p *Pvr) InitCustom(customInitJson string, objectsDir string) error {
 		p.SaveConfig()
 	}
 
-	err = os.Mkdir(p.Objdir, 0755)
+	err = os.MkdirAll(p.Objdir, 0755)
+	if err != nil && !os.IsExist(err) {
+		return err
+	}
 
 	jsonFile, err := os.OpenFile(filepath.Join(p.Pvrdir, "json"), os.O_CREATE|os.O_WRONLY, 0644)
 
@@ -525,7 +527,9 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 
 	// lets generate checkpoint file
 	if isCheckpoint {
-		err = p.prepCommitCheckpoint()
+		if err := p.prepCommitCheckpoint(); err != nil {
+			return err
+		}
 	}
 
 	status, err := p.Status()
@@ -630,6 +634,10 @@ func (p *Pvr) PutLocal(repoPath string) error {
 	}
 
 	tP, err := NewPvr(p.Session, repoPath)
+	if err != nil {
+		return err
+	}
+
 	objectsPath := tP.Pvrconfig.ObjectsDir
 
 	info, err := os.Stat(objectsPath)
@@ -638,7 +646,7 @@ func (p *Pvr) PutLocal(repoPath string) error {
 	} else if err != nil {
 		err = os.MkdirAll(objectsPath, 0755)
 	}
-	if err != nil {
+	if err != nil && !os.IsExist(err) {
 		return err
 	}
 
@@ -652,6 +660,9 @@ func (p *Pvr) PutLocal(repoPath string) error {
 
 	}
 	err = filepath.Walk(p.Objdir, func(filePath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		// ignore directories
 		if info.IsDir() {
 			return nil
@@ -666,6 +677,9 @@ func (p *Pvr) PutLocal(repoPath string) error {
 			path.Join(objectsPath, base))
 		return err
 	})
+	if err != nil {
+		return err
+	}
 
 	err = Copy(filepath.Join(repoPath, "json.new"), filepath.Join(p.Pvrdir, "json"))
 	if err != nil {
@@ -802,7 +816,7 @@ func readCredentials(targetPrompt string) (string, string) {
 	}
 
 	fmt.Fprint(os.Stderr, "Password: ")
-	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Fprintln(os.Stderr, "*****")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: "+err.Error())
@@ -825,7 +839,7 @@ func readRegistration(targetPrompt string) (string, string, string) {
 
 	for {
 		fmt.Fprint(os.Stderr, " 3. Password: ")
-		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 		fmt.Fprintln(os.Stderr, "*****")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error: "+err.Error())
@@ -834,7 +848,7 @@ func readRegistration(targetPrompt string) (string, string, string) {
 		password = string(bytePassword)
 
 		fmt.Fprint(os.Stderr, " 4. Password Repeat: ")
-		bytePassword, err = terminal.ReadPassword(int(syscall.Stdin))
+		bytePassword, err = term.ReadPassword(int(syscall.Stdin))
 		fmt.Fprintln(os.Stderr, "*****")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error: "+err.Error())
@@ -891,7 +905,7 @@ func (p *Pvr) DoClaim(deviceEp, challenge string) error {
 	}
 
 	if response.StatusCode() != http.StatusOK {
-		return errors.New("Claiming device failed (code=" + string(response.StatusCode()) + "): " + string(response.Body()))
+		return fmt.Errorf("claiming device failed (code=%d): %s", response.StatusCode(), response.Body())
 	}
 
 	return nil
@@ -937,6 +951,7 @@ func worker(jobs chan FilePut, done chan FilePut) {
 			log.Println("ERROR: " + err.Error())
 			continue
 		}
+		defer reader.Close()
 
 		j.bar.Total = fstat.Size()
 		j.bar.Units = pb.U_BYTES
@@ -947,7 +962,6 @@ func worker(jobs chan FilePut, done chan FilePut) {
 		objBaseName := filepath.Base(j.objName)
 		j.bar.Prefix(objBaseName[:Min(len(objBaseName)-1, 12)] + " ")
 
-		defer reader.Close()
 		r := &AsyncBody{
 			Delegate: reader,
 			bar:      j.bar,
@@ -1045,15 +1059,13 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		fmt.Fprintf(os.Stderr, "Synching baseline state with device")
 
 		buf, err := p.getJSONBuf(pvrRemote)
-
 		if err != nil {
-			goto errout
+			return errout(err)
 		}
 
 		json.Unmarshal(buf, &baselineState)
-
 		if err != nil {
-			goto errout
+			return errout(err)
 		}
 		fmt.Fprintf(os.Stderr, " [OK]\n")
 	}
@@ -1115,12 +1127,12 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		})
 
 		if err != nil {
-			goto errout
+			return errout(err)
 		}
 
 		if response == nil {
 			err = errors.New("BAD STATE; no respo")
-			goto errout
+			return errout(err)
 		}
 
 		if shaSeen[remoteObject.Sha] != nil {
@@ -1133,7 +1145,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 		if response.StatusCode() != http.StatusOK &&
 			response.StatusCode() != http.StatusConflict {
 			err = errors.New("Error posting object " + strconv.Itoa(response.StatusCode()))
-			goto errout
+			return errout(err)
 		}
 
 		if response.StatusCode() == http.StatusConflict {
@@ -1159,7 +1171,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 		err = json.Unmarshal(response.Body(), &remoteObject)
 		if err != nil {
-			goto errout
+			return errout(err)
 		}
 
 		fileName := filepath.Join(p.Objdir, v)
@@ -1186,19 +1198,20 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 
 	for _, v := range filePutResults {
 		if v.err != nil {
-			err = fmt.Errorf("Error putting file %s: %s", v.objName, v.err.Error())
-			goto errout
+			err = fmt.Errorf("error putting file %s: %s", v.objName, v.err.Error())
+			return errout(err)
 		}
 		if v.res.StatusCode != 200 {
 			err = errors.New("REST call failed. " +
 				strconv.Itoa(v.res.StatusCode) + "  " + v.res.Status)
-			goto errout
+			return errout(err)
 		}
 	}
 
 	return nil
+}
 
-errout:
+func errout(err error) error {
 	fmt.Fprintf(os.Stderr, " [ERROR: "+err.Error()+"]")
 	return err
 }
@@ -1270,7 +1283,7 @@ func (p *Pvr) Put(uri string, force bool) error {
 		// if we get pointed at a pvr repo on disk, go local
 		if err == nil {
 			err = p.PutLocal(uri)
-			goto save
+			return p.saveWithError(uri, err)
 		} else if !os.IsNotExist(err) {
 			return errors.New("error testing existance of json file in provided path: " + err.Error())
 		}
@@ -1289,16 +1302,14 @@ func (p *Pvr) Put(uri string, force bool) error {
 		}
 
 		url = repoBaseURL.ResolveReference(refURL)
-
 	}
 
 	err = p.PutRemote(url, force)
 
-	if err != nil {
-		return err
-	}
+	return err
+}
 
-save:
+func (p *Pvr) saveWithError(uri string, err error) error {
 	if p.Pvrconfig.DefaultGetUrl == "" {
 		p.Pvrconfig.DefaultGetUrl = uri
 	}
@@ -1745,6 +1756,9 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 			return objectsCount, err
 		}
 		jsonMerged, err = jsonpatch.MergePatchIndent(p.PristineJson, jsonDataSelect, "", "	")
+		if err != nil {
+			return objectsCount, err
+		}
 	} else {
 		// manually remove everything not matching the part from fragement ...
 		pJSONMap := p.PristineJsonMap
@@ -2135,7 +2149,9 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 		}
 
 		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
-
+		if err != nil {
+			return objectsCount, err
+		}
 	} else {
 		// manually remove everything not matching the part from fragment ...
 		pJSONMap := p.PristineJsonMap
@@ -2325,8 +2341,10 @@ func (p *Pvr) resetInternal(hardlink bool, canonicalJson bool) error {
 			if err != nil {
 				return err
 			}
-			err = os.Rename(targetP+".new",
-				targetP)
+			err = os.Rename(targetP+".new", targetP)
+			if err != nil {
+				return err
+			}
 		} else {
 			objectP := filepath.Join(p.Objdir, v.(string))
 			if !hardlink {
@@ -2340,6 +2358,9 @@ func (p *Pvr) resetInternal(hardlink bool, canonicalJson bool) error {
 				}
 			} else {
 				err = Hardlink(targetP, objectP)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -2596,7 +2617,7 @@ func (p *Pvr) DeployPvLinks() error {
 
 	if fitFile != "" {
 		fitLink := path.Join(p.Dir, ".pv", "pantavisor.fit")
-		os.Mkdir(path.Join(p.Dir, ".pv"), 0755)
+		os.MkdirAll(path.Join(p.Dir, ".pv"), 0755)
 		os.Remove(fitLink)
 
 		err = os.Link(path.Join(p.Dir, "bsp", fitFile), fitLink)
@@ -2610,7 +2631,7 @@ func (p *Pvr) DeployPvLinks() error {
 		if dtbFile != "" {
 			dtbLink = path.Join(p.Dir, ".pv", "pv-fdt.dtb")
 		}
-		os.Mkdir(path.Join(p.Dir, ".pv"), 0755)
+		os.MkdirAll(path.Join(p.Dir, ".pv"), 0755)
 		os.Remove(kernelLink)
 		os.Remove(initrdLink)
 		if dtbLink != "" {
