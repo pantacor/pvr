@@ -193,12 +193,29 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 		{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes .Source.persistence -}}
 		{{- if ne $key "lxc-overlay" }}
 		"docker-{{ $key | trimSuffix "/" | replace "/" "-" -}}": {
-			"persistence": "{{ $value }}"
+			{{- $length := splitList "@" $value | len }}
+			{{- if eq $length 1 }}
+			"persistence": "{{- sprig_splitList "@" $value | sprig_first | pvr_ifNull "built-in" }}"
+			{{- else }}
+			"persistence": "{{- sprig_splitList "@" $value | sprig_first }}"{{ "," }}
+			"disk": "{{- sprig_splitList "@" $value | sprig_last }}"
+			{{- end }}
 		},
 		{{- end -}}
 		{{- end }}
 		"lxc-overlay" : {
-			"persistence": "{{ if index .Source.persistence "lxc-overlay" }}{{ index .Source.persistence "lxc-overlay" }}{{ else }}boot{{ end }}"
+			{{- $value := index .Source.persistence "lxc-overlay" }}
+			{{- if $value }}
+			{{- $length := splitList "@" $value | len }}
+			{{- if eq $length 1 }}
+			"persistence": "{{- sprig_splitList "@" $value | sprig_first | pvr_ifNull "built-in" }}"
+			{{- else }}
+			"persistence": "{{- sprig_splitList "@" $value | sprig_first }}"{{ "," }}
+			"disk": "{{- sprig_splitList "@" $value | sprig_last }}"
+			{{- end }}
+			{{- else }}
+			"persistence": "boot"
+			{{- end }}
 		}
 	},
 	"exports": {{  .Source.exports | sprig_toPrettyJson | sprig_indent 8 }},
