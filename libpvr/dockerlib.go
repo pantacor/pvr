@@ -40,6 +40,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/genuinetools/reg/registry"
 	"github.com/genuinetools/reg/repoutils"
+	"github.com/go-resty/resty"
 )
 
 const (
@@ -82,7 +83,7 @@ func (p *Pvr) GetDockerRegistry(image registry.Image, auth types.AuthConfig) (*r
 	return registry.New(context.Background(), auth, registry.Opt{
 		Domain:   image.Domain,
 		Insecure: false,
-		Debug:    false,
+		Debug:    IsDebugEnabled,
 		SkipPing: true,
 		NonSSL:   false,
 		Timeout:  1800 * time.Second,
@@ -124,13 +125,15 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 
 	blobsURL := fmt.Sprintf("%s/v2/%s/blobs/%s", r.URL, image.Path, manifestV2.Config.Digest)
 
-	resp, err := http.Get(blobsURL)
+	resp, err := resty.R().
+		SetHeader("Accept", "application/vnd.docker.distribution.manifest.v2+json").
+		Get(blobsURL)
 	if err != nil {
 		return nil, err
 	}
 
-	if resp.StatusCode == http.StatusUnauthorized {
-		wwwHeaders := resp.Header["Www-Authenticate"][0]
+	if resp.StatusCode() == http.StatusUnauthorized {
+		wwwHeaders := resp.Header().Get("Www-Authenticate")
 
 		// Expected format: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull"
 
@@ -146,25 +149,19 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 		scope := scopeReg.FindStringSubmatch(wwwHeaders)[1]
 
 		tokenURL := fmt.Sprintf("%s?service=%s&scope=%s", realm, service, scope)
-		req, err := http.NewRequest(http.MethodGet, tokenURL, nil)
-		if err != nil {
-			return nil, err
-		}
+		req := resty.R()
 
 		if auth.Username != "" && auth.Password != "" {
 			auth := base64.StdEncoding.EncodeToString([]byte(auth.Username + ":" + auth.Password))
-			req.Header.Set("Authorization", "Basic "+auth)
+			req = req.SetHeader("Authorization", "Basic "+auth)
 		}
 
-		resp, err = http.DefaultClient.Do(req)
+		resp, err = req.Get(tokenURL)
 		if err != nil {
 			return nil, err
 		}
 
-		content, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
+		content := resp.Body()
 
 		var tokenResponse map[string]interface{}
 		err = json.Unmarshal(content, &tokenResponse)
@@ -181,20 +178,16 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 		}
 
 		token := tokenData.(string)
-		req, err = http.NewRequest(http.MethodGet, blobsURL, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v2+json")
-		req.Header.Add("Authorization", "Bearer "+token)
-		resp, err = http.DefaultClient.Do(req)
+		resp, err = resty.R().SetBody(nil).
+			SetHeader("Accept", "application/vnd.docker.distribution.manifest.v2+json").
+			SetHeader("Authorization", "Bearer "+token).
+			Get(blobsURL)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, ErrImageNotFound
 	}
 
@@ -202,10 +195,7 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 		return nil, err
 	}
 
-	blobContent, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
+	blobContent := resp.Body()
 
 	var blob map[string]interface{}
 	err = json.Unmarshal(blobContent, &blob)
@@ -226,18 +216,14 @@ func DownloadLayersFromLocalDocker(digest string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	cli.NegotiateAPIVersion(ctx)
-	httpClient := cli.HTTPClient()
 
 	url := "http://v" + cli.ClientVersion() + "/images/" + digest + "/get"
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+
+	res, err := resty.R().Get(url)
 	if err != nil {
 		return nil, err
 	}
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	return res.Body, nil
+	return res.RawResponse.Body, nil
 }
 
 // DockerImage : return type of ImageExistsInLocalDocker()

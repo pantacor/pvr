@@ -93,6 +93,7 @@ func main() {
 		libpvr.IsDebugEnabled = c.GlobalBool("debug")
 		resty.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: c.GlobalBool("insecure")})
 		resty.SetDebug(libpvr.IsDebugEnabled)
+		resty.SetRedirectPolicy(resty.FlexibleRedirectPolicy(20))
 
 		c.App.Metadata["PVR_AUTH"] = c.GlobalString("access-token")
 
