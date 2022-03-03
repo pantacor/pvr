@@ -1192,6 +1192,7 @@ PVR sig commands offers support for maintaining pvs signatures inside your tree.
 For details see README.pvs.md
 
 Commands currently supported are:
+ * Review all object and file usage cases to ensure tall are validated before they are installed/used.
 
  * pvr sig add - adds a new signature to the _pvs/ hierarchy of the state
  * pvr sig update - updates a committed signature from the _pvs/ hierarchy to be validate against committed state
@@ -1250,7 +1251,7 @@ Date:   Wed Oct 20 17:58:50 2021 +0200
     ```
 ```
 
-# PVR dm commands (device-mapper)
+# PVR dm commands (device-mapper) (BETA)
 
 pvr device mapper support for container volumes allows for an easy way to
 postprocess the squashfs volumes produced by pvr app add etc. in a way that
@@ -1259,7 +1260,7 @@ the pantavisor device mapper addon can mount volumes using device-mapper.
 For now dm-verity type device mapper entries are supported by pantavisor
 client and hence pvr supports that mode first and foremost for now.
 
-## PVR dm-convert
+## PVR dm-convert (BETA)
 
 This command allows you to convert any standard squashfs volume into a
 device-mapper mounted volume.
@@ -1298,10 +1299,10 @@ volume handler.
 You can then `pvr commit` this and post it to a pantavisor device-mapper
 enabled device
 
-## PVR dm-apply
+## PVR dm-apply (BETA)
 
 This command iterates through the whole committed pristine json of the repo
 and updates the hash and manifests for all dm-verity manifests.
 
-This is good if you updated a container and wnat to recalculate the hash file.
+This is good if you updated a container and want to recalculate the hash file.
 
