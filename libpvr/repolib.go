@@ -2348,10 +2348,20 @@ func (p *Pvr) resetInternal(hardlink bool, canonicalJson bool) error {
 		} else {
 			objectP := filepath.Join(p.Objdir, v.(string))
 			if !hardlink {
-				err = Copy(targetP+".new", objectP)
+				newFileName := targetP + ".new"
+				err = Copy(newFileName, objectP)
 				if err != nil {
 					return err
 				}
+				newFileSha, err := FiletoSha(newFileName)
+				if err != nil {
+					return err
+				}
+
+				if newFileSha != v.(string) {
+					return errors.New("Object cannot be checked out; wrong sha: " + newFileSha + " == " + v.(string))
+				}
+
 				err = os.Rename(targetP+".new", targetP)
 				if err != nil {
 					return err
