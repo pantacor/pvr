@@ -192,7 +192,6 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	{{- if .Source.args.PV_RUNLEVEL }}
 	"runlevel": "{{- .Source.args.PV_RUNLEVEL }}",
 	{{- end }}
-	{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" }}
 	"storage":{
 		{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes $persistence -}}
 		{{- if ne $key "lxc-overlay" }}
@@ -222,6 +221,7 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 			{{- end }}
 		}
 	},
+	{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" }}
 	"exports": {{  .Source.exports | sprig_toPrettyJson | sprig_indent 8 }},
 	"logs": {{  .Source.logs | sprig_toPrettyJson | sprig_indent 8 }},
 	"type":"lxc",
