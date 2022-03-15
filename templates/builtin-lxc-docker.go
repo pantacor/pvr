@@ -189,10 +189,16 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" }}
 	"config": "lxc.container.conf",
 	{{- end }}
+	{{- if .Source.args.PV_CONDITIONS }}
+	"conditions": {{- sprig_toPrettyJson .Source.args.PV_CONDITIONS | pvr_jsonIndent 0 1 "\t" -}}{{- "," -}}
+	{{- end }}
+	{{- if .Source.args.PV_GROUP }}
+	"group": "{{- .Source.args.PV_GROUP }}",
+	{{- else }}
 	{{- if .Source.args.PV_RUNLEVEL }}
 	"runlevel": "{{- .Source.args.PV_RUNLEVEL }}",
 	{{- end }}
-	{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" }}
+	{{- end }}
 	"storage":{
 		{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes $persistence -}}
 		{{- if ne $key "lxc-overlay" }}
@@ -222,6 +228,7 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 			{{- end }}
 		}
 	},
+	{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" }}
 	"exports": {{  .Source.exports | sprig_toPrettyJson | sprig_indent 8 }},
 	"logs": {{  .Source.logs | sprig_toPrettyJson | sprig_indent 8 }},
 	"type":"lxc",
