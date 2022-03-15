@@ -79,6 +79,25 @@ var pvrFuncMap = map[string]interface{}{
 
 		return arg
 	},
+	"jsonIndent": func(first int, rest int, char string, value string) interface{} {
+		builder := strings.Builder{}
+		lines := strings.Split(value, "\n")
+		var isRest bool
+		for _, v := range lines {
+			var count = rest
+			if !isRest {
+				count = first
+				isRest = true
+			} else {
+				builder.WriteString("\n")
+			}
+			for i := 0; i < count; i++ {
+				_, _ = builder.WriteString(char)
+			}
+			builder.WriteString(v)
+		}
+		return builder.String()
+	},
 }
 
 func PvrFuncMap() map[string]interface{} {
