@@ -2278,6 +2278,37 @@ save:
 	return objectsCount, err
 }
 
+func (p *Pvr) Cleanup() error {
+
+	status, err := p.Status()
+	if err != nil {
+		return err
+	}
+
+	for _, v := range status.UntrackedFiles {
+		err = os.RemoveAll(path.Join(p.Dir, v))
+		if err != nil {
+			break
+		}
+	}
+
+	dirContent, err := os.ReadDir(p.Dir)
+	if err != nil {
+		return err
+	}
+
+	// remove all empty dirs
+	for _, v := range dirContent {
+		if !v.IsDir() {
+			continue
+		}
+		// if not empty this will just fail...
+		os.Remove(path.Join(p.Dir, v.Name()))
+	}
+
+	return err
+}
+
 func (p *Pvr) Reset(canonicalJson bool) error {
 	return p.resetInternal(false, canonicalJson)
 }
