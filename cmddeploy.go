@@ -115,11 +115,17 @@ func CommandDeploy() cli.Command {
 					return cli.NewExitError(err, 7)
 				}
 				// wd repo gets deployed in this branch
-				fmt.Println("   - deploying " + repoPath)
+				fmt.Println("   - deploying single " + repoPath)
 				_, err = deployPvr.GetRepo(repoPath, merge, true)
 				if err != nil {
 					return cli.NewExitError(err, 6)
 				}
+			}
+
+			fmt.Println("... Cleanup repo ...")
+			err = deployPvr.Cleanup()
+			if err != nil {
+				return cli.NewExitError(err, 9)
 			}
 
 			fmt.Println("... deploying hardlinks ...")
@@ -134,7 +140,7 @@ func CommandDeploy() cli.Command {
 			err = deployPvr.DeployPvLinks()
 
 			if err != nil {
-				return cli.NewExitError(err, 7)
+				return cli.NewExitError(err, 10)
 			}
 
 			fmt.Println("Deployment finished. Now now available at: " + deployDir)

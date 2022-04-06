@@ -1591,6 +1591,7 @@ func (p *Pvr) GetStateJson(uri string) (
 func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	objectsCount int,
 	err error) {
+
 	jsonMap := map[string]interface{}{}
 
 	objectsCount = 0
@@ -1750,11 +1751,25 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 
 	var jsonMerged []byte
 	if merge {
-		jsonDataSelect, err := cjson.Marshal(jsonMap)
-
+		pJSONMap := p.PristineJsonMap
+		for _, unpartPrefix := range unpartPrefixes {
+			// remove all files for name "app/"
+			for k, _ := range pJSONMap {
+				if strings.HasPrefix(k, unpartPrefix) {
+					delete(pJSONMap, k)
+				}
+			}
+		}
+		p.PristineJson, err = cjson.Marshal(pJSONMap)
 		if err != nil {
 			return objectsCount, err
 		}
+
+		jsonDataSelect, err := cjson.Marshal(jsonMap)
+		if err != nil {
+			return objectsCount, err
+		}
+
 		jsonMerged, err = jsonpatch.MergePatchIndent(p.PristineJson, jsonDataSelect, "", "	")
 		if err != nil {
 			return objectsCount, err
@@ -1798,8 +1813,9 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	}
 
 	p.PristineJson = jsonMerged
-	err = json.Unmarshal(p.PristineJson, &p.PristineJsonMap)
+	p.PristineJsonMap = map[string]interface{}{}
 
+	err = json.Unmarshal(p.PristineJson, &p.PristineJsonMap)
 	if err != nil {
 		return objectsCount, err
 	}
@@ -2132,10 +2148,6 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 
 	var jsonMerged []byte
 	if merge {
-		jsonDataSelect, err := cjson.Marshal(jsonMap)
-		if err != nil {
-			return objectsCount, err
-		}
 
 		pJSONMap := p.PristineJsonMap
 
@@ -2146,6 +2158,16 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 					delete(pJSONMap, k)
 				}
 			}
+		}
+
+		p.PristineJson, err = cjson.Marshal(pJSONMap)
+		if err != nil {
+			return objectsCount, err
+		}
+
+		jsonDataSelect, err := cjson.Marshal(jsonMap)
+		if err != nil {
+			return objectsCount, err
 		}
 
 		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
@@ -2192,6 +2214,8 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 	}
 
 	p.PristineJson = jsonMerged
+	p.PristineJsonMap = map[string]interface{}{}
+
 	err = json.Unmarshal(p.PristineJson, &p.PristineJsonMap)
 
 	if err != nil {
@@ -2276,6 +2300,37 @@ save:
 	err = p.SaveConfig()
 
 	return objectsCount, err
+}
+
+func (p *Pvr) Cleanup() error {
+
+	status, err := p.Status()
+	if err != nil {
+		return err
+	}
+
+	for _, v := range status.UntrackedFiles {
+		err = os.RemoveAll(path.Join(p.Dir, v))
+		if err != nil {
+			break
+		}
+	}
+
+	dirContent, err := os.ReadDir(p.Dir)
+	if err != nil {
+		return err
+	}
+
+	// remove all empty dirs
+	for _, v := range dirContent {
+		if !v.IsDir() {
+			continue
+		}
+		// if not empty this will just fail...
+		os.Remove(path.Join(p.Dir, v.Name()))
+	}
+
+	return err
 }
 
 func (p *Pvr) Reset(canonicalJson bool) error {
