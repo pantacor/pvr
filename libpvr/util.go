@@ -35,9 +35,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/udhos/equalfile"
 
 	"github.com/Masterminds/sprig"
 	cjson "github.com/gibson042/canonicaljson-go"
@@ -1083,4 +1086,157 @@ func DownloadFile(uri *url.URL) (string, error) {
 	}
 
 	return filepath.Abs(filepath.Dir(tempfile.Name()))
+}
+
+type TreeDiff struct {
+	A       string
+	B       string
+	Errors  []error
+	InA     []string
+	InB     []string
+	OnlyInA []string
+	OnlyInB []string
+	Differ  []string
+}
+
+func (self TreeDiff) String() string {
+	res, err := json.MarshalIndent(self, "", "    ")
+	if err != nil {
+		return err.Error()
+	}
+	return string(res)
+}
+
+func MkTreeDiff(dir1, dir2 string) TreeDiff {
+	treeDiff := TreeDiff{
+		A:       dir1,
+		B:       dir2,
+		Errors:  []error{},
+		InA:     []string{},
+		InB:     []string{},
+		OnlyInA: []string{},
+		OnlyInB: []string{},
+		Differ:  []string{},
+	}
+	compareList := []string{}
+
+	filepath.Walk(dir1, func(path string, info os.FileInfo, err error) error {
+		if path == dir1 {
+			return nil
+		}
+		size := len(treeDiff.InA)
+		dir1len := len(dir1)
+		relpath := path[dir1len:]
+		pos := sort.Search(len(treeDiff.InA), func(i int) bool { return strings.Compare(treeDiff.InA[i], relpath) >= 0 })
+		if pos == 0 {
+			treeDiff.InA = append([]string{relpath}, treeDiff.InA...)
+		} else if pos == size {
+			treeDiff.InA = append(treeDiff.InA, relpath)
+		} else {
+			treeDiff.InA = append(treeDiff.InA[0:pos+1], treeDiff.InA[pos:]...)
+			treeDiff.InA[pos] = relpath
+		}
+		return nil
+	})
+	filepath.Walk(dir2, func(path string, info os.FileInfo, err error) error {
+		if path == dir2 {
+			return nil
+		}
+		size := len(treeDiff.InB)
+		dir2len := len(dir2)
+		relpath := path[dir2len:]
+		pos := sort.Search(size, func(i int) bool { return strings.Compare(treeDiff.InB[i], relpath) >= 0 })
+		if pos == 0 {
+			treeDiff.InB = append([]string{relpath}, treeDiff.InB...)
+		} else if pos == size {
+			treeDiff.InB = append(treeDiff.InB, relpath)
+		} else {
+			treeDiff.InB = append(treeDiff.InB[0:pos+1], treeDiff.InB[pos:]...)
+			treeDiff.InB[pos] = relpath
+		}
+		return nil
+	})
+	for _, v := range treeDiff.InA {
+		pos := sort.Search(len(treeDiff.InB), func(i int) bool { return strings.Compare(treeDiff.InB[i], v) >= 0 })
+		if len(treeDiff.OnlyInA) > 0 &&
+			strings.HasPrefix(v, treeDiff.OnlyInA[len(treeDiff.OnlyInA)-1]) {
+			continue
+		}
+		if pos == len(treeDiff.InB) {
+			treeDiff.OnlyInA = append(treeDiff.OnlyInA, v)
+		} else if treeDiff.InB[pos] == v {
+			compareList = append(compareList, v)
+		} else {
+			treeDiff.OnlyInA = append(treeDiff.OnlyInA, v)
+		}
+	}
+	for _, v := range treeDiff.InB {
+		if len(treeDiff.OnlyInB) > 0 &&
+			strings.HasPrefix(v, treeDiff.OnlyInB[len(treeDiff.OnlyInB)-1]) {
+			continue
+		}
+		pos := sort.Search(len(treeDiff.InA), func(i int) bool { return strings.Compare(treeDiff.InA[i], v) >= 0 })
+		if pos == len(treeDiff.InA) {
+			treeDiff.OnlyInB = append(treeDiff.OnlyInB, v)
+		} else if treeDiff.InA[pos] == v {
+			//compareList = append(compareList, v)
+		} else {
+			treeDiff.OnlyInB = append(treeDiff.OnlyInB, v)
+		}
+	}
+
+	for _, v := range compareList {
+		fInfo, err := os.Stat(path.Join(dir1, v))
+		if err != nil {
+			treeDiff.Errors = append(treeDiff.Errors, err)
+			continue
+		}
+		if fInfo.IsDir() {
+			continue
+		}
+		fcmp := equalfile.New(nil, equalfile.Options{})
+		sameContent, err := fcmp.CompareFile(path.Join(dir1, v), path.Join(dir2, v))
+
+		if err != nil {
+			treeDiff.Errors = append(treeDiff.Errors, err)
+			continue
+		}
+		if !sameContent {
+			treeDiff.Differ = append(treeDiff.Differ, v)
+		}
+	}
+
+	return treeDiff
+}
+
+func (self TreeDiff) MkOvl(ovlDir string) {
+	for _, v := range self.OnlyInA {
+		vDir := path.Dir(v)
+		vBase := path.Base(v)
+		os.MkdirAll(path.Join(ovlDir, vDir), 0755)
+		cmd := exec.Command("mknod", path.Join(ovlDir, vDir, vBase), "c", "0", "0")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
+		if err != nil {
+			self.Errors = append(self.Errors, err)
+			fmt.Println("ERROR: mknod failed with: " + err.Error())
+		}
+	}
+	for _, v := range append(self.OnlyInB, self.Differ...) {
+		vDir := path.Dir(v)
+		vBase := path.Base(v)
+		ovlTarget := path.Join(ovlDir, vDir)
+		os.MkdirAll(ovlTarget, 0755)
+		src := path.Join(self.B, vDir, vBase)
+		dest := path.Join(ovlDir, vDir, vBase)
+		cmd := exec.Command("cp", "-a", "-v", src, dest)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
+		if err != nil {
+			self.Errors = append(self.Errors, err)
+			fmt.Println("ERROR: cp failed with: " + err.Error())
+		}
+	}
 }

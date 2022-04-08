@@ -61,6 +61,7 @@ require (
 	github.com/sirupsen/logrus v1.5.0 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/tinylib/msgp v1.1.2 // indirect
+	github.com/udhos/equalfile v0.3.0
 	github.com/urfave/cli v1.22.4
 	gitlab.com/pantacor/pantahub-base v0.0.0-20200517092730-d03429894e0c
 	go.mongodb.org/mongo-driver v1.3.2
