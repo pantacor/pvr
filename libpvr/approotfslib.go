@@ -27,20 +27,15 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
-func UpdateRootFSApp(p *Pvr, app AppData) error {
+func UpdateRootFSApp(p *Pvr, app *AppData, appManifest *Source) error {
 	appPath := filepath.Join(p.Dir, app.Appname)
 	if _, err := os.Stat(appPath); os.IsNotExist(err) {
 		return errors.New("application is not installed")
 	}
 
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
-
 	appManifest.RootFsURL = app.From
 
-	persistence, err := GetPersistence(&app)
+	persistence, err := GetPersistence(app)
 	if err != nil {
 		return err
 	}
@@ -51,7 +46,7 @@ func UpdateRootFSApp(p *Pvr, app AppData) error {
 			appManifest.DockerConfig = map[string]interface{}{}
 		}
 
-		config, err := GetDockerConfigFile(p, &app)
+		config, err := GetDockerConfigFile(p, app)
 		if err != nil {
 			return err
 		}
@@ -61,7 +56,7 @@ func UpdateRootFSApp(p *Pvr, app AppData) error {
 		}
 	}
 
-	fromPath, err := GetFromRootFs(&app)
+	fromPath, err := GetFromRootFs(app)
 	if err != nil {
 		return err
 	}
@@ -69,12 +64,12 @@ func UpdateRootFSApp(p *Pvr, app AppData) error {
 	app.Appmanifest = appManifest
 	app.DestinationPath = appPath
 
-	if err = MakeSquash(fromPath, &app); err != nil {
+	if err = MakeSquash(fromPath, app); err != nil {
 		return err
 	}
 
-	squashFilePath := filepath.Join(app.DestinationPath, SQUASH_FILE)
-	digestFile := filepath.Join(app.DestinationPath, ROOTFS_DIGEST_FILE)
+	squashFilePath := filepath.Join(app.DestinationPath, app.SquashFile)
+	digestFile := filepath.Join(app.DestinationPath, app.SquashFile+ROOTFS_DIGEST_SUFFIX)
 	squashFile, err := os.Open(squashFilePath)
 	if err != nil {
 		return err
@@ -100,14 +95,10 @@ func UpdateRootFSApp(p *Pvr, app AppData) error {
 		return err
 	}
 
-	return p.InstallApplication(app)
+	return nil
 }
 
-func InstallRootFsApp(p *Pvr, app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
+func InstallRootFsApp(p *Pvr, app *AppData, appManifest *Source) error {
 
 	dockerConfig := map[string]interface{}{}
 	if appManifest.DockerConfig != nil {
@@ -116,7 +107,7 @@ func InstallRootFsApp(p *Pvr, app AppData) error {
 
 	app.Appmanifest = appManifest
 	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
-	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
+	err := p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
 	if err != nil {
 		return err
 	}
@@ -124,23 +115,23 @@ func InstallRootFsApp(p *Pvr, app AppData) error {
 	return nil
 }
 
-func AddRootFsApp(p *Pvr, app AppData) error {
+func AddRootFsApp(p *Pvr, app *AppData) error {
 	appPath := filepath.Join(p.Dir, app.Appname)
 	if _, err := os.Stat(appPath); !os.IsNotExist(err) {
 		return nil
 	}
 
-	from, err := GetFromRootFs(&app)
+	from, err := GetFromRootFs(app)
 	if err != nil {
 		return err
 	}
 
-	persistence, err := GetPersistence(&app)
+	persistence, err := GetPersistence(app)
 	if err != nil {
 		return err
 	}
 
-	dockerConfig, err := GetDockerConfigFile(p, &app)
+	dockerConfig, err := GetDockerConfigFile(p, app)
 	if err != nil {
 		return err
 	}
@@ -166,12 +157,12 @@ func AddRootFsApp(p *Pvr, app AppData) error {
 	app.Appmanifest = &src
 	app.DestinationPath = appPath
 
-	if err = MakeSquash(from, &app); err != nil {
+	if err = MakeSquash(from, app); err != nil {
 		return err
 	}
 
-	squashFilePath := filepath.Join(app.DestinationPath, SQUASH_FILE)
-	digestFile := filepath.Join(app.DestinationPath, ROOTFS_DIGEST_FILE)
+	squashFilePath := filepath.Join(app.DestinationPath, app.SquashFile)
+	digestFile := filepath.Join(app.DestinationPath, app.SquashFile+ROOTFS_DIGEST_SUFFIX)
 	squashFile, err := os.Open(squashFilePath)
 	if err != nil {
 		return err

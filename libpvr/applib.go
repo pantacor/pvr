@@ -47,13 +47,14 @@ var (
 )
 
 type DockerSource struct {
-	DockerName     string                 `json:"docker_name,omitempty"`
-	DockerTag      string                 `json:"docker_tag,omitempty"`
-	DockerDigest   string                 `json:"docker_digest,omitempty"`
-	DockerSource   string                 `json:"docker_source,omitempty"`
-	DockerConfig   map[string]interface{} `json:"docker_config,omitempty"`
-	DockerPlatform string                 `json:"docker_platform,omitempty"`
-	FormatOptions  string                 `json:"format_options,omitempty"`
+	DockerName      string                 `json:"docker_name,omitempty"`
+	DockerTag       string                 `json:"docker_tag,omitempty"`
+	DockerDigest    string                 `json:"docker_digest,omitempty"`
+	DockerOvlDigest string                 `json:"docker_ovl_digest,omitempty"`
+	DockerSource    string                 `json:"docker_source,omitempty"`
+	DockerConfig    map[string]interface{} `json:"docker_config,omitempty"`
+	DockerPlatform  string                 `json:"docker_platform,omitempty"`
+	FormatOptions   string                 `json:"format_options,omitempty"`
 }
 
 type PvrSource struct {
@@ -81,35 +82,102 @@ type Source struct {
 }
 
 // InstallApplication : Install Application from any type of source
-func (p *Pvr) InstallApplication(app AppData) error {
+func (p *Pvr) InstallApplication(app *AppData) error {
+
+	app.SquashFile = SQUASH_FILE
+	appManifest, err := p.GetApplicationManifest(app.Appname)
+	if err != nil {
+		return err
+	}
+
+	dockerName := appManifest.DockerName
+	repoDigest := appManifest.DockerDigest
+
+	app.From = repoDigest
+	if app.Source == "remote" && !strings.Contains(repoDigest, "@") {
+		app.From = dockerName + "@" + repoDigest
+	}
+
 	switch app.SourceType {
 	case models.SourceTypeDocker:
-		return InstallDockerApp(p, app)
+		err = InstallDockerApp(p, app, appManifest)
 	case models.SourceTypeRootFs:
-		return InstallRootFsApp(p, app)
+		err = InstallRootFsApp(p, app, appManifest)
 	case models.SourceTypePvr:
-		return InstallPVApp(p, app)
+		err = InstallPVApp(p, app, appManifest)
 	default:
 		return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
 	}
+
+	if err != nil {
+		return err
+	}
+
+	// if we have ovl digest we go for it ...
+	if appManifest.DockerOvlDigest != "" {
+		app.SquashFile = SQUASH_OVL_FILE
+
+		repoDigest = appManifest.DockerOvlDigest
+		app.From = repoDigest
+		if app.Source == "remote" && !strings.Contains(repoDigest, "@") {
+			app.From = dockerName + "@" + repoDigest
+		}
+
+		switch app.SourceType {
+		case models.SourceTypeDocker:
+			err = InstallDockerApp(p, app, appManifest)
+		case models.SourceTypeRootFs:
+			err = InstallRootFsApp(p, app, appManifest)
+		case models.SourceTypePvr:
+			err = InstallPVApp(p, app, appManifest)
+		default:
+			return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
+		}
+
+	}
+	return err
 }
 
 // UpdateApplication : Update any application and any type
 func (p *Pvr) UpdateApplication(app AppData) error {
+	appManifest, err := p.GetApplicationManifest(app.Appname)
+	if err != nil {
+		return err
+	}
+
+	if !app.DoOverlay || appManifest.DockerDigest == "" {
+		app.SquashFile = SQUASH_FILE
+		app.DoOverlay = false
+		fmt.Println("Update base: " + app.SquashFile)
+		appManifest.DockerOvlDigest = ""
+	} else {
+		app.SquashFile = SQUASH_OVL_FILE
+		fmt.Println("Update ovl: " + app.SquashFile)
+	}
 	switch app.SourceType {
 	case models.SourceTypeDocker:
-		return UpdateDockerApp(p, app)
+		err = UpdateDockerApp(p, &app, appManifest)
 	case models.SourceTypeRootFs:
-		return UpdateRootFSApp(p, app)
+		err = UpdateRootFSApp(p, &app, appManifest)
 	case models.SourceTypePvr:
-		return UpdatePvApp(p, app)
+		err = UpdatePvApp(p, &app, appManifest)
 	default:
-		return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
+		err = fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
 	}
+
+	if err != nil {
+		return err
+	}
+
+	err = p.InstallApplication(&app)
+	return nil
 }
 
 // AddApplication : Add application from several types of sources
-func (p *Pvr) AddApplication(app AppData) error {
+func (p *Pvr) AddApplication(app *AppData) error {
+	if app.SquashFile == "" {
+		app.SquashFile = SQUASH_FILE
+	}
 	switch app.SourceType {
 	case models.SourceTypeDocker:
 		return AddDockerApp(p, app)
@@ -418,9 +486,8 @@ func MakeSquash(rootfsPath string, app *AppData) error {
 	if makeSquashfsPath == "" {
 		return ErrMakeSquashFSNotFound
 	}
-
-	tempSquashFile := filepath.Join(app.DestinationPath, SQUASH_FILE+".new")
-	squashFile := filepath.Join(app.DestinationPath, SQUASH_FILE)
+	tempSquashFile := filepath.Join(app.DestinationPath, app.SquashFile+".new")
+	squashFile := filepath.Join(app.DestinationPath, app.SquashFile)
 
 	squashExist, err := IsFileExists(squashFile)
 	if err != nil {

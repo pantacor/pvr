@@ -92,7 +92,7 @@ func CommandAppAdd() cli.Command {
 			if c.String("from") == "" {
 				return cli.NewExitError(errors.New(" --from flag is required (e.g. --from=nginx)"), 4)
 			}
-			app := libpvr.AppData{
+			app := &libpvr.AppData{
 				Appname:       appname,
 				Platform:      c.String("platform"),
 				Username:      c.String("username"),

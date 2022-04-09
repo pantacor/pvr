@@ -88,17 +88,8 @@ func CommandAppInstall() cli.Command {
 				return cli.NewExitError(err, 3)
 			}
 
-			dockerName := appManifest.DockerName
-			repoDigest := appManifest.DockerDigest
-			from := repoDigest
-
-			if source == "remote" && !strings.Contains(repoDigest, "@") {
-				from = dockerName + "@" + repoDigest
-			}
-
-			app := libpvr.AppData{
+			app := &libpvr.AppData{
 				Appname:      appname,
-				From:         from,
 				Source:       source,
 				Username:     username,
 				Password:     password,
@@ -106,7 +97,7 @@ func CommandAppInstall() cli.Command {
 				TemplateArgs: map[string]interface{}{},
 			}
 
-			pvr.SetSourceTypeFromManifest(&app, nil)
+			pvr.SetSourceTypeFromManifest(app, nil)
 
 			err = pvr.InstallApplication(app)
 			if err != nil {

@@ -26,8 +26,8 @@ import (
 	"github.com/urfave/cli"
 )
 
-func AddDockerApp(p *Pvr, app AppData) error {
-	err := p.FindDockerImage(&app)
+func AddDockerApp(p *Pvr, app *AppData) error {
+	err := p.FindDockerImage(app)
 	if err != nil {
 		return cli.NewExitError(err, 3)
 	}
@@ -45,7 +45,7 @@ func AddDockerApp(p *Pvr, app AppData) error {
 		return ErrEmptyFrom
 	}
 
-	persistence, err := GetPersistence(&app)
+	persistence, err := GetPersistence(app)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func AddDockerApp(p *Pvr, app AppData) error {
 	if app.ConfigFile != "" {
 		dockerConfig := map[string]interface{}{}
 
-		config, err := GetDockerConfigFile(p, &app)
+		config, err := GetDockerConfigFile(p, app)
 		if err != nil {
 			return err
 		}
@@ -116,11 +116,7 @@ func AddDockerApp(p *Pvr, app AppData) error {
 	return p.InstallApplication(app)
 }
 
-func UpdateDockerApp(p *Pvr, app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
+func UpdateDockerApp(p *Pvr, app *AppData, appManifest *Source) error {
 
 	if app.Source == "" {
 		app.Source = appManifest.DockerSource.DockerSource
@@ -133,7 +129,7 @@ func UpdateDockerApp(p *Pvr, app AppData) error {
 		updateDockerFromFrom(appManifest, app.From)
 	}
 
-	err = p.FindDockerImage(&app)
+	err := p.FindDockerImage(app)
 	if err != nil {
 		return err
 	}
@@ -146,12 +142,20 @@ func UpdateDockerApp(p *Pvr, app AppData) error {
 	//	Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
-		appManifest.DockerDigest = app.LocalImage.DockerDigest
 		appManifest.DockerConfig = app.LocalImage.DockerConfig
+		if app.DoOverlay {
+			appManifest.DockerOvlDigest = app.LocalImage.DockerDigest
+		} else {
+			appManifest.DockerDigest = app.LocalImage.DockerDigest
+		}
 	} else if app.RemoteImage.Exists {
-		appManifest.DockerDigest = app.RemoteImage.DockerDigest
 		appManifest.DockerPlatform = app.RemoteImage.DockerPlatform
 		appManifest.DockerConfig = app.RemoteImage.DockerConfig
+		if app.DoOverlay {
+			appManifest.DockerOvlDigest = app.RemoteImage.DockerDigest
+		} else {
+			appManifest.DockerDigest = app.RemoteImage.DockerDigest
+		}
 	}
 
 	appManifest.DockerSource.DockerSource = app.Source
@@ -165,26 +169,13 @@ func UpdateDockerApp(p *Pvr, app AppData) error {
 	if err != nil {
 		return err
 	}
-
-	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
-	if err != nil {
-		return err
-	}
-	if appManifest.DockerDigest == squashFSDigest {
-		fmt.Println("Application already up to date.")
-		return nil
-	}
-	return p.InstallApplication(app)
+	return nil
 }
 
-func InstallDockerApp(p *Pvr, app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
-
+func InstallDockerApp(p *Pvr, app *AppData, appManifest *Source) error {
+	var err error
 	if appManifest.DockerName == "" {
-		return err
+		return errors.New("No docker_name in manifest")
 	}
 
 	trackURL := appManifest.DockerName
@@ -205,7 +196,7 @@ func InstallDockerApp(p *Pvr, app AppData) error {
 	if appManifest.DockerConfig != nil {
 		dockerConfig = appManifest.DockerConfig
 	} else {
-		err = p.FindDockerImage(&app)
+		err = p.FindDockerImage(app)
 
 		if err != nil {
 			fmt.Println("\nSeems like you have an invalid docker digest value in your " + app.Appname + "/src.json file\n")
@@ -232,15 +223,23 @@ func InstallDockerApp(p *Pvr, app AppData) error {
 	}
 	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
 
-	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	squashFSDigest, err := p.GetSquashFSDigest(app.SquashFile, app.Appname)
 	if err != nil {
 		return err
 	}
 
-	if appManifest.DockerDigest == squashFSDigest {
-		fmt.Println("Application already up to date. Will skip generating new root.squashfs")
+	if (app.SquashFile == SQUASH_FILE && appManifest.DockerDigest == squashFSDigest) ||
+		(app.SquashFile == SQUASH_OVL_FILE && appManifest.DockerOvlDigest == squashFSDigest) {
+		fmt.Println(app.SquashFile + ": already up to date.")
 		return nil
 	}
 
-	return p.GenerateApplicationSquashFS(app)
+	err = p.FindDockerImage(app)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Generating " + app.SquashFile)
+
+	return p.GenerateApplicationSquashFS(app, appManifest)
 }

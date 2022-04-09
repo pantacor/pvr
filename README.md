@@ -1107,6 +1107,15 @@ example1$ $ pvr app info nginx-app
 
 ```
 
+## pvr app install <APP_NAME>
+
+pvr app install rerun the template engine and reproduce any rootfs binary
+that is not present in the $APP_NAME directory.
+
+For docker app install will take the docker_digest and docker_ovl_digest
+value from $APP_NAME/src.json and generate the matching rootfs and ovr files.
+
+
 ## pvr app ls
 
 pvr app ls :list applications in pvr checkout
@@ -1149,6 +1158,14 @@ example1$ $ pvr app update nginx-app
 Application updated
 
 ```
+
+Unless PVR_APP_UPDATE_BASE=true is set, pvr app update will
+generate a base $APP_NAME/root.squashfs for the whole container rootfs
+on first run and for all runs after a $APP_NAME/root.ovl.squashfs, whihc
+is a overlayfs formatted diff layer from the current root.squashfs.
+
+To force updating the base tarball (and deleting the current ovl) you can pass
+the --base argument to pvr app update.
 
 #### Update app from rootfs
 

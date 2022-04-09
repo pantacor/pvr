@@ -25,13 +25,13 @@ import (
 	"github.com/urfave/cli"
 )
 
-func AddPvApp(p *Pvr, app AppData) error {
-	destAppPath, srcJson, err := p.GetFromRepo(&app)
+func AddPvApp(p *Pvr, app *AppData) error {
+	destAppPath, srcJson, err := p.GetFromRepo(app)
 	if err != nil {
 		return err
 	}
 
-	persistence, err := GetPersistence(&app)
+	persistence, err := GetPersistence(app)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func AddPvApp(p *Pvr, app AppData) error {
 			srcJson.DockerConfig = map[string]interface{}{}
 		}
 
-		config, err := GetDockerConfigFile(p, &app)
+		config, err := GetDockerConfigFile(p, app)
 		if err != nil {
 			return err
 		}
@@ -67,11 +67,8 @@ func AddPvApp(p *Pvr, app AppData) error {
 	return p.InstallApplication(app)
 }
 
-func UpdatePvApp(p *Pvr, app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
+func UpdatePvApp(p *Pvr, app *AppData, appManifest *Source) error {
+	var err error
 
 	if app.Source == "" {
 		app.Source = appManifest.DockerSource.DockerSource
@@ -82,12 +79,12 @@ func UpdatePvApp(p *Pvr, app AppData) error {
 	}
 
 	if appManifest.PvrUrl == "" {
-		return UpdateDockerApp(p, app)
+		return UpdateDockerApp(p, app, appManifest)
 	}
 
 	initialFrom := app.From
 	app.From = appManifest.PvrUrl
-	if _, appManifest, err = p.GetFromRepo(&app); err != nil {
+	if _, appManifest, err = p.GetFromRepo(app); err != nil {
 		return err
 	}
 	app.From = initialFrom
@@ -103,7 +100,7 @@ func UpdatePvApp(p *Pvr, app AppData) error {
 		return err
 	}
 
-	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	squashFSDigest, err := p.GetSquashFSDigest(app.SquashFile, app.Appname)
 	if err != nil {
 		return err
 	}
@@ -113,17 +110,13 @@ func UpdatePvApp(p *Pvr, app AppData) error {
 		return nil
 	}
 
-	return p.InstallApplication(app)
+	return nil
 }
 
-func InstallPVApp(p *Pvr, app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
+func InstallPVApp(p *Pvr, app *AppData, appManifest *Source) error {
 
 	if appManifest.DockerName == "" {
-		return err
+		return errors.New("no docker_name in app manifest")
 	}
 
 	trackURL := appManifest.DockerName
@@ -148,13 +141,13 @@ func InstallPVApp(p *Pvr, app AppData) error {
 	}
 
 	app.Appmanifest = appManifest
-	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
+	err := p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
 	if err != nil {
 		return err
 	}
 	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
 
-	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	squashFSDigest, err := p.GetSquashFSDigest(app.SquashFile, app.Appname)
 	if err != nil {
 		return err
 	}

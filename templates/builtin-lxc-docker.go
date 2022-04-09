@@ -38,7 +38,10 @@ lxc.cgroup.devices.allow = a
 lxc.cgroup.{{ $v }}
 {{- end }}
 {{- end }}
-lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
+lxc.rootfs.path = overlayfs:
+	{{- if .Source.docker_ovl_digest -}}
+			/volumes/{{- .Source.name -}}/root.ovl.squashfs:
+	{{- end -}}	/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
 {{- if .Docker.Entrypoint }}
 	{{- if pvr_isSlice .Docker.Entrypoint }}
@@ -258,6 +261,11 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 			{{- $q := quote $j }}
 			{{- $n = sprig_append $n $q }}
 		{{- end }}
+		{{- if .Source.docker_ovl_digest }}
+		{{- if not ( eq .Source.docker_ovl_digest "" ) }}
+			{{- $n = sprig_append $n "\"root.ovl.squashfs\"" }}
+		{{- end }}
+		{{- end}}
 		{{ join ",\\n" $n }}
 	]
 }`

@@ -18,6 +18,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -95,9 +96,18 @@ func CommandAppUpdate() cli.Command {
 				app.TemplateArgs["PV_RUNLEVEL"] = c.String("runlevel")
 			}
 
+			if !c.Bool("base") {
+				app.DoOverlay = true
+			}
+
 			err = pvr.UpdateApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
+			}
+
+			if c.Bool("base") {
+				os.Remove(path.Join(pvr.Dir, appname, libpvr.SQUASH_OVL_FILE+libpvr.DOCKER_DIGEST_SUFFIX))
+				os.Remove(path.Join(pvr.Dir, appname, libpvr.SQUASH_OVL_FILE))
 			}
 
 			fmt.Println("Application updated")
@@ -131,6 +141,11 @@ func CommandAppUpdate() cli.Command {
 			Name:   "platform",
 			Usage:  "docker platform to resolve",
 			EnvVar: "PVR_PLATFORM",
+		},
+		cli.BoolFlag{
+			Name:   "base, b",
+			Usage:  "update base; clean ovl",
+			EnvVar: "PVR_APP_UPDATE_BASE",
 		},
 		cli.StringFlag{
 			Name:   "from",
