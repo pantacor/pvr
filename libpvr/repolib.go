@@ -2066,7 +2066,6 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 		grabs = append(grabs, req)
 
 	cont:
-		fmt.Fprintf(os.Stderr, "OK\n")
 	}
 
 	objectsCount, err = p.grabObjects(showFilenames, grabs...)
