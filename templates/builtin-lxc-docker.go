@@ -78,6 +78,9 @@ lxc.environment = {{ . }}
 lxc.environment = {{ . }}
 	{{- end }}
 {{- end }}
+{{- if .Source.args.PV_LXC_NAMESPACE_KEEP }}
+lxc.namespace.keep = {{ .Source.args.PV_LXC_NAMESPACE_KEEP }}
+{{- else }}
 lxc.namespace.keep = user
 {{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
 {{- if eq .Source.args.PV_LXC_NETWORK_TYPE "host" -}}
@@ -87,6 +90,7 @@ lxc.namespace.keep = user
 {{ " " }} net
 {{- end -}}
 {{ " " }} ipc
+{{- end }}
 {{- if .Source.args.PV_LXC_DISABLE_CONSOLE }}
 lxc.console.path = none
 {{- end }}
