@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/user"
+	"path"
 	"path/filepath"
 	"sync"
 	"time"
@@ -317,6 +318,10 @@ func processDownloads(downloads chan *downloadData, totalLayers int) ([]string, 
 func downloadlayers(layerdata *layerData) {
 	i := layerdata.Number
 	filename := filepath.Join(layerdata.OutputDir, string(layerdata.LayerDigest)+cacheFileExt)
+	fileDir := path.Dir(filename)
+	if fileDir != "" {
+		os.MkdirAll(fileDir, 0755)
+	}
 
 	sameFile, err := FileHasSameSha(filename, string(layerdata.LayerDigest))
 	if err != nil {
