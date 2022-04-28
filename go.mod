@@ -1,4 +1,4 @@
-module gitlab.com/pantacor/pvr/v2
+module gitlab.com/pantacor/pvr/v3
 
 go 1.16
 
@@ -37,4 +37,3 @@ require (
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
 )
-
