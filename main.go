@@ -39,9 +39,12 @@ func main() {
 	app.Usage = "PantaVisor Repo"
 	app.Version = VERSION
 
+	fmt.Printf("UID processing\n")
+
 	usr, err := user.Current()
 	if err != nil {
 		euid := syscall.Geteuid()
+		fmt.Printf("Effective UID considered %d\n",euid)
 		usr, err = user.LookupId(fmt.Sprintf("%d", euid))
 	}
 	if err != nil {
