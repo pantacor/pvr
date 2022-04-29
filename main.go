@@ -18,11 +18,13 @@ package main
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
+	"syscall"
 
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
@@ -39,9 +41,12 @@ func main() {
 
 	usr, err := user.Current()
 	if err != nil {
+		euid := syscall.Geteuid()
+		usr, err = user.LookupId(fmt.Sprintf("%d", euid))
+	}
+	if err != nil {
 		panic(err)
 	}
-
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:   "access-token, a",
