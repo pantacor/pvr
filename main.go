@@ -38,17 +38,18 @@ func main() {
 	app.Name = "pvr"
 	app.Usage = "PantaVisor Repo"
 	app.Version = VERSION
+	home := os.Getenv("HOME")
 
-	fmt.Printf("UID processing\n")
-
-	usr, err := user.Current()
-	if err != nil {
-		euid := syscall.Geteuid()
-		fmt.Printf("Effective UID considered %d\n",euid)
-		usr, err = user.LookupId(fmt.Sprintf("%d", euid))
-	}
-	if err != nil {
-		panic(err)
+	if home == "" {
+		usr, err := user.Current()
+		if err != nil {
+			euid := syscall.Geteuid()
+			usr, err = user.LookupId(fmt.Sprintf("%d", euid))
+		}
+		if err != nil {
+			panic(err)
+		}
+		home = usr.HomeDir
 	}
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -78,7 +79,7 @@ func main() {
 			Name:   "config-dir, c",
 			Usage:  "Use `PVR_CONFIG_DIR` for using a custom global config directory (used to store auth.json etc.).",
 			EnvVar: "PVR_CONFIG_DIR",
-			Value:  filepath.Join(usr.HomeDir, ".pvr"),
+			Value:  filepath.Join(home, ".pvr"),
 		},
 		cli.BoolFlag{
 			Name:   "debug, d",
@@ -131,7 +132,7 @@ func main() {
 		if c.GlobalString("config-dir") != "" {
 			c.App.Metadata["PVR_CONFIG_DIR"] = c.GlobalString("config-dir")
 		} else {
-			c.App.Metadata["PVR_CONFIG_DIR"] = filepath.Join(usr.HomeDir, ".pvr")
+			c.App.Metadata["PVR_CONFIG_DIR"] = filepath.Join(home, ".pvr")
 		}
 
 		if !c.GlobalBool("disable-self-upgrade") {
