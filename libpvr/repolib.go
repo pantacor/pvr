@@ -967,21 +967,10 @@ func worker(jobs chan FilePut, done chan FilePut) {
 			bar:      j.bar,
 		}
 
-		req, err := http.NewRequest(http.MethodPut, j.putUrl, r)
-		req.ContentLength = fstat.Size()
-
-		if err != nil {
-			j.bar.Finish()
-			j.err = err
-			j.res = nil
-
-			done <- j
-			continue
-		}
-
-		httpClient := http.DefaultClient
-
-		res, err := httpClient.Do(req)
+		req := resty.R()
+		req = req.SetBody(r).SetContentLength(true)
+		req.SetHeader("Content-Length", strconv.FormatInt(fstat.Size(), 10))
+		res, err := req.Put(j.putUrl)
 		j.bar.ShowFinalTime = true
 		j.bar.ShowPercent = false
 		j.bar.ShowCounters = false
@@ -1005,7 +994,7 @@ func worker(jobs chan FilePut, done chan FilePut) {
 		j.bar.Finish()
 
 		j.err = err
-		j.res = res
+		j.res = res.RawResponse
 		done <- j
 	}
 }
