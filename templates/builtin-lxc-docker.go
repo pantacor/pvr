@@ -196,6 +196,11 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	{{- if .Source.args.PV_CONDITIONS }}
 	"conditions": {{- sprig_toPrettyJson .Source.args.PV_CONDITIONS | pvr_jsonIndent 0 1 "\t" -}}{{- "," -}}
 	{{- end }}
+	"drivers": {
+		"manual": {{- if .Source.args.PV_DRIVERS_MANUAL }} {{ sprig_toJson .Source.args.PV_DRIVERS_MANUAL -}}{{- else }}[]{{- end }},
+		"required": {{- if .Source.args.PV_DRIVERS_REQUIRED }} {{ sprig_toJson .Source.args.PV_DRIVERS_REQUIRED -}}{{- else }}[]{{- end }},
+		"optional": {{- if .Source.args.PV_DRIVERS_OPTIONAL }} {{ sprig_toJson .Source.args.PV_DRIVERS_OPTIONAL -}}{{- else }}[]{{- end }}
+	},
 	{{- if .Source.args.PV_GROUP }}
 	"group": "{{- .Source.args.PV_GROUP }}",
 	{{- else }}
