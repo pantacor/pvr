@@ -143,9 +143,14 @@ func CommandAppUpdate() cli.Command {
 			EnvVar: "PVR_PLATFORM",
 		},
 		cli.BoolFlag{
-			Name:   "base, b",
-			Usage:  "update base; clean ovl",
-			EnvVar: "PVR_APP_UPDATE_BASE",
+			Name:   "ovl-clean, c",
+			Usage:  "clean ovl reference",
+			EnvVar: "PVR_APP_UPDATE_OVL_CLEAN",
+		},
+		cli.BoolFlag{
+			Name:   "ovl, o",
+			Usage:  "update ovl reference",
+			EnvVar: "PVR_APP_UPDATE_OVL",
 		},
 		cli.StringFlag{
 			Name:   "from",

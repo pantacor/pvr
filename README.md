@@ -1159,13 +1159,13 @@ Application updated
 
 ```
 
-Unless PVR_APP_UPDATE_BASE=true is set, pvr app update will
-generate a base $APP_NAME/root.squashfs for the whole container rootfs
-on first run and for all runs after a $APP_NAME/root.ovl.squashfs, whihc
-is a overlayfs formatted diff layer from the current root.squashfs.
+If PVR_APP_UPDATE_OVL=true (or --ovl parameter) is set, pvr
+app update will add the docker_diget_ovl reference to the src.json
+and call `app install`.
 
-To force updating the base tarball (and deleting the current ovl) you can pass
-the --base argument to pvr app update.
+`app install` will generate a diff overlay squashfs allowing
+to ship minor updates as a diff layer.
+
 
 #### Update app from rootfs
 
