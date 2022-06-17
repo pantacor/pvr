@@ -24,14 +24,17 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 
 	"github.com/bmatcuk/doublestar"
 	cjson "github.com/gibson042/canonicaljson-go"
 	gojose "github.com/go-jose/go-jose/v3"
+	"github.com/go-resty/resty"
 )
 
 type PvsMatch struct {
@@ -49,6 +52,47 @@ type PvsPartSelection struct {
 	Selected    map[string]interface{}
 	NotSelected map[string]interface{}
 	NotSeen     map[string]interface{}
+}
+
+const tarFileName = "pvs.defaultkeys.tar.gz"
+
+// DownloadSigningCertWithConfirmation ask for confirmation to download signing certs
+func DownloadSigningCertWithConfirmation(url string, path string) error {
+	question := fmt.Sprintf(
+		"%s %s\n%s",
+		"Do you want to download the default",
+		"developer keys that can be validated by pantavisor official developer builds? [yes/no]",
+		"(NOTE: this should be used only for development propourses because they are not secret)",
+	)
+	c := AskForConfirmation(question)
+	if !c {
+		return nil
+	}
+
+	fmt.Printf("Downloading certs from: \n%s\n", url)
+	return DownloadSigningCert(url, path)
+}
+
+func DownloadSigningCert(url string, path string) error {
+	tarFilePath := filepath.Join(path, tarFileName)
+	resp, err := resty.
+		R().
+		SetOutput(tarFilePath).
+		Get(url)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return errors.New("there was an error downloading the certificates tar.gz")
+	}
+
+	err = Untar(path, tarFilePath, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func selectPayload(buf []byte, match *PvsMatch) (*PvsPartSelection, error) {
@@ -298,7 +342,7 @@ found:
 		case 512:
 			algo = gojose.ES512
 		default:
-			return errors.New("Private key with unsupported bitsize for ESXXXX: " + string(ePK.Params().BitSize))
+			return errors.New("Private key with unsupported bitsize for ESXXXX: " + fmt.Sprint(ePK.Params().BitSize))
 		}
 	} else {
 		return errors.New("Not supported priv key of type " + reflect.TypeOf(parsedKey).Name())

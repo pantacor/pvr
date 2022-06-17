@@ -158,6 +158,15 @@ func CommandSigLs() cli.Command {
 
 			if pubkey == "" && cacerts == "" {
 				cacerts = path.Join(pvr.Session.GetConfigDir(), "pvs", "cacerts.default.pem")
+				if _, err := os.Stat(cacerts); errors.Is(err, os.ErrNotExist) {
+					err := libpvr.DownloadSigningCertWithConfirmation(
+						c.App.Metadata["PVS_CERTS_URL"].(string),
+						pvr.Session.GetConfigDir(),
+					)
+					if err != nil {
+						return cli.NewExitError(err, 126)
+					}
+				}
 			}
 
 			for _, v := range args {
