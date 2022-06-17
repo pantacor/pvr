@@ -18,6 +18,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/bmatcuk/doublestar"
@@ -65,11 +66,15 @@ func CommandSigUpdate() cli.Command {
 			}
 
 			ops := libpvr.PvsOptions{}
-			ops.X5cPath = c.Parent().String("x5c")
 
 			keyPath := c.Parent().String("key")
 			if keyPath == "" {
-				return cli.NewExitError("needs a --key argument; see --help.", 126)
+				keyPath = path.Join(pvr.Session.GetConfigDir(), "pvs", "key.default.pem")
+			}
+
+			ops.X5cPath = c.Parent().String("x5c")
+			if ops.X5cPath == "" {
+				ops.X5cPath = path.Join(pvr.Session.GetConfigDir(), "pvs", "x5c.default.pem")
 			}
 
 			for k, v := range pvr.PristineJsonMap {

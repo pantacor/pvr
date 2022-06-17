@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"sort"
 	"strings"
 
@@ -154,6 +155,10 @@ func CommandSigLs() cli.Command {
 			var verifySummary []libpvr.JwsVerifySummary
 
 			cacerts := c.Parent().String("cacerts")
+
+			if pubkey == "" && cacerts == "" {
+				cacerts = path.Join(pvr.Session.GetConfigDir(), "pvs", "cacerts.default.pem")
+			}
 
 			for _, v := range args {
 				w, err := pvr.JwsVerifyPvs(pubkey, cacerts, v)
