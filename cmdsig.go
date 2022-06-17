@@ -50,7 +50,6 @@ func CommandSig() cli.Command {
 				Name:   "cacerts, c",
 				EnvVar: "PVR_SIG_CACERTS",
 				Usage:  "initialize cert pool from file or directory provided in this argument. use __system__ to use system cert store",
-				Value:  "_system_",
 			},
 		},
 	}

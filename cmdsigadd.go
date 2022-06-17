@@ -107,10 +107,13 @@ func CommandSigAdd() cli.Command {
 
 			keyPath := c.Parent().String("key")
 			if keyPath == "" {
-				return cli.NewExitError("needs a --key argument; see --help.", 126)
+				keyPath = path.Join(pvr.Session.GetConfigDir(), "pvs", "key.default.pem")
 			}
 
 			ops.X5cPath = c.Parent().String("x5c")
+			if ops.X5cPath == "" {
+				ops.X5cPath = path.Join(pvr.Session.GetConfigDir(), "pvs", "x5c.default.pem")
+			}
 
 			err = pvr.JwsSign(name, keyPath, &match, &ops)
 
