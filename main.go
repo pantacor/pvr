@@ -31,10 +31,6 @@ import (
 	"gitlab.com/pantacor/pvr/libpvr"
 )
 
-const (
-	defaultCertsDownloadUrl = "https://gitlab.com/pantacor/pv-developer-ca/-/raw/master/pvs/pvs.defaultkeys.tar.gz?inline=false"
-)
-
 func main() {
 
 	app := cli.NewApp()
@@ -78,12 +74,6 @@ func main() {
 			Usage:  "Use `PVR_REPO_BASEURL` for resolving PVR repositories like docker through user/name syntax.",
 			EnvVar: "PVR_REPO_BASEURL",
 			Value:  "https://pvr.pantahub.com",
-		},
-		cli.StringFlag{
-			Name:   "certs-url",
-			Usage:  "Use `PVS_CERTS_URL` for downloading the pvs certificates as a tarball.",
-			EnvVar: "PVS_CERTS_URL",
-			Value:  defaultCertsDownloadUrl,
 		},
 		cli.StringFlag{
 			Name:   "config-dir, c",
@@ -131,12 +121,6 @@ func main() {
 			c.App.Metadata["PVR_REPO_BASEURL"] = c.GlobalString("repo-baseurl")
 		} else {
 			c.App.Metadata["PVR_REPO_BASEURL"] = "https://pvr.pantahub.com"
-		}
-
-		if c.GlobalString("certs-url") != "" {
-			c.App.Metadata["PVS_CERTS_URL"] = c.GlobalString("certs-url")
-		} else {
-			c.App.Metadata["PVS_CERTS_URL"] = defaultCertsDownloadUrl
 		}
 
 		repoBaseURL, err := url.Parse(c.App.Metadata["PVR_REPO_BASEURL"].(string))

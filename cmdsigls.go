@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"sort"
 	"strings"
 
@@ -157,15 +156,13 @@ func CommandSigLs() cli.Command {
 			cacerts := c.Parent().String("cacerts")
 
 			if pubkey == "" && cacerts == "" {
-				cacerts = path.Join(pvr.Session.GetConfigDir(), "pvs", "cacerts.default.pem")
-				if _, err := os.Stat(cacerts); errors.Is(err, os.ErrNotExist) {
-					err := libpvr.DownloadSigningCertWithConfirmation(
-						c.App.Metadata["PVS_CERTS_URL"].(string),
-						pvr.Session.GetConfigDir(),
-					)
-					if err != nil {
-						return cli.NewExitError(err, 126)
-					}
+				cacerts, err = libpvr.GetFromConfigPvs(
+					c.App.Metadata["PVS_CERTS_URL"].(string),
+					pvr.Session.GetConfigDir(),
+					libpvr.SigCacertFilename,
+				)
+				if err != nil {
+					return cli.NewExitError(err, 127)
 				}
 			}
 

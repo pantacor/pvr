@@ -54,10 +54,27 @@ type PvsPartSelection struct {
 	NotSeen     map[string]interface{}
 }
 
-const tarFileName = "pvs.defaultkeys.tar.gz"
+const (
+	tarFileName       = "pvs.defaultkeys.tar.gz"
+	SigKeyFilename    = "key.default.pem"
+	SigX5cFilename    = "x5c.default.pem"
+	SigCacertFilename = "cacerts.default.pem"
+)
+
+func GetFromConfigPvs(url, configPath, name string) (string, error) {
+	cert := path.Join(configPath, "pvs", name)
+	if _, err := os.Stat(cert); errors.Is(err, os.ErrNotExist) {
+		err := DownloadSigningCertWithConfirmation(url, configPath)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return cert, nil
+}
 
 // DownloadSigningCertWithConfirmation ask for confirmation to download signing certs
-func DownloadSigningCertWithConfirmation(url string, path string) error {
+func DownloadSigningCertWithConfirmation(url, path string) error {
 	question := fmt.Sprintf(
 		"%s %s\n%s",
 		"Do you want to download the default",
@@ -73,7 +90,7 @@ func DownloadSigningCertWithConfirmation(url string, path string) error {
 	return DownloadSigningCert(url, path)
 }
 
-func DownloadSigningCert(url string, path string) error {
+func DownloadSigningCert(url, path string) error {
 	tarFilePath := filepath.Join(path, tarFileName)
 	resp, err := resty.
 		R().
