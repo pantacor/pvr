@@ -107,18 +107,32 @@ func CommandSigAdd() cli.Command {
 
 			keyPath := c.Parent().String("key")
 			if keyPath == "" {
-				keyPath = path.Join(pvr.Session.GetConfigDir(), "pvs", "key.default.pem")
+				keyPath, err = libpvr.GetFromConfigPvs(
+					c.App.Metadata["PVS_CERTS_URL"].(string),
+					pvr.Session.GetConfigDir(),
+					libpvr.SigKeyFilename,
+				)
+				if err != nil {
+					return cli.NewExitError(err, 127)
+				}
 			}
 
 			ops.X5cPath = c.Parent().String("x5c")
 			if ops.X5cPath == "" {
-				ops.X5cPath = path.Join(pvr.Session.GetConfigDir(), "pvs", "x5c.default.pem")
+				ops.X5cPath, err = libpvr.GetFromConfigPvs(
+					c.App.Metadata["PVS_CERTS_URL"].(string),
+					pvr.Session.GetConfigDir(),
+					libpvr.SigX5cFilename,
+				)
+				if err != nil {
+					return cli.NewExitError(err, 127)
+				}
 			}
 
 			err = pvr.JwsSign(name, keyPath, &match, &ops)
 
 			if err != nil {
-				return cli.NewExitError(err, 126)
+				return cli.NewExitError(err, 127)
 			}
 
 			return nil
