@@ -79,7 +79,7 @@ func DownloadSigningCertWithConfirmation(url, path string) error {
 		"%s %s\n%s",
 		"Do you want to download the default",
 		"developer keys that can be validated by pantavisor official developer builds? [yes/no]",
-		"(NOTE: this should be used only for development propourses because they are not secret)",
+		"(NOTE: this should be used only for development proposes because they are not secret)",
 	)
 	c := AskForConfirmation(question)
 	if !c {
