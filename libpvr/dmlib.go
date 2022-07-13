@@ -169,7 +169,7 @@ func (p *Pvr) DmCVerityApply(prefix string) error {
 				return err
 			}
 			os.Rename(manifestPath+".new", manifestPath)
-			p.AddFile([]string{path.Join(container, hashDevice)})
+			p.AddFile([]string{path.Join(container, hashDevice)}, false)
 
 			fmt.Println("- Updated " + manifestPath)
 
@@ -257,7 +257,7 @@ func (p *Pvr) DmCVerityConvert(container string, volume string) error {
 	}
 	os.Rename(manifestPath+".new", manifestPath)
 	p.AddFile([]string{path.Join(container, manifestMap["hash_device"].(string)),
-		path.Join(container, DmVolumes, volume+".json")})
+		path.Join(container, DmVolumes, volume+".json")}, false)
 
 	fmt.Println("- Updated " + manifestPath)
 

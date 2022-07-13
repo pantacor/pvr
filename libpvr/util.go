@@ -256,6 +256,17 @@ func FiletoSha(path string) (string, error) {
 	return shaBal, nil
 }
 
+func IsSha(sha string) bool {
+	if len(sha) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(sha)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 func Min(x, y int) int {
 	if x < y {
 		return x
