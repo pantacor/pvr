@@ -967,18 +967,31 @@ func worker(jobs chan FilePut, done chan FilePut) {
 			bar:      j.bar,
 		}
 
-		req := resty.R()
-		req = req.SetBody(r).SetContentLength(true)
-		req.SetHeader("Content-Length", strconv.FormatInt(fstat.Size(), 10))
-		res, err := req.Put(j.putUrl)
-		j.bar.ShowFinalTime = true
-		j.bar.ShowPercent = false
-		j.bar.ShowCounters = false
-		j.bar.ShowTimeLeft = false
-		j.bar.ShowSpeed = false
-		j.bar.ShowBar = true
-		j.bar.Set64(j.bar.Total)
-		j.bar.UnitsWidth = 25
+		var res *http.Response
+		if resty.DefaultClient.Debug {
+			var restyresponse *resty.Response
+			r := resty.
+				R().
+				SetBody(r).
+				SetContentLength(true).
+				SetHeader("Content-Length", strconv.FormatInt(fstat.Size(), 10))
+
+			restyresponse, err = r.Put(j.putUrl)
+			res = restyresponse.RawResponse
+		} else {
+			req, err := http.NewRequest(http.MethodPut, j.putUrl, r)
+			req.ContentLength = fstat.Size()
+			if err != nil {
+				j.bar.Finish()
+				j.err = err
+				j.res = nil
+
+				done <- j
+				continue
+			}
+			res, err = http.DefaultClient.Do(req)
+		}
+
 		if err != nil {
 			j.bar.Postfix(" [ERROR]")
 		} else {
@@ -991,10 +1004,18 @@ func worker(jobs chan FilePut, done chan FilePut) {
 			}
 		}
 
+		j.bar.ShowFinalTime = true
+		j.bar.ShowPercent = false
+		j.bar.ShowCounters = false
+		j.bar.ShowTimeLeft = false
+		j.bar.ShowSpeed = false
+		j.bar.ShowBar = true
+		j.bar.Set64(j.bar.Total)
+		j.bar.UnitsWidth = 25
 		j.bar.Finish()
 
 		j.err = err
-		j.res = res.RawResponse
+		j.res = res
 		done <- j
 	}
 }
