@@ -77,7 +77,7 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 	}
 
 	srcFrag := srcURL.Fragment
-	destFrag := srcURL.Fragment
+	destFrag := destURL.Fragment
 
 	if srcFrag == "" && destFrag != "" {
 		return errors.New("RemoteCopy source URL must have a #fragement part if destination URL is specifying a #fragement")
@@ -117,7 +117,9 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 	for k, v := range srcJson {
 		if (srcFrag != "" && strings.HasPrefix(k, srcFrag+"/")) ||
 			(srcFrag == "" && strings.Contains(k, "/")) {
-			destJson[k] = v
+			nk := strings.TrimPrefix(k, srcFrag)
+			nk = destFrag + nk
+			destJson[nk] = v
 		}
 	}
 
