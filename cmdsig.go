@@ -19,6 +19,10 @@ import (
 	"github.com/urfave/cli"
 )
 
+const (
+	defaultCertsDownloadUrl = "https://gitlab.com/pantacor/pv-developer-ca/-/raw/master/pvs/pvs.defaultkeys.tar.gz?inline=false"
+)
+
 func CommandSig() cli.Command {
 	return cli.Command{
 		Name:      "sig",
@@ -50,8 +54,21 @@ func CommandSig() cli.Command {
 				Name:   "cacerts, c",
 				EnvVar: "PVR_SIG_CACERTS",
 				Usage:  "initialize cert pool from file or directory provided in this argument. use __system__ to use system cert store",
-				Value:  "_system_",
 			},
+			cli.StringFlag{
+				Name:   "certs-url",
+				Usage:  "Use `PVS_CERTS_URL` for downloading the pvs certificates as a tarball.",
+				EnvVar: "PVS_CERTS_URL",
+				Value:  defaultCertsDownloadUrl,
+			},
+		},
+		Before: func(c *cli.Context) error {
+			if c.GlobalString("certs-url") != "" {
+				c.App.Metadata["PVS_CERTS_URL"] = c.GlobalString("certs-url")
+			} else {
+				c.App.Metadata["PVS_CERTS_URL"] = defaultCertsDownloadUrl
+			}
+			return nil
 		},
 	}
 }

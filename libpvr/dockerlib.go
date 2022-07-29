@@ -654,7 +654,10 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		os.MkdirAll(dirToMake, 0755)
 	}
 
-	MakeSquash(extractPath, &app)
+	err = MakeSquash(extractPath, &app)
+	if err != nil {
+		return err
+	}
 	return ioutil.WriteFile(digestFile, []byte(digest), 0644)
 }
 

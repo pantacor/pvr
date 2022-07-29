@@ -65,11 +65,29 @@ func CommandSigUpdate() cli.Command {
 			}
 
 			ops := libpvr.PvsOptions{}
-			ops.X5cPath = c.Parent().String("x5c")
 
 			keyPath := c.Parent().String("key")
 			if keyPath == "" {
-				return cli.NewExitError("needs a --key argument; see --help.", 126)
+				keyPath, err = libpvr.GetFromConfigPvs(
+					c.App.Metadata["PVS_CERTS_URL"].(string),
+					pvr.Session.GetConfigDir(),
+					libpvr.SigKeyFilename,
+				)
+				if err != nil {
+					return cli.NewExitError(err, 127)
+				}
+			}
+
+			ops.X5cPath = c.Parent().String("x5c")
+			if ops.X5cPath == "" {
+				ops.X5cPath, err = libpvr.GetFromConfigPvs(
+					c.App.Metadata["PVS_CERTS_URL"].(string),
+					pvr.Session.GetConfigDir(),
+					libpvr.SigX5cFilename,
+				)
+				if err != nil {
+					return cli.NewExitError(err, 127)
+				}
 			}
 
 			for k, v := range pvr.PristineJsonMap {

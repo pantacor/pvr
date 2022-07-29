@@ -126,7 +126,12 @@ func (p *Pvr) isRunningAsRoot() bool {
 	whoami := exec.Command("whoami")
 	out, err := whoami.Output()
 	if err != nil {
-		return false
+		whoami = exec.Command("id", "-u", "-n")
+		out, err = whoami.Output()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error checking user id: "+err.Error())
+			return false
+		}
 	}
 
 	return strings.Trim(string(out), "\n") == "root"
@@ -420,8 +425,10 @@ func MakeSquash(rootfsPath string, app *AppData) error {
 	}
 
 	tempSquashFile := filepath.Join(app.DestinationPath, SQUASH_FILE+".new")
-	squashFile := filepath.Join(app.DestinationPath, SQUASH_FILE)
+	// Always Remove tempSquashfsFile
+	Remove(tempSquashFile)
 
+	squashFile := filepath.Join(app.DestinationPath, SQUASH_FILE)
 	squashExist, err := IsFileExists(squashFile)
 	if err != nil {
 		return err

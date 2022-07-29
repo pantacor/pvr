@@ -155,6 +155,17 @@ func CommandSigLs() cli.Command {
 
 			cacerts := c.Parent().String("cacerts")
 
+			if pubkey == "" && cacerts == "" {
+				cacerts, err = libpvr.GetFromConfigPvs(
+					c.App.Metadata["PVS_CERTS_URL"].(string),
+					pvr.Session.GetConfigDir(),
+					libpvr.SigCacertFilename,
+				)
+				if err != nil {
+					return cli.NewExitError(err, 127)
+				}
+			}
+
 			for _, v := range args {
 				w, err := pvr.JwsVerifyPvs(pubkey, cacerts, v)
 				if errors.Is(err, os.ErrNotExist) {

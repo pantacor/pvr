@@ -78,6 +78,9 @@ lxc.environment = {{ . }}
 lxc.environment = {{ . }}
 	{{- end }}
 {{- end }}
+{{- if .Source.args.PV_LXC_NAMESPACE_KEEP }}
+lxc.namespace.keep = {{ .Source.args.PV_LXC_NAMESPACE_KEEP }}
+{{- else }}
 lxc.namespace.keep = user
 {{- if .Source.args.PV_LXC_NETWORK_TYPE -}}
 {{- if eq .Source.args.PV_LXC_NETWORK_TYPE "host" -}}
@@ -87,6 +90,7 @@ lxc.namespace.keep = user
 {{ " " }} net
 {{- end -}}
 {{ " " }} ipc
+{{- end }}
 {{- if .Source.args.PV_LXC_DISABLE_CONSOLE }}
 lxc.console.path = none
 {{- end }}
@@ -192,6 +196,11 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	{{- if .Source.args.PV_CONDITIONS }}
 	"conditions": {{- sprig_toPrettyJson .Source.args.PV_CONDITIONS | pvr_jsonIndent 0 1 "\t" -}}{{- "," -}}
 	{{- end }}
+	"drivers": {
+		"manual": {{- if .Source.args.PV_DRIVERS_MANUAL }} {{ sprig_toJson .Source.args.PV_DRIVERS_MANUAL -}}{{- else }}[]{{- end }},
+		"required": {{- if .Source.args.PV_DRIVERS_REQUIRED }} {{ sprig_toJson .Source.args.PV_DRIVERS_REQUIRED -}}{{- else }}[]{{- end }},
+		"optional": {{- if .Source.args.PV_DRIVERS_OPTIONAL }} {{ sprig_toJson .Source.args.PV_DRIVERS_OPTIONAL -}}{{- else }}[]{{- end }}
+	},
 	{{- if .Source.args.PV_GROUP }}
 	"group": "{{- .Source.args.PV_GROUP }}",
 	{{- else }}

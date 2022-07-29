@@ -119,29 +119,35 @@ func Mkdir(path string, perm os.FileMode) error {
 
 // RemoveAll remove a path, could be a file or a folder
 func RemoveAll(path string) error {
-	if _, err := os.Stat(path); err != nil {
+
+	if _, err := os.Lstat(path); err != nil {
 		return err
 	}
+
 	rm, err := exec.LookPath(RM_CMD)
 	if err != nil {
 		return err
 	}
-	args := []string{rm, "-rf", path}
+
+	args := []string{rm, "-rvf", path}
 	rmCmd := exec.Command(args[0], args[1:]...)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	rmCmd.Stdout = &out
 	rmCmd.Stderr = &stderr
 	err = rmCmd.Run()
+	if IsDebugEnabled {
+		fmt.Fprintln(os.Stderr, "rm output: "+out.String())
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, fmt.Sprint(err)+": "+stderr.String())
 	}
-	return nil
+	return err
 }
 
 // Remove remove a path, a file
 func Remove(path string) error {
-	if _, err := os.Stat(path); err != nil {
+	if _, err := os.Lstat(path); err != nil {
 		return err
 	}
 	rm, err := exec.LookPath(RM_CMD)
@@ -292,10 +298,10 @@ func GetPhAuthHeaderTokenKey(authHeader string) (string, error) {
 
 // ReadOrCreateFile read a file from file system if is not avaible creates the file
 func ReadOrCreateFile(filePath string) (*[]byte, error) {
-	_, err := os.Stat(filePath)
+	_, err := os.Lstat(filePath)
 
 	if os.IsNotExist(err) {
-		_, err := os.Stat(filepath.Dir(filePath))
+		_, err := os.Lstat(filepath.Dir(filePath))
 		if os.IsNotExist(err) {
 			err = os.MkdirAll(filePath, 0700)
 			if err != nil {
@@ -1041,6 +1047,10 @@ func Untar(dst string, src string, options []string) error {
 	untar.Stdout = &out
 	untar.Stderr = &stderr
 	err = untar.Run()
+	if IsDebugEnabled {
+		fmt.Println("untar output: " + out.String())
+	}
+
 	if err != nil {
 		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 	}
