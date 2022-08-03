@@ -69,7 +69,7 @@ func CommandFastCopy() cli.Command {
 				return cli.NewExitError(err, 8)
 			}
 
-			err = pvr.RemoteCopy(src, dest, false, c.String("envelope"), c.String("commit-msg"),
+			err = pvr.RemoteCopy(src, dest, c.Bool("merge"), c.String("envelope"), c.String("commit-msg"),
 				c.Int("rev"), c.Bool("force"))
 
 			if err != nil {
@@ -96,6 +96,10 @@ func CommandFastCopy() cli.Command {
 			cli.BoolFlag{
 				Name:  "force, f",
 				Usage: "force reupload of existing objects",
+			},
+			cli.BoolFlag{
+				Name:  "merge",
+				Usage: "merge the source json into the target json instead of replacing it",
 			},
 		},
 	}
