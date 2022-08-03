@@ -43,6 +43,7 @@ build-tags:
     - pvr-$CI_BUILD_TAG.windows.x32.zip
     - pvr-$CI_BUILD_TAG.windows.x64.zip
     - vendor.tar.gz
+    expire_in: never
   only:
     - tags
 
