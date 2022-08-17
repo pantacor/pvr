@@ -29,6 +29,7 @@ build-tags:
     - tar -cvzf pvr-$CI_BUILD_TAG.linux.arm.tar.gz -C $tempdir/bin/linux_arm pvr
     - tar -cvzf pvr-$CI_BUILD_TAG.linux.arm64.tar.gz -C $tempdir/bin/linux_arm64 pvr
     - tar -cvzf pvr-$CI_BUILD_TAG.darwin.amd64.tar.gz -C $tempdir/bin/darwin_amd64 pvr
+    - tar -cvzf pvr-$CI_BUILD_TAG.darwin.arm64.tar.gz -C $tempdir/bin/darwin_arm64 pvr
     - echo CWD `pwd`
     - sh -c "cd $tempdir/bin/windows_386/; zip pvr-$CI_BUILD_TAG.windows.x32.zip pvr.exe"
     - cp $tempdir/bin/windows_386/pvr-$CI_BUILD_TAG.windows.x32.zip .
@@ -40,6 +41,7 @@ build-tags:
     - pvr-$CI_BUILD_TAG.linux.arm64.tar.gz
     - pvr-$CI_BUILD_TAG.linux.arm.tar.gz
     - pvr-$CI_BUILD_TAG.darwin.amd64.tar.gz
+    - pvr-$CI_BUILD_TAG.darwin.arm64.tar.gz
     - pvr-$CI_BUILD_TAG.windows.x32.zip
     - pvr-$CI_BUILD_TAG.windows.x64.zip
     - vendor.tar.gz
@@ -60,6 +62,7 @@ build-master:
     - tar -cvzf pvr.linux.arm.tar.gz -C $tempdir/bin/linux_arm pvr
     - tar -cvzf pvr.linux.arm64.tar.gz -C $tempdir/bin/linux_arm64 pvr
     - tar -cvzf pvr.darwin.amd64.tar.gz -C $tempdir/bin/darwin_amd64 pvr
+    - tar -cvzf pvr.darwin.arm64.tar.gz -C $tempdir/bin/darwin_arm64 pvr
     - echo CWD `pwd`
     - sh -c "cd $tempdir/bin/windows_386/; zip pvr.windows.x32.zip pvr.exe"
     - cp $tempdir/bin/windows_386/pvr.windows.x32.zip .
@@ -71,6 +74,7 @@ build-master:
     - pvr.linux.arm.tar.gz
     - pvr.linux.arm64.tar.gz
     - pvr.darwin.amd64.tar.gz
+    - pvr.darwin.arm64.tar.gz
     - pvr.windows.x32.zip
     - pvr.windows.x64.zip
     - vendor.tar.gz
@@ -90,6 +94,7 @@ build:
     - tar -cvzf pvr.linux.arm.tar.gz -C $tempdir/bin/linux_arm pvr
     - tar -cvzf pvr.linux.arm64.tar.gz -C $tempdir/bin/linux_arm64 pvr
     - tar -cvzf pvr.darwin.amd64.tar.gz -C $tempdir/bin/darwin_amd64 pvr
+    - tar -cvzf pvr.darwin.arm64.tar.gz -C $tempdir/bin/darwin_arm64 pvr
     - echo CWD `pwd`
     - sh -c "cd $tempdir/bin/windows_386/; zip pvr.windows.x32.zip pvr.exe"
     - cp $tempdir/bin/windows_386/pvr.windows.x32.zip .
@@ -101,6 +106,7 @@ build:
     - pvr.linux.arm.tar.gz
     - pvr.linux.arm64.tar.gz
     - pvr.darwin.amd64.tar.gz
+    - pvr.darwin.arm64.tar.gz
     - pvr.windows.x32.zip
     - pvr.windows.x64.zip
     - vendor.tar.gz

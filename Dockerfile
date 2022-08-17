@@ -56,6 +56,13 @@ RUN apk update; apk add git
 RUN CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o /go/bin/darwin_amd64/pvr -v .
 
 
+# build darwin arm64 static
+FROM src as darwin_arm64
+
+RUN apk update; apk add git
+RUN CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o /go/bin/darwin_arm64/pvr -v .
+
+
 FROM alpine
 
 RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
@@ -67,6 +74,7 @@ COPY --from=linux_arm64 /go/bin /pkg/bin
 COPY --from=windows_386 /go/bin /pkg/bin
 COPY --from=windows_amd64 /go/bin /pkg/bin
 COPY --from=darwin_amd64 /go/bin /pkg/bin
+COPY --from=darwin_arm64 /go/bin /pkg/bin
 
 ENV USER root
 
