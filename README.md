@@ -260,7 +260,7 @@ $ pvr clone https://api.pantahub.com/trails/<YOURDEVICE>/steps/<REV>
 ...
 ```
 
-### pvr fastcopy <SOURCE> <DESTINATION>
+### pvr fastcopy <SOURCE>[#part1,part2,path/part3] <DESTINATION>[#part1name,$part2name,...]
 
 You can copy device state or subelements from one device to another without
 downloading the bits to your local machine.
@@ -304,6 +304,23 @@ pvr fastcopy -m "copy pvr-sdk from source device to yourdevice" \
 	https://pvr.pantahub.com/pantahub-ci/rpi4_initial_latest#pvr-sdk \
 	https://pvr.pantahub.com/yournick/yourdevice
 ```
+
+You can even copy multiple parts like the matching config for your app:
+
+```
+pvr fastcopy -m "copy pvr-sdk from source device to yourdevice" \
+	https://pvr.pantahub.com/pantahub-ci/rpi4_initial_latest#pvr-sdk,_config/pvr-sdk \
+	https://pvr.pantahub.com/yournick/yourdevice
+```
+
+... and to make things complete rename them during the copy:
+
+```
+pvr fastcopy -m "copy pvr-sdk from source device to yourdevice" \
+	https://pvr.pantahub.com/pantahub-ci/rpi4_initial_latest#pvr-sdk,_config/pvr-sdk \
+	https://pvr.pantahub.com/yournick/yourdevice#pvr-sdk-new,_config/pvr-sdk-new
+```
+
 
 # PVR Device Commands
 
