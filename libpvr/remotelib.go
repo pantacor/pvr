@@ -88,7 +88,7 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 
 	// if we have no destFrag, we will use srcFrags
 	if srcFrags[0] != "" && destFrags[0] == "" {
-		destFrags = append(destFrags, srcFrags...)
+		destFrags = srcFrags
 	}
 
 	var srcJson map[string]interface{}
@@ -110,7 +110,7 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 			for _, destFrag := range destFrags {
 				if destFrag != "" && strings.HasPrefix(k, destFrag+"/") {
 					delete(destJson, k)
-				} else if destFrag == "" && strings.Contains(k, "/") {
+				} else if destFrag == "" {
 					// no destFrag we remove all in any folder
 					delete(destJson, k)
 				}
@@ -122,10 +122,8 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 	for k, v := range srcJson {
 		for i, srcFrag := range srcFrags {
 			if (srcFrag != "" && strings.HasPrefix(k, srcFrag+"/")) ||
-				(srcFrag == "" && strings.Contains(k, "/")) {
+				srcFrag == "" {
 				nk := strings.TrimPrefix(k, srcFrag)
-				// destFrag position has to match srcFrags position; above
-				// we check that len of both frag slices is the same
 				nk = destFrags[i] + nk
 				destJson[nk] = v
 			}
