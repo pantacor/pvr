@@ -715,7 +715,7 @@ func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
 
 	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (response *resty.Response, err error) {
-		fmt.Fprintf(os.Stderr, "Getting remote repositor info ... ")
+		fmt.Fprintf(os.Stderr, "Getting remote repository info ... ")
 		if response, err = req.Get(pvrRemoteUrl.String()); err != nil {
 			fmt.Fprintf(os.Stderr, "[ERROR "+err.Error()+"]\n")
 			return response, err
