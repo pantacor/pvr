@@ -176,6 +176,7 @@ func main() {
 		CommandPost(),
 		CommandGet(),
 		CommandInspect(),
+		CommandRemoteInfo(),
 		CommandDeploy(),
 		CommandMerge(),
 		CommandReset(),

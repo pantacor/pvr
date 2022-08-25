@@ -22,6 +22,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	pvrapi "gitlab.com/pantacor/pvr/api"
 )
 
 // RemoteCopy will perform a remote only copy
@@ -148,4 +150,23 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 		responseMap["state-sha"].(string)[:8], responseMap["trail-id"])
 
 	return nil
+}
+
+func (p *Pvr) RemoteInfo(pvrRef string) (*pvrapi.PvrRemote, error) {
+	infoUrl, err := url.Parse(pvrRef)
+	if err != nil {
+		return nil, err
+	}
+	if !infoUrl.IsAbs() {
+		repoURL := p.Session.GetApp().Metadata["PVR_REPO_BASEURL_url"].(*url.URL)
+		infoUrl = repoURL.ResolveReference(infoUrl)
+	}
+
+	pvrRemote, err := p.initializeRemote(infoUrl)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &pvrRemote, nil
 }
