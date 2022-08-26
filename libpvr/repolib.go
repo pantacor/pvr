@@ -1,4 +1,4 @@
-// Copyright 2017-2021  Pantacor Ltd.
+// Copyright 2017-2022  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1598,6 +1598,30 @@ func (p *Pvr) GetStateJson(uri string) (
 	return
 }
 
+func (p *Pvr) GetJson(uri string) (
+	state map[string]interface{},
+	err error,
+) {
+	var data []byte
+
+	if uri == "" {
+		err = errors.New("must be remote URL with scheme://")
+		return
+	}
+
+	data, err = p.getURLBuf(uri)
+
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(data, &state)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	objectsCount int,
 	err error) {
@@ -1852,6 +1876,21 @@ func (p *Pvr) getJSONBuf(pvrRemote pvrapi.PvrRemote) ([]byte, error) {
 
 	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
 		return req.Get(pvrRemote.JsonGetUrl)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	jsonData := response.Body()
+
+	return jsonData, nil
+}
+
+func (p *Pvr) getURLBuf(url string) ([]byte, error) {
+
+	response, err := p.Session.DoAuthCall(true, func(req *resty.Request) (*resty.Response, error) {
+		return req.Get(url)
 	})
 
 	if err != nil {
