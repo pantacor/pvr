@@ -1,5 +1,5 @@
 //
-// Copyright 2017-2021  Pantacor Ltd.
+// Copyright 2017-2022  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -176,6 +176,8 @@ func main() {
 		CommandPost(),
 		CommandGet(),
 		CommandInspect(),
+		CommandRemoteInfo(),
+		CommandStepInfo(),
 		CommandDeploy(),
 		CommandMerge(),
 		CommandReset(),

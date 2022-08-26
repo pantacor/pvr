@@ -22,6 +22,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	pvrapi "gitlab.com/pantacor/pvr/api"
 )
 
 // RemoteCopy will perform a remote only copy
@@ -76,16 +78,19 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 		return err
 	}
 
-	srcFrag := srcURL.Fragment
-	destFrag := destURL.Fragment
+	srcFrags := strings.Split(srcURL.Fragment, ",")
+	destFrags := strings.Split(destURL.Fragment, ",")
 
-	if srcFrag == "" && destFrag != "" {
+	if destFrags[0] != "" && srcFrags[0] == "" {
 		return errors.New("RemoteCopy source URL must have a #fragement part if destination URL is specifying a #fragement")
 	}
+	if destFrags[0] != "" && len(destFrags) != len(srcFrags) {
+		return errors.New("RemoteCopy source URL must have same source fragements as destFragments or no destfragement at all")
+	}
 
-	// if we have no destFrag, we will use srcFrag
-	if destFrag == "" {
-		destFrag = srcFrag
+	// if we have no destFrag, we will use srcFrags
+	if srcFrags[0] != "" && destFrags[0] == "" {
+		destFrags = srcFrags
 	}
 
 	var srcJson map[string]interface{}
@@ -104,22 +109,26 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 	// reduce destJson if we are not merging
 	if !merge {
 		for k := range destJson {
-			if destFrag != "" && strings.HasPrefix(k, destFrag+"/") {
-				delete(destJson, k)
-			} else if destFrag == "" && strings.Contains(k, "/") {
-				// no destFrag we remove all in any folder
-				delete(destJson, k)
+			for _, destFrag := range destFrags {
+				if destFrag != "" && strings.HasPrefix(k, destFrag+"/") {
+					delete(destJson, k)
+				} else if destFrag == "" {
+					// no destFrag we remove all in any folder
+					delete(destJson, k)
+				}
 			}
 		}
 	}
 
 	// copy over relevant key/values
 	for k, v := range srcJson {
-		if (srcFrag != "" && strings.HasPrefix(k, srcFrag+"/")) ||
-			(srcFrag == "" && strings.Contains(k, "/")) {
-			nk := strings.TrimPrefix(k, srcFrag)
-			nk = destFrag + nk
-			destJson[nk] = v
+		for i, srcFrag := range srcFrags {
+			if (srcFrag != "" && strings.HasPrefix(k, srcFrag+"/")) ||
+				srcFrag == "" {
+				nk := strings.TrimPrefix(k, srcFrag)
+				nk = destFrags[i] + nk
+				destJson[nk] = v
+			}
 		}
 	}
 
@@ -141,4 +150,23 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 		responseMap["state-sha"].(string)[:8], responseMap["trail-id"])
 
 	return nil
+}
+
+func (p *Pvr) RemoteInfo(pvrRef string) (*pvrapi.PvrRemote, error) {
+	infoUrl, err := url.Parse(pvrRef)
+	if err != nil {
+		return nil, err
+	}
+	if !infoUrl.IsAbs() {
+		repoURL := p.Session.GetApp().Metadata["PVR_REPO_BASEURL_url"].(*url.URL)
+		infoUrl = repoURL.ResolveReference(infoUrl)
+	}
+
+	pvrRemote, err := p.initializeRemote(infoUrl)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &pvrRemote, nil
 }
