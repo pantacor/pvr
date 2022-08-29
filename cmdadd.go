@@ -46,12 +46,19 @@ func CommandAdd() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 
-			err = pvr.AddFile(c.Args())
+			err = pvr.AddFile(c.Args(), c.Bool("raw"))
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
 
 			return nil
+		},
+		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name:   "raw, r",
+				Usage:  "Use `PVR_ADD_RAW` to mark all files to be committed as objects (including .json)",
+				EnvVar: "PVR_ADD_RAW",
+			},
 		},
 	}
 }

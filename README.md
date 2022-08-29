@@ -197,6 +197,18 @@ $ pvr add lxc-platform.json pxc-platform.conf
 
 These files will then be part of the next commit.
 
+#### pvr add --raw [file1 ...]
+
+By default pvr inlines any .json file in the main system state and does not save it
+as an object. This implies that the exact formatting and order of elements in that .json
+might get lost and for large .json files this might artifically grow the state json.
+
+For those cases one might decide to hint at pvr that a .json file shall be added
+as a raw object instead. For that oe uses the pvr add --raw command flag.
+
+You can use that for new files but also to mark an already committed file for
+conversion to a raw object on next commit.
+
 ### pvr diff
 
 You can look at your current changes to working directory using the diff command to get RFCXXXX json patch format:
