@@ -30,8 +30,6 @@ lxc.cgroup.devices.deny = a
 {{- range $i,$v := .Source.args.PVR_LXC_CGROUP_DEVICES_WHITE }}
 lxc.cgroup.devices.allow = {{ $v }}
 {{- end }}
-{{- else }}
-lxc.cgroup.devices.allow = a
 {{- end }}
 {{- if .Source.args.PVR_LXC_CGROUP_V1 }}
 {{- range $i,$v := .Source.args.PVR_LXC_CGROUP_V1 }}
