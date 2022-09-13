@@ -123,7 +123,7 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 	// copy over relevant key/values
 	for k, v := range srcJson {
 		for i, srcFrag := range srcFrags {
-			if (srcFrag != "" && strings.HasPrefix(k, srcFrag+"/")) ||
+			if (srcFrag != "" && (strings.HasPrefix(k, srcFrag+"/")) || srcFrag == k) ||
 				srcFrag == "" {
 				nk := strings.TrimPrefix(k, srcFrag)
 				nk = destFrags[i] + nk
