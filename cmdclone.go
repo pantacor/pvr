@@ -67,17 +67,19 @@ func CommandClone() cli.Command {
 				return cli.NewExitError("clone needs need repository argument. See --help", 2)
 			}
 
+			origURL, err := url.Parse(c.Args().Get(0))
+			if err != nil {
+				return cli.NewExitError("clone must have a valid URL as argument", 2)
+			}
+
 			deviceString, err := libpvr.FixupRepoRef(c.Args().Get(0))
 			if err != nil {
 				return cli.NewExitError(err, 7)
 			}
 
-			newURL, err := url.Parse(deviceString)
-			if err != nil {
-				return cli.NewExitError(err, 3)
-			}
-
-			base := path.Base(newURL.Path)
+			// we use the url as passed in before repo ref to gather the
+			// basename to use as the default clone target.
+			base := path.Base(origURL.Path)
 			base = path.Join(wd, base)
 			if c.NArg() == 2 {
 				base = c.Args().Get(1)
@@ -123,7 +125,7 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 20)
 			}
 
-			_, err = pvr.GetRepo(newURL.String(), false, false)
+			_, err = pvr.GetRepo(deviceString, false, false)
 			if err != nil {
 				return cli.NewExitError(err, 7)
 			}
