@@ -218,7 +218,8 @@ func (p *Pvr) DmCVerityConvert(container string, volume string) error {
 	manifestMap["data_device"] = volume
 	manifestMap["hash_device"] = volume + ".hash"
 
-	cmd := exec.Command("veritysetup", "format", manifestMap["data_device"].(string), manifestMap["hash_device"].(string))
+	cmd := exec.Command("veritysetup", "format", manifestMap["data_device"].(string),
+		manifestMap["hash_device"].(string))
 	cmd.Dir = path.Join(p.Dir, container)
 	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
