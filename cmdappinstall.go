@@ -26,7 +26,10 @@ import (
 	"github.com/urfave/cli"
 )
 
-var RunlevelFlagUsageNoDefault = "runlevel to install app to, valid runlevels at this point: root, platform, app [default: \"\"]"
+var RunlevelFlagUsageNoDefault = "Runlevel to install container to (deprecated)"
+var GroupFlagUsageNoDefault = "Group to install container to"
+var RestartPolicyFlagUsageNoDefault = "Restart policy in case of container modification (valid policies: system and container)"
+var StatusGoalFlagUsageNoDefault = "Status goal for container (valid goals: MOUNTED, STARTED and READY)"
 
 func CommandAppInstall() cli.Command {
 	cmd := cli.Command{
@@ -108,6 +111,23 @@ func CommandAppInstall() cli.Command {
 
 			pvr.SetSourceTypeFromManifest(&app, nil)
 
+			group, err := pvr.GetGroup(c.String("group"))
+			if err != nil {
+				fmt.Printf("WARN: using deprecated runlevel. Use --group instead for Pantavisor 015 or above\n")
+				fmt.Printf("Setting new platform with runlevel \"%s\"\n", c.String("runlevel"))
+				app.TemplateArgs["PV_RUNLEVEL"] = c.String("runlevel")
+			} else {
+				fmt.Printf("Setting new platform in group \"%s\"\n", group)
+				app.TemplateArgs["PV_GROUP"] = group
+			}
+
+			if c.String("restart-policy") != "" {
+				app.TemplateArgs["PV_RESTART_POLICY"] = c.String("restart-policy")
+			}
+			if c.String("status-goal") != "" {
+				app.TemplateArgs["PV_STATUS_GOAL"] = c.String("status-goal")
+			}
+
 			err = pvr.InstallApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
@@ -146,6 +166,21 @@ func CommandAppInstall() cli.Command {
 			Usage:  RunlevelFlagUsageNoDefault,
 			EnvVar: "PVR_RUNLEVEL",
 			Value:  "app",
+		},
+		cli.StringFlag{
+			Name:   "group",
+			Usage:  RestartPolicyFlagUsageNoDefault,
+			EnvVar: "PVR_GROUP",
+		},
+		cli.StringFlag{
+			Name:   "restart-policy",
+			Usage:  RestartPolicyFlagUsageNoDefault,
+			EnvVar: "PVR_RESTART_POLICY",
+		},
+		cli.StringFlag{
+			Name:   "status-goal",
+			Usage:  StatusGoalFlagUsageNoDefault,
+			EnvVar: "PVR_STATUS_GOAL",
 		},
 	}
 

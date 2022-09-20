@@ -28,8 +28,11 @@ import (
 )
 
 // SourceFlagUsage : Source Flag Usage Description
-var SourceFlagUsage = "Comma separated priority list of source (valid sources: local and remote)"
-var RunlevelFlagUsage = "runlevel to install app to, valid runlevels at this point: root, platform, app [default: app]"
+var SourceFlagUsage = "Comma separated priority list of source (valid sources: \"local\" and \"remote\")"
+var RunlevelFlagUsage = "Runlevel to install container to (valid runlevels: \"data\", \"root\", \"platform\" and \"app\") (deprecated) (default: \"app\")"
+var GroupFlagUsage = "Group to install container to (default: last group in groups.json, if exists)"
+var RestartPolicyFlagUsage = "Restart policy in case of container modification (valid policies: \"system\" and \"container\")"
+var StatusGoalFlagUsage = "Status goal for container after bootup (valid goals: \"MOUNTED\", \"STARTED\" and \"READY\")"
 
 func CommandAppAdd() cli.Command {
 	cmd := cli.Command{
@@ -106,8 +109,21 @@ func CommandAppAdd() cli.Command {
 				TemplateArgs:  templateArgs,
 			}
 
-			if c.String("runlevel") != "" {
+			group, err := pvr.GetGroup(c.String("group"))
+			if err != nil {
+				fmt.Printf("WARN: using deprecated runlevel. Use --group instead for Pantavisor 015 or above\n")
+				fmt.Printf("Setting new platform with runlevel \"%s\"\n", c.String("runlevel"))
 				app.TemplateArgs["PV_RUNLEVEL"] = c.String("runlevel")
+			} else {
+				fmt.Printf("Setting new platform in group \"%s\"\n", group)
+				app.TemplateArgs["PV_GROUP"] = group
+			}
+
+			if c.String("restart-policy") != "" {
+				app.TemplateArgs["PV_RESTART_POLICY"] = c.String("restart-policy")
+			}
+			if c.String("status-goal") != "" {
+				app.TemplateArgs["PV_STATUS_GOAL"] = c.String("status-goal")
 			}
 
 			err = pvr.AddApplication(app)
@@ -158,6 +174,21 @@ func CommandAppAdd() cli.Command {
 			Usage:  RunlevelFlagUsage,
 			EnvVar: "PVR_RUNLEVEL",
 			Value:  "app",
+		},
+		cli.StringFlag{
+			Name:   "group",
+			Usage:  GroupFlagUsage,
+			EnvVar: "PVR_GROUP",
+		},
+		cli.StringFlag{
+			Name:   "restart-policy",
+			Usage:  RestartPolicyFlagUsage,
+			EnvVar: "PVR_RESTART_POLICY",
+		},
+		cli.StringFlag{
+			Name:   "status-goal",
+			Usage:  StatusGoalFlagUsage,
+			EnvVar: "PVR_STATUS_GOAL",
 		},
 		cli.StringFlag{
 			Name:   "config-json",

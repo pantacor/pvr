@@ -315,6 +315,83 @@ func (p *Pvr) GetWorkingJsonMap() (resMap map[string]interface{}, untracked []st
 	return
 }
 
+func (p *Pvr) GetWorkingGroupsJson() (result []interface{}, err error) {
+	json, _, err := p.GetWorkingJsonMap()
+	if err != nil {
+		return
+	}
+
+	for k, v := range json {
+		if strings.HasPrefix(k, "groups.json") {
+			switch vv := v.(type) {
+			case []interface{}:
+				result = vv
+			default:
+				err = errors.New("ERROR: groups.json not an array")
+			}
+			return
+		}
+	}
+	return
+}
+
+func (p *Pvr) HasGroups() bool {
+	groups, err := p.GetWorkingGroupsJson()
+	if err != nil || (len(groups) < 1) {
+		return false
+	}
+
+	return true
+}
+
+func (p *Pvr) HasGroup(name string) bool {
+	groups, err := p.GetWorkingGroupsJson()
+	if err != nil || (len(groups) < 1) {
+		return false
+	}
+
+	for _, v := range groups {
+		g := v.(map[string]interface{})
+		if n, ok := g["name"].(string); ok {
+			if n == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (p *Pvr) GetDefaultGroup() string {
+	groups, err := p.GetWorkingGroupsJson()
+	if (err != nil) || (len(groups) < 1) {
+		return ""
+	}
+
+	g := groups[len(groups) - 1].(map[string]interface{})
+	if n, ok := g["name"].(string); ok {
+		return n
+	}
+	return ""
+}
+
+func (p *Pvr) GetGroup(name string) (result string, err error) {
+	if name != "" {
+		if p.HasGroups() && !p.HasGroup(name) {
+			fmt.Printf("WARN: group \"%s\" does not exist in groups.json\n", name);
+		}
+		result = name
+	} else {
+		defaultGroup := p.GetDefaultGroup()
+		if defaultGroup != "" {
+			fmt.Printf("Using default group \"%s\" from groups.json", defaultGroup)
+			result = defaultGroup
+		} else {
+			err = errors.New("cannot use default group")
+		}
+	}
+	return
+}
+
 // create the canonical json for the working directory
 func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 
