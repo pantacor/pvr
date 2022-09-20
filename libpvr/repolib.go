@@ -1438,10 +1438,15 @@ func (p *Pvr) postRemoteJson(remotePvr pvrapi.PvrRemote, pvrMap PvrMap, envelope
 		envJSON["post"] = pvrMap
 	}
 
+	// marshall as canonical json into []byte so resty does not reformat....
 	data, err := cjson.Marshal(envJSON)
 
 	if err != nil {
 		return nil, err
+	}
+
+	if IsDebugEnabled {
+		fmt.Fprintf(os.Stderr, "Posting JSON: %s\n", string(data))
 	}
 
 	response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
