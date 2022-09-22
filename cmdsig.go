@@ -41,6 +41,16 @@ func CommandSig() cli.Command {
 				Usage:  "private key in PEM format to use for signing",
 			},
 			cli.StringFlag{
+				Name:   "signcmd, s",
+				EnvVar: "PVR_SIG_SIGNCMD",
+				Usage:  "sign command (CMD sign <algo>) with stdin binary payload and stdout binary signature",
+			},
+			cli.StringFlag{
+				Name:   "signalgo, a",
+				EnvVar: "PVR_SIG_SIGNALGO",
+				Usage:  "signature algo like ES256, RS256, ES384,...",
+			},
+			cli.StringFlag{
 				Name:   "x5c, x",
 				EnvVar: "PVR_X5C_PATH",
 				Usage:  "path to cert chain to include in jws x5c header. Note: we will not validate that the actual signature can be validated with this one.",

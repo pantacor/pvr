@@ -17,9 +17,11 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path"
 
+	gojose "github.com/go-jose/go-jose/v3"
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
 )
@@ -106,15 +108,16 @@ func CommandSigAdd() cli.Command {
 			ops := libpvr.PvsOptions{}
 
 			keyPath := c.Parent().String("key")
-			if keyPath == "" {
-				keyPath, err = libpvr.GetFromConfigPvs(
-					c.App.Metadata["PVS_CERTS_URL"].(string),
-					pvr.Session.GetConfigDir(),
-					libpvr.SigKeyFilename,
-				)
-				if err != nil {
-					return cli.NewExitError(err, 127)
-				}
+			opaqueCmd := c.Parent().String("signcmd")
+			if opaqueCmd == "" && keyPath == "" {
+				return cli.NewExitError(errors.New("pvr sig add/update must provide either key or signcmd as argument."), 127)
+			}
+			var algo gojose.SignatureAlgorithm
+			val := c.Parent().String("signalgo")
+			algo = gojose.SignatureAlgorithm(val)
+
+			if opaqueCmd != "" && algo == "" {
+				return cli.NewExitError(errors.New("pvr sig add/update must provide --signalgo if --signcmd is used."), 129)
 			}
 
 			ops.X5cPath = c.Parent().String("x5c")
@@ -128,10 +131,13 @@ func CommandSigAdd() cli.Command {
 					return cli.NewExitError(err, 127)
 				}
 			}
-
-			err = pvr.JwsSign(name, keyPath, &match, &ops)
-
+			if opaqueCmd != "" {
+				err = pvr.JwsSignOpaque(name, opaqueCmd, algo, &match, &ops)
+			} else {
+				err = pvr.JwsSignKey(name, keyPath, &match, &ops)
+			}
 			if err != nil {
+				fmt.Fprint(os.Stderr, "ERROR: "+err.Error()+"\n")
 				return cli.NewExitError(err, 127)
 			}
 

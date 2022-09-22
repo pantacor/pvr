@@ -16,6 +16,7 @@
 package libpvr
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
@@ -26,6 +27,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -33,6 +35,7 @@ import (
 
 	"github.com/bmatcuk/doublestar"
 	cjson "github.com/gibson042/canonicaljson-go"
+	"github.com/go-jose/go-jose/v3"
 	gojose "github.com/go-jose/go-jose/v3"
 	"github.com/go-resty/resty"
 )
@@ -280,7 +283,7 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 
 	name := path.Base(pvsPath)
 	name = strings.TrimSuffix(name, ".json")
-	return p.JwsSign(name, privKeyPath, match, options)
+	return p.JwsSignKey(name, privKeyPath, match, options)
 }
 
 // JwsSign will add or update a signature based using a private
@@ -291,7 +294,114 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 //
 // PvsOptions allow to pass additional JoseHeader options to include
 // in the Signature.
-func (p *Pvr) JwsSign(name string,
+func (p *Pvr) JwsSignInternal(name string,
+	signingKey gojose.SigningKey,
+	match *PvsMatch,
+	options *PvsOptions) error {
+
+	buf := p.PristineJson
+
+	if buf == nil {
+		return errors.New("empty state format")
+	}
+
+	if match.Include == nil {
+		match.Include = []string{
+			"*",
+		}
+	}
+
+	if match.Exclude == nil {
+		match.Exclude = []string{
+			path.Join("**", "src.json"),
+			path.Join("_sigs", name+".json"),
+		}
+	}
+
+	signerOpts := &gojose.SignerOptions{EmbedJWK: true}
+	signerOpts = signerOpts.
+		WithHeader("pvs", match).
+		WithType("PVS")
+
+	if options.X5cPath != "" {
+		certs, err := parseCertsFromPEMFile(options.X5cPath)
+		if err != nil {
+			return err
+		}
+
+		var certsRaw [][]byte
+
+		for _, c := range certs {
+			certsRaw = append(certsRaw, c.Raw)
+		}
+
+		signerOpts.WithHeader("x5c", certsRaw)
+	}
+
+	for k, v := range options.ExtraHeaders {
+		signerOpts = signerOpts.WithHeader(gojose.HeaderKey(k), v)
+	}
+
+	signer, err := gojose.NewSigner(signingKey, signerOpts)
+
+	if err != nil {
+		return err
+	}
+
+	payloadBuf, err := selectPayloadBuf(buf, match)
+
+	if err != nil {
+		return err
+	}
+
+	sig, err := signer.Sign(payloadBuf)
+	if err != nil {
+		return err
+	}
+
+	strippedBuf, err := stripPayloadFromRawJSON([]byte(sig.FullSerialize()))
+
+	if err != nil {
+		return err
+	}
+
+	sigMap := map[string]interface{}{}
+
+	err = json.Unmarshal(strippedBuf, &sigMap)
+
+	if err != nil {
+		return err
+	}
+
+	sigMap["#spec"] = "pvs@2"
+
+	newJson, err := cjson.Marshal(sigMap)
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(path.Join(p.Dir, "_sigs"), 0755)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(path.Join(p.Dir, "_sigs", name+".json"), newJson, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// JwsSign will add or update a signature based using a private
+// key provided.
+//
+// The payload will be assembled from the prinstine system state JSON
+// using the match rule provided in PvsMatch struct.
+//
+// PvsOptions allow to pass additional JoseHeader options to include
+// in the Signature.
+func (p *Pvr) JwsSignKey(name string,
 	privKeyPath string,
 	match *PvsMatch,
 	options *PvsOptions) error {
@@ -365,95 +475,107 @@ found:
 		return errors.New("Not supported priv key of type " + reflect.TypeOf(parsedKey).Name())
 	}
 
-	if match.Include == nil {
-		match.Include = []string{
-			"*",
-		}
-	}
-
-	if match.Exclude == nil {
-		match.Exclude = []string{
-			path.Join("**", "src.json"),
-			path.Join("_sigs", name+".json"),
-		}
-	}
-
-	signerOpts := &gojose.SignerOptions{EmbedJWK: true}
-	signerOpts = signerOpts.
-		WithHeader("pvs", match).
-		WithType("PVS")
-
-	if options.X5cPath != "" {
-		certs, err := parseCertsFromPEMFile(options.X5cPath)
-		if err != nil {
-			return err
-		}
-
-		var certsRaw [][]byte
-
-		for _, c := range certs {
-			certsRaw = append(certsRaw, c.Raw)
-		}
-
-		signerOpts.WithHeader("x5c", certsRaw)
-	}
-
-	for k, v := range options.ExtraHeaders {
-		signerOpts = signerOpts.WithHeader(gojose.HeaderKey(k), v)
-	}
-
-	signer, err := gojose.NewSigner(gojose.SigningKey{
+	return p.JwsSignInternal(name, gojose.SigningKey{
 		Algorithm: algo,
 		Key:       privKey,
-	}, signerOpts)
+	}, match, options)
+}
+
+type CmdSigner struct {
+	gojose.OpaqueSigner
+	CmdSign    string
+	PubPem     *pem.Block
+	Algorithms []gojose.SignatureAlgorithm
+}
+
+func (signer CmdSigner) Public() *gojose.JSONWebKey {
+
+	var err error
+	pubPem := signer.PubPem
+
+	// lets get public webkeys
+	var parsedKey interface{}
+	var pubKeys []gojose.JSONWebKey
+	pemBytes := pubPem.Bytes
+	if parsedKey, err = x509.ParsePKCS1PublicKey(pemBytes); err != nil {
+		parsedKey, _ = x509.ParsePKIXPublicKey(pemBytes)
+	}
+
+	if parsedKey == nil {
+		cert, err := x509.ParseCertificate(pubPem.Bytes)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: Cannot append PEM to cert pool. %s\n", err.Error())
+			return nil
+		}
+		parsedKey = cert.PublicKey
+	}
+
+	webkey := gojose.JSONWebKey{
+		Key: parsedKey,
+	}
+	pubKeys = append(pubKeys, webkey)
+
+	return &pubKeys[0]
+}
+
+func (signer CmdSigner) Algs() []gojose.SignatureAlgorithm {
+	return signer.Algorithms
+}
+
+func (signer CmdSigner) SignPayload(payload []byte, alg gojose.SignatureAlgorithm) ([]byte, error) {
+
+	c := exec.Command("/bin/sh", "-c", signer.CmdSign)
+	if c == nil {
+		return nil, errors.New("Cannot setup Command")
+	}
+
+	inbuffer := bytes.Buffer{}
+	inbuffer.Write(payload)
+	c.Stdin = &inbuffer
+	outbuffer := bytes.Buffer{}
+	c.Stdout = &outbuffer
+	errbuffer := bytes.Buffer{}
+	c.Stderr = &errbuffer
+
+	err := c.Run()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return outbuffer.Bytes(), nil
+}
+
+// JwsSign will add or update a signature based using a private
+// key provided.
+//
+// The payload will be assembled from the prinstine system state JSON
+// using the match rule provided in PvsMatch struct.
+//
+// PvsOptions allow to pass additional JoseHeader options to include
+// in the Signature.
+func (p *Pvr) JwsSignOpaque(name string,
+	signCmd string,
+	algo gojose.SignatureAlgorithm,
+	match *PvsMatch,
+	options *PvsOptions) error {
+
+	fileBuf, err := os.ReadFile(options.X5cPath)
 
 	if err != nil {
 		return err
 	}
 
-	payloadBuf, err := selectPayloadBuf(buf, match)
+	pb, _ := pem.Decode(fileBuf)
 
-	if err != nil {
-		return err
-	}
-
-	sig, err := signer.Sign(payloadBuf)
-	if err != nil {
-		return err
-	}
-
-	strippedBuf, err := stripPayloadFromRawJSON([]byte(sig.FullSerialize()))
-
-	if err != nil {
-		return err
-	}
-
-	sigMap := map[string]interface{}{}
-
-	err = json.Unmarshal(strippedBuf, &sigMap)
-
-	if err != nil {
-		return err
-	}
-
-	sigMap["#spec"] = "pvs@2"
-
-	newJson, err := cjson.Marshal(sigMap)
-	if err != nil {
-		return err
-	}
-
-	err = os.MkdirAll(path.Join(p.Dir, "_sigs"), 0755)
-	if err != nil {
-		return err
-	}
-
-	err = ioutil.WriteFile(path.Join(p.Dir, "_sigs", name+".json"), newJson, 0644)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return p.JwsSignInternal(name, jose.SigningKey{
+		Key: CmdSigner{
+			CmdSign:    signCmd,
+			PubPem:     pb,
+			Algorithms: []gojose.SignatureAlgorithm{algo},
+		},
+		Algorithm: algo,
+	}, match, options)
 }
 
 type JwsVerifySummary struct {

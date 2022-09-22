@@ -78,7 +78,7 @@ func CommandClone() cli.Command {
 			}
 
 			// we use the url as passed in before repo ref to gather the
-			// basename to use as the default clone target.
+			// basename to use as the default clone target.pv
 			base := path.Base(origURL.Path)
 			base = path.Join(wd, base)
 			if c.NArg() == 2 {
