@@ -299,6 +299,22 @@ func isInlineJson(k string, v interface{}) bool {
 	return false
 }
 
+func (p *Pvr) GetWorkingJsonMap() (resMap map[string]interface{}, untracked []string, err error) {
+	var buf []byte
+	buf, untracked, err = p.GetWorkingJson()
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(buf, resMap)
+
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 // create the canonical json for the working directory
 func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 
