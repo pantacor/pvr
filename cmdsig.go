@@ -61,6 +61,11 @@ func CommandSig() cli.Command {
 				EnvVar: "PVS_CERTS_URL",
 				Value:  defaultCertsDownloadUrl,
 			},
+			cli.BoolFlag{
+				Name:   "with-payload",
+				Usage:  "Use `PVS_SIG_WITH_PAYLOAD` for including full payload in jose serialization.",
+				EnvVar: "PVS_SIG_WITH_PAYLOAD",
+			},
 		},
 		Before: func(c *cli.Context) error {
 			if c.GlobalString("certs-url") != "" {

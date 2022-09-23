@@ -65,6 +65,7 @@ func CommandSigUpdate() cli.Command {
 			}
 
 			ops := libpvr.PvsOptions{}
+			ops.IncludePayLoad = c.Parent().Bool("with-payload")
 
 			keyPath := c.Parent().String("key")
 			if keyPath == "" {

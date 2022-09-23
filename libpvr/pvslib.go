@@ -43,9 +43,10 @@ type PvsMatch struct {
 }
 
 type PvsOptions struct {
-	Algorithm    gojose.SignatureAlgorithm
-	X5cPath      string
-	ExtraHeaders map[string]interface{}
+	Algorithm      gojose.SignatureAlgorithm
+	X5cPath        string
+	ExtraHeaders   map[string]interface{}
+	IncludePayLoad bool
 }
 
 type PvsPartSelection struct {
@@ -422,7 +423,10 @@ found:
 		return err
 	}
 
-	strippedBuf, err := stripPayloadFromRawJSON([]byte(sig.FullSerialize()))
+	strippedBuf := []byte(sig.FullSerialize())
+	if !options.IncludePayLoad {
+		strippedBuf, err = stripPayloadFromRawJSON(strippedBuf)
+	}
 
 	if err != nil {
 		return err
