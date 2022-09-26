@@ -306,7 +306,7 @@ func (p *Pvr) GetWorkingJsonMap() (resMap map[string]interface{}, untracked []st
 		return
 	}
 
-	err = json.Unmarshal(buf, resMap)
+	err = json.Unmarshal(buf, &resMap)
 
 	if err != nil {
 		return
