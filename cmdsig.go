@@ -66,6 +66,11 @@ func CommandSig() cli.Command {
 				Usage:  "Use `PVS_SIG_WITH_PAYLOAD` for including full payload in jose serialization.",
 				EnvVar: "PVS_SIG_WITH_PAYLOAD",
 			},
+			cli.StringFlag{
+				Name:   "output",
+				Usage:  "Use `PVS_SIG_OUTPUT` output of the signature file to the file given. '-' will print to stdout.",
+				EnvVar: "PVS_SIG_OUTPUT",
+			},
 		},
 		Before: func(c *cli.Context) error {
 			if c.GlobalString("certs-url") != "" {

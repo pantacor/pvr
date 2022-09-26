@@ -47,6 +47,7 @@ type PvsOptions struct {
 	X5cPath        string
 	ExtraHeaders   map[string]interface{}
 	IncludePayLoad bool
+	OutputFile     *os.File
 }
 
 type PvsPartSelection struct {
@@ -447,6 +448,13 @@ found:
 		return err
 	}
 
+	if options.OutputFile != nil {
+		_, err = options.OutputFile.Write(newJson)
+
+		if err != nil {
+			return err
+		}
+	}
 	err = os.MkdirAll(path.Join(p.Dir, "_sigs"), 0755)
 	if err != nil {
 		return err
