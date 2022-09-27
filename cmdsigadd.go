@@ -104,6 +104,7 @@ func CommandSigAdd() cli.Command {
 			}
 
 			ops := libpvr.PvsOptions{}
+			ops.IncludePayLoad = c.Parent().Bool("with-payload")
 
 			keyPath := c.Parent().String("key")
 			if keyPath == "" {
@@ -127,6 +128,21 @@ func CommandSigAdd() cli.Command {
 				if err != nil {
 					return cli.NewExitError(err, 127)
 				}
+			}
+
+			if c.Parent().IsSet("output") {
+				output := c.Parent().String("output")
+				if output != "-" {
+					ops.OutputFile, err = os.OpenFile(output,
+						os.O_CREATE|os.O_WRONLY, 0644)
+				} else {
+					ops.OutputFile = os.Stdout
+				}
+				if err != nil {
+					return cli.NewExitError(err, 127)
+				}
+
+				defer ops.OutputFile.Close()
 			}
 
 			err = pvr.JwsSign(name, keyPath, &match, &ops)

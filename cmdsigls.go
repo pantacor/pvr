@@ -55,7 +55,7 @@ func mergeSummary(dest *libpvr.JwsVerifySummary, merge ...libpvr.JwsVerifySummar
 		dest.Excluded = append(dest.Excluded, m.Excluded...)
 		dest.Protected = append(dest.Protected, m.Protected...)
 		dest.NotSeen = append(dest.NotSeen, m.NotSeen...)
-		dest.JSONWebSignatures = append(dest.JSONWebSignatures, m.JSONWebSignatures...)
+		dest.FullJSONWebSigs = append(dest.FullJSONWebSigs, m.FullJSONWebSigs...)
 	}
 	sort.Strings(dest.Excluded)
 	sort.Strings(dest.NotSeen)
@@ -167,7 +167,7 @@ func CommandSigLs() cli.Command {
 			}
 
 			for _, v := range args {
-				w, err := pvr.JwsVerifyPvs(pubkey, cacerts, v)
+				w, err := pvr.JwsVerifyPvs(pubkey, cacerts, v, c.Parent().Bool("with-payload"))
 				if errors.Is(err, os.ErrNotExist) {
 					return cli.NewExitError("ERROR: signature file does not exist with name "+v, 125)
 				}
@@ -180,7 +180,7 @@ func CommandSigLs() cli.Command {
 			mergeSummary(&resultSummary, verifySummary...)
 
 			if !c.Bool("with-sigs") {
-				resultSummary.JSONWebSignatures = nil
+				resultSummary.FullJSONWebSigs = nil
 			}
 			jsonBuf, err := json.MarshalIndent(resultSummary, "", "    ")
 
