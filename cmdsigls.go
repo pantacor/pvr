@@ -55,6 +55,7 @@ func mergeSummary(dest *libpvr.JwsVerifySummary, merge ...libpvr.JwsVerifySummar
 		dest.Excluded = append(dest.Excluded, m.Excluded...)
 		dest.Protected = append(dest.Protected, m.Protected...)
 		dest.NotSeen = append(dest.NotSeen, m.NotSeen...)
+		dest.JSONWebSignatures = append(dest.JSONWebSignatures, m.JSONWebSignatures...)
 	}
 	sort.Strings(dest.Excluded)
 	sort.Strings(dest.NotSeen)
@@ -82,7 +83,6 @@ func mergeSummary(dest *libpvr.JwsVerifySummary, merge ...libpvr.JwsVerifySummar
 		}
 		dest.NotSeen = append(dest.NotSeen, v)
 	}
-
 }
 
 func CommandSigLs() cli.Command {
