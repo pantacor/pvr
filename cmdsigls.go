@@ -179,6 +179,9 @@ func CommandSigLs() cli.Command {
 
 			mergeSummary(&resultSummary, verifySummary...)
 
+			if !c.Bool("with-sigs") {
+				resultSummary.JSONWebSignatures = nil
+			}
 			jsonBuf, err := json.MarshalIndent(resultSummary, "", "    ")
 
 			if err != nil {
@@ -194,6 +197,11 @@ func CommandSigLs() cli.Command {
 				Name:   "part, p",
 				Usage:  "select elements of part",
 				EnvVar: "PVR_SIG_ADD_PART",
+			},
+			cli.BoolFlag{
+				Name:   "with-sigs, s",
+				Usage:  "Show full json web signatures in summary display",
+				EnvVar: "PVR_SIG_LS_WITH_SIGS",
 			},
 		},
 	}
