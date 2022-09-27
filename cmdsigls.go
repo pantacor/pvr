@@ -55,6 +55,7 @@ func mergeSummary(dest *libpvr.JwsVerifySummary, merge ...libpvr.JwsVerifySummar
 		dest.Excluded = append(dest.Excluded, m.Excluded...)
 		dest.Protected = append(dest.Protected, m.Protected...)
 		dest.NotSeen = append(dest.NotSeen, m.NotSeen...)
+		dest.JSONWebSignatures = append(dest.JSONWebSignatures, m.JSONWebSignatures...)
 	}
 	sort.Strings(dest.Excluded)
 	sort.Strings(dest.NotSeen)
@@ -82,7 +83,6 @@ func mergeSummary(dest *libpvr.JwsVerifySummary, merge ...libpvr.JwsVerifySummar
 		}
 		dest.NotSeen = append(dest.NotSeen, v)
 	}
-
 }
 
 func CommandSigLs() cli.Command {
@@ -179,6 +179,9 @@ func CommandSigLs() cli.Command {
 
 			mergeSummary(&resultSummary, verifySummary...)
 
+			if !c.Bool("with-sigs") {
+				resultSummary.JSONWebSignatures = nil
+			}
 			jsonBuf, err := json.MarshalIndent(resultSummary, "", "    ")
 
 			if err != nil {
@@ -194,6 +197,11 @@ func CommandSigLs() cli.Command {
 				Name:   "part, p",
 				Usage:  "select elements of part",
 				EnvVar: "PVR_SIG_ADD_PART",
+			},
+			cli.BoolFlag{
+				Name:   "with-sigs, s",
+				Usage:  "Show full json web signatures in summary display",
+				EnvVar: "PVR_SIG_LS_WITH_SIGS",
 			},
 		},
 	}

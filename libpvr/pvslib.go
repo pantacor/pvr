@@ -457,9 +457,10 @@ found:
 }
 
 type JwsVerifySummary struct {
-	Protected []string `json:"protected,omitempty"`
-	Excluded  []string `json:"excluded,omitempty"`
-	NotSeen   []string `json:"notseen,omitempty"`
+	Protected         []string                   `json:"protected,omitempty"`
+	Excluded          []string                   `json:"excluded,omitempty"`
+	NotSeen           []string                   `json:"notseen,omitempty"`
+	JSONWebSignatures []*gojose.JSONWebSignature `json:"sigs,omitempty"`
 }
 
 // JwsVerify will add or update a signature based using a private
@@ -684,6 +685,8 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	for k := range selection.NotSeen {
 		summary.NotSeen = append(summary.NotSeen, k)
 	}
+
+	summary.JSONWebSignatures = append(summary.JSONWebSignatures, sig)
 
 	return &summary, nil
 }
