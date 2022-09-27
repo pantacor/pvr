@@ -19,6 +19,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -469,10 +470,10 @@ found:
 }
 
 type JwsVerifySummary struct {
-	Protected         []string                   `json:"protected,omitempty"`
-	Excluded          []string                   `json:"excluded,omitempty"`
-	NotSeen           []string                   `json:"notseen,omitempty"`
-	JSONWebSignatures []*gojose.JSONWebSignature `json:"sigs,omitempty"`
+	Protected       []string      `json:"protected,omitempty"`
+	Excluded        []string      `json:"excluded,omitempty"`
+	NotSeen         []string      `json:"notseen,omitempty"`
+	FullJSONWebSigs []interface{} `json:"sigs,omitempty"`
 }
 
 // JwsVerify will add or update a signature based using a private
@@ -484,7 +485,7 @@ type JwsVerifySummary struct {
 // special value for caCerts "_system_" hints at using the system cacert
 // store. Can be configured using SSH_CERT_FILE and SSH_CERTS_DIR on linux
 //
-func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*JwsVerifySummary, error) {
+func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, includePayload bool) (*JwsVerifySummary, error) {
 
 	var summary JwsVerifySummary
 	var err error
@@ -698,7 +699,22 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 		summary.NotSeen = append(summary.NotSeen, k)
 	}
 
-	summary.JSONWebSignatures = append(summary.JSONWebSignatures, sig)
+	var fullSig map[string]interface{}
+
+	err = json.Unmarshal([]byte(sig.FullSerialize()), &fullSig)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if includePayload {
+		buf := make([]byte, base64.StdEncoding.
+			WithPadding(base64.NoPadding).EncodedLen(len(payloadBuf)))
+		base64.StdEncoding.
+			WithPadding(base64.NoPadding).Encode(buf, payloadBuf)
+		fullSig["payload"] = string(buf)
+	}
+	summary.FullJSONWebSigs = append(summary.FullJSONWebSigs, fullSig)
 
 	return &summary, nil
 }
