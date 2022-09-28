@@ -272,6 +272,14 @@ $ pvr clone https://api.pantahub.com/trails/<YOURDEVICE>/steps/<REV>
 ...
 ```
 
+### pvr clone <IP>
+
+When developing a device that has a pvr compatible cgi local 
+frontend (such as provided by pvr-sdk by default) installed
+you can use `pvr clone IP` directly.
+
+In that `pvr clone 1.2.3.4` is equivalent to `pvr clone http://1.2.3.4:12368/cgi-bin/pvr`.
+
 ### pvr fastcopy <SOURCE>[#part1,part2,path/part3] <DESTINATION>[#part1name,$part2name,...]
 
 You can copy device state or subelements from one device to another without
