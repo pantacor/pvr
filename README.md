@@ -1280,6 +1280,56 @@ Date:   Wed Oct 20 17:58:50 2021 +0200
     ```
 ```
 
+## PVR sig options
+
+To allow easier integration in higher level tools, like external signing tools
+`pvr sig` offers a few options to make their live easier.
+
+The idea of making an external signing tool is to keep the logic that interprets
+the PVS headers and create the protected header and the payload of the jose token
+inside pvr itself, but allow for easy export of the complete jose token including
+payload which then external tools can inspect and sign.
+
+### pvr sig add/update with payload
+
+The first avenue is to produce a signature during signing that includes the full
+payload. This can be achieved through the `--with-payload` option for `pvr sig add`
+and `pvr sig update`. Example:
+
+```
+$ pvr clone pantahub-ci/rock64_initial_stable example
+$ cd example
+$ pvr sig --with-payload add --part awconnect
+```
+
+This will produce a jose signature file in _sigs/awconnect.json that
+includes the full payload and hence can be send to a service that resigns
+it in infrastructure.
+
+To make this more conveniebnt, the --output=- option allows to print that
+signature to stdout:
+
+```
+$ pvr sig --with-payload add --part awconnect
+```
+
+### pvr sig ls with full jose token
+
+The second approach that might be viable is to take a package that was
+already signed by a developer or CI system, inspect it and resign it with
+a production key.
+
+For that the `pvr sig ls` command offers some convenience to include the
+jose serialization found in the result summary with the `--with-sig` option.
+
+Combined with the `--with-payload` option this gives the user the ability
+to again a produce a complete jose token that an external system can
+resign without further business logic. Example:
+
+```
+$ pvr sig --with-payload ls --with-sig _sigs/awconnect.json 
+```
+
 # PVR dm commands (device-mapper) (BETA)
 
 pvr device mapper support for container volumes allows for an easy way to
