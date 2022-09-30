@@ -18,7 +18,8 @@ package templates
 const (
 	LXC_CONTAINER_CONF = `
 {{- $runlevel := .Source.args.PV_RUNLEVEL }}
-{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" -}}
+{{- if and (.Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data")
+           (.Source.args.PV_STATUS_GOAL | pvr_ifNull "__null__" | ne "MOUNTED") -}}
 	{{ "" -}}
 lxc.tty.max = {{ .Source.args.LXC_TTY_MAX | pvr_ifNull "8" }}
 lxc.pty.max = {{ .Source.args.LXC_PTY_MAX | pvr_ifNull "1024" }}
@@ -190,7 +191,8 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 {
 	"#spec": "service-manifest-run@1",
 	"name":"{{- .Source.name -}}",
-	{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" }}
+	{{- if and (.Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data")
+           (.Source.args.PV_STATUS_GOAL | pvr_ifNull "__null__" | ne "MOUNTED") }}
 	"config": "lxc.container.conf",
 	{{- end }}
 	{{- if .Source.args.PV_CONDITIONS }}
@@ -201,12 +203,17 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 		"required": {{- if .Source.args.PV_DRIVERS_REQUIRED }} {{ sprig_toJson .Source.args.PV_DRIVERS_REQUIRED -}}{{- else }}[]{{- end }},
 		"optional": {{- if .Source.args.PV_DRIVERS_OPTIONAL }} {{ sprig_toJson .Source.args.PV_DRIVERS_OPTIONAL -}}{{- else }}[]{{- end }}
 	},
-	{{- if .Source.args.PV_GROUP }}
-	"group": "{{- .Source.args.PV_GROUP }}",
-	{{- else }}
+	{{- if .EffectiveGroup }}
+	"group": "{{- .EffectiveGroup }}",
+	{{- end }}
 	{{- if .Source.args.PV_RUNLEVEL }}
 	"runlevel": "{{- .Source.args.PV_RUNLEVEL }}",
 	{{- end }}
+	{{- if .Source.args.PV_RESTART_POLICY }}
+	"restart_policy": "{{- .Source.args.PV_RESTART_POLICY }}",
+	{{- end }}
+	{{- if .Source.args.PV_STATUS_GOAL }}
+	"status_goal": "{{- .Source.args.PV_STATUS_GOAL }}",
 	{{- end }}
 	"storage":{
 		{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes $persistence -}}
@@ -237,7 +244,8 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 			{{- end }}
 		}
 	},
-	{{- if .Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data" }}
+	{{- if and (.Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data")
+           (.Source.args.PV_STATUS_GOAL | pvr_ifNull "__null__" | ne "MOUNTED") }}
 	"exports": {{  .Source.exports | sprig_toPrettyJson | sprig_indent 8 }},
 	"logs": {{  .Source.logs | sprig_toPrettyJson | sprig_indent 8 }},
 	"type":"lxc",
