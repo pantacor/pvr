@@ -228,15 +228,29 @@ func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[
 	configValues := map[string]interface{}{}
 	configValues["Source"] = appManifestMap
 	configValues["Docker"] = dockerConfig
+
+	if appManifest.TemplateArgs["PV_GROUP"] != nil {
+		fmt.Fprintf(os.Stderr, "Setting new platform to group \"%s\"\n", appManifest.TemplateArgs["PV_GROUP"].(string))
+	}
+	if appManifest.TemplateArgs["PV_RUNLEVEL"] != nil {
+		fmt.Fprintf(os.Stderr, "Setting new platform to runlevel \"%s\"\n", appManifest.TemplateArgs["PV_RUNLEVEL"].(string))
+		fmt.Fprintf(os.Stderr, "WARN: using deprecated runlevel. Use --group instead for Pantavisor 015 or above\n")
+	}
+
 	if appManifest.TemplateArgs["PV_RUNLEVEL"] != nil && p.HasGroups() {
-		fmt.Fprintln(os.Stderr, "WARNING: PV_RUNLEVEL used and groups.json found at the same time")
+		fmt.Fprintln(os.Stderr, "WARN: PV_RUNLEVEL used and groups.json found at the same time")
 	}
 
 	configValues["EffectiveGroup"] = appManifest.TemplateArgs["PV_GROUP"]
+	if configValues["EffectiveGroup"] != nil && !p.HasGroup(configValues["EffectiveGroup"].(string)) {
+		fmt.Fprintln(os.Stderr, "WARN: group does not exist in groups.json")
+	}
 
 	if configValues["EffectiveGroup"] == nil && appManifest.TemplateArgs["PV_RUNLEVEL"] == nil {
-		if p.GetDefaultGroup() != "" {
-			configValues["EffectiveGroup"] = p.GetDefaultGroup()
+		defaultGroup := p.GetDefaultGroup()
+		if defaultGroup != "" {
+			fmt.Fprintf(os.Stderr, "Setting new platform to default group \"%s\"\n", defaultGroup)
+			configValues["EffectiveGroup"] = defaultGroup
 		}
 	}
 
