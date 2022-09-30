@@ -228,6 +228,17 @@ func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[
 	configValues := map[string]interface{}{}
 	configValues["Source"] = appManifestMap
 	configValues["Docker"] = dockerConfig
+	if appManifest.TemplateArgs["PV_RUNLEVEL"] != nil && p.HasGroups() {
+		fmt.Fprintln(os.Stderr, "WARNING: PV_RUNLEVEL used and groups.json found at the same time")
+	}
+
+	configValues["EffectiveGroup"] = appManifest.TemplateArgs["PV_GROUP"]
+
+	if configValues["EffectiveGroup"] == nil && appManifest.TemplateArgs["PV_RUNLEVEL"] == nil {
+		if p.GetDefaultGroup() != "" {
+			configValues["EffectiveGroup"] = p.GetDefaultGroup()
+		}
+	}
 
 	if appManifest.Template == "" {
 		return fmt.Errorf("empty template")

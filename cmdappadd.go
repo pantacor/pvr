@@ -109,14 +109,20 @@ func CommandAppAdd() cli.Command {
 				TemplateArgs:  templateArgs,
 			}
 
-			group, err := pvr.GetGroup(c.String("group"))
-			if err != nil {
+			if c.IsSet("group") && c.IsSet("runlevel") {
+				return cli.NewExitError(errors.New("You must not use --runlevel and --group at the same time"), 5)
+			}
+
+			group := c.String("group")
+			if group != "" {
+				app.TemplateArgs["PV_GROUP"] = group
+			}
+
+			runlevel := c.String("runlevel")
+			if runlevel != "" {
 				fmt.Printf("WARN: using deprecated runlevel. Use --group instead for Pantavisor 015 or above\n")
 				fmt.Printf("Setting new platform with runlevel \"%s\"\n", c.String("runlevel"))
 				app.TemplateArgs["PV_RUNLEVEL"] = c.String("runlevel")
-			} else {
-				fmt.Printf("Setting new platform in group \"%s\"\n", group)
-				app.TemplateArgs["PV_GROUP"] = group
 			}
 
 			if c.String("restart-policy") != "" {
@@ -173,7 +179,6 @@ func CommandAppAdd() cli.Command {
 			Name:   "runlevel",
 			Usage:  RunlevelFlagUsage,
 			EnvVar: "PVR_RUNLEVEL",
-			Value:  "app",
 		},
 		cli.StringFlag{
 			Name:   "group",
