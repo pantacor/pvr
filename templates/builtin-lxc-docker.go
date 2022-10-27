@@ -273,7 +273,7 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 		{{- end }}
 		{{ $m := sprig_list}}
 		{{- range $i, $v := $n }}
-			{{- if and (.Source.dm_enabled) (index .Source.dm_enabled $v) }}$n dm:{{ $v }}"
+			{{- if and (.Source.dm_enabled) (index .Source.dm_enabled $v) }} {{ sprig_set $n $i (print "dm:" $v) }}{{ end }}
 		{{- end }}
 		{{ join ",\\n" $n }}
 	]
