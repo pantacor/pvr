@@ -246,14 +246,14 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	},
 	{{- if and (.Source.args.PV_RUNLEVEL | pvr_ifNull "__null__" | ne "data")
            (.Source.args.PV_STATUS_GOAL | pvr_ifNull "__null__" | ne "MOUNTED") }}
-	"exports": {{  .Source.exports | sprig_toPrettyJson | sprig_indent 8 }},
-	"logs": {{  .Source.logs | sprig_toPrettyJson | sprig_indent 8 }},
+	{{- if .Source.exports }}"exports": {{ .Source.exports | sprig_toPrettyJson | sprig_indent 8 }},{{- end }}
+	{{- if .Source.logs }}"logs": {{  .Source.logs | sprig_toPrettyJson | sprig_indent 8 }},{{- end }}
 	"type":"lxc",
 	{{- if .Source.args.PV_ROLES }}
 	"roles": {{- .Source.args.PV_ROLES | sprig_toPrettyJson | sprig_indent 8 }},
 	{{- end }}
 	{{- end }}
-	"root-volume": "root.squashfs",
+	"root-volume": "{{- if and (.Source.dm_enabled) (index .Source.dm_enabled "root.squashfs") }}dm:root.squashfs{{ else }}root.squashfs{{ end }}",
 	"volumes":[
 		{{- $v := sprig_list }}
 		{{- if .Source.args.PV_EXTRA_VOLUMES }}
@@ -270,6 +270,10 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 		{{- range $i, $j := $v }}
 			{{- $q := quote $j }}
 			{{- $n = sprig_append $n $q }}
+		{{- end }}
+		{{ $m := sprig_list}}
+		{{- range $i, $v := $n }}
+			{{- if and (.Source.dm_enabled) (index .Source.dm_enabled $v) }}$n dm:{{ $v }}"
 		{{- end }}
 		{{ join ",\\n" $n }}
 	]

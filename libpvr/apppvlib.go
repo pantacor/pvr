@@ -64,35 +64,35 @@ func AddPvApp(p *Pvr, app AppData) error {
 		return err
 	}
 
+	app.Appmanifest = srcJson
+
 	return p.InstallApplication(app)
 }
 
 func UpdatePvApp(p *Pvr, app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
+
+	var err error
 
 	if app.Source == "" {
-		app.Source = appManifest.DockerSource.DockerSource
+		app.Source = app.Appmanifest.DockerSource.DockerSource
 	}
 
 	if app.Platform == "" {
-		app.Platform = appManifest.DockerPlatform
+		app.Platform = app.Appmanifest.DockerPlatform
 	}
 
-	if appManifest.PvrUrl == "" {
+	if app.Appmanifest.PvrUrl == "" {
 		return UpdateDockerApp(p, app)
 	}
 
 	initialFrom := app.From
-	app.From = appManifest.PvrUrl
-	if _, appManifest, err = p.GetFromRepo(&app); err != nil {
+	app.From = app.Appmanifest.PvrUrl
+	if _, app.Appmanifest, err = p.GetFromRepo(&app); err != nil {
 		return err
 	}
 	app.From = initialFrom
 
-	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
+	srcContent, err := json.MarshalIndent(app.Appmanifest, " ", " ")
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func UpdatePvApp(p *Pvr, app AppData) error {
 		return err
 	}
 
-	if appManifest.DockerDigest == squashFSDigest {
+	if app.Appmanifest.DockerDigest == squashFSDigest {
 		fmt.Println("Application already up to date.")
 		return nil
 	}
@@ -117,26 +117,18 @@ func UpdatePvApp(p *Pvr, app AppData) error {
 }
 
 func InstallPVApp(p *Pvr, app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
 
-	if appManifest.DockerName == "" {
-		return err
-	}
-
-	trackURL := appManifest.DockerName
-	if appManifest.DockerTag != "" {
-		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
+	trackURL := app.Appmanifest.DockerName
+	if app.Appmanifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", app.Appmanifest.DockerTag)
 	}
 
 	app.DockerURL = trackURL
 
 	var dockerConfig map[string]interface{}
 
-	if appManifest.DockerConfig != nil {
-		dockerConfig = appManifest.DockerConfig
+	if app.Appmanifest.DockerConfig != nil {
+		dockerConfig = app.Appmanifest.DockerConfig
 	} else {
 		if app.LocalImage.Exists {
 			dockerConfig = app.LocalImage.DockerConfig
@@ -147,8 +139,7 @@ func InstallPVApp(p *Pvr, app AppData) error {
 		}
 	}
 
-	app.Appmanifest = appManifest
-	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
+	err := p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
 	if err != nil {
 		return err
 	}
@@ -159,7 +150,7 @@ func InstallPVApp(p *Pvr, app AppData) error {
 		return err
 	}
 
-	if appManifest.DockerDigest == squashFSDigest {
+	if app.Appmanifest.DockerDigest == squashFSDigest {
 		fmt.Println("Application already up to date. Will skip generating new root.squashfs")
 		return nil
 	}

@@ -97,6 +97,7 @@ func CommandAppInstall() cli.Command {
 			}
 
 			app := libpvr.AppData{
+				Appmanifest:  appManifest,
 				Appname:      appname,
 				From:         from,
 				Source:       source,

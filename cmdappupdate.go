@@ -78,7 +78,13 @@ func CommandAppUpdate() cli.Command {
 				trackURL = c.String("from")
 			}
 
+			appManifest, err := pvr.GetApplicationManifest(appname)
+			if err != nil {
+				return cli.NewExitError(err, 4)
+			}
+
 			app := libpvr.AppData{
+				Appmanifest:  appManifest,
 				Appname:      appname,
 				From:         trackURL,
 				Source:       c.String("source"),
