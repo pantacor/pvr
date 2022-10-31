@@ -364,14 +364,14 @@ func (p *Pvr) HasGroup(name string) bool {
 func (p *Pvr) GetDefaultGroup() string {
 	groups, err := p.GetWorkingGroupsJson()
 	if (err != nil) || (len(groups) < 1) {
-		return ""
+		return "app"
 	}
 
 	g := groups[len(groups) - 1].(map[string]interface{})
 	if n, ok := g["name"].(string); ok {
 		return n
 	}
-	return ""
+	return "app"
 }
 
 func (p *Pvr) GetGroup(name string) (result string, err error) {
