@@ -72,8 +72,13 @@ func (p *PvrStatus) String() string {
 	return str
 }
 
+type PvrFileAddInfo struct {
+	Sha         string
+	ForceObject bool
+}
+
 type PvrMap map[string]interface{}
-type PvrIndex map[string]string
+type PvrIndex map[string]PvrFileAddInfo
 
 type Pvr struct {
 	Initialized     bool
@@ -176,7 +181,7 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 	if err == nil {
 		err = json.Unmarshal(bytesNew, &pvr.NewFiles)
 	} else {
-		pvr.NewFiles = map[string]string{}
+		pvr.NewFiles = map[string]PvrFileAddInfo{}
 		err = nil
 	}
 
@@ -208,7 +213,7 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 	return &pvr, nil
 }
 
-func (p *Pvr) addPvrFile(path string) error {
+func (p *Pvr) addPvrFile(path string, forceObject bool) error {
 	shaBal, err := FiletoSha(path)
 	if err != nil {
 		return err
@@ -216,14 +221,17 @@ func (p *Pvr) addPvrFile(path string) error {
 	relPath := strings.TrimPrefix(path, p.Dir)
 	relPathSlash := filepath.ToSlash(relPath)
 	if p.NewFiles == nil {
-		p.NewFiles = map[string]string{}
+		p.NewFiles = map[string]PvrFileAddInfo{}
 	}
-	p.NewFiles[relPathSlash] = shaBal
+	p.NewFiles[relPathSlash] = PvrFileAddInfo{
+		Sha:         shaBal,
+		ForceObject: forceObject,
+	}
 	return nil
 }
 
 // XXX: make this git style
-func (p *Pvr) AddFile(globs []string) error {
+func (p *Pvr) AddFile(globs []string, forceObject bool) error {
 
 	err := filepath.Walk(p.Dir, func(walkPath string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -236,7 +244,7 @@ func (p *Pvr) AddFile(globs []string) error {
 
 		// no globs specified: add all
 		if len(globs) == 0 || (len(globs) == 1 && globs[0] == ".") {
-			p.addPvrFile(walkPath)
+			p.addPvrFile(walkPath, forceObject)
 		}
 		for _, glob := range globs {
 			absglob := glob
@@ -250,7 +258,7 @@ func (p *Pvr) AddFile(globs []string) error {
 				return err
 			}
 			if matched {
-				err = p.addPvrFile(walkPath)
+				err = p.addPvrFile(walkPath, forceObject)
 				if err != nil {
 					return nil
 				}
@@ -281,6 +289,107 @@ func (p *Pvr) AddFile(globs []string) error {
 
 func (p *Pvr) GetCPristineJson() ([]byte, error) {
 	return cjson.Marshal(p.PristineJsonMap)
+}
+
+func isInlineJson(k string, v interface{}) bool {
+	vs, ok := v.(string)
+	if strings.HasSuffix(k, ".json") && !ok || (strings.HasSuffix(k, ".json") && !IsSha(vs)) {
+		return true
+	}
+	return false
+}
+
+func (p *Pvr) GetWorkingJsonMap() (resMap map[string]interface{}, untracked []string, err error) {
+	var buf []byte
+	buf, untracked, err = p.GetWorkingJson()
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(buf, &resMap)
+
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (p *Pvr) GetWorkingGroupsJson() (result []interface{}, err error) {
+	json, _, err := p.GetWorkingJsonMap()
+	if err != nil {
+		return
+	}
+
+	for k, v := range json {
+		if strings.HasPrefix(k, "groups.json") {
+			switch vv := v.(type) {
+			case []interface{}:
+				result = vv
+			default:
+				err = errors.New("ERROR: groups.json not an array")
+			}
+			return
+		}
+	}
+	return
+}
+
+func (p *Pvr) HasGroups() bool {
+	groups, err := p.GetWorkingGroupsJson()
+	if err != nil || (len(groups) < 1) {
+		return false
+	}
+
+	return true
+}
+
+func (p *Pvr) HasGroup(name string) bool {
+	groups, err := p.GetWorkingGroupsJson()
+	if err != nil || (len(groups) < 1) {
+		return false
+	}
+
+	for _, v := range groups {
+		g := v.(map[string]interface{})
+		if n, ok := g["name"].(string); ok {
+			if n == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (p *Pvr) GetDefaultGroup() string {
+	groups, err := p.GetWorkingGroupsJson()
+	if (err != nil) || (len(groups) < 1) {
+		return ""
+	}
+
+	g := groups[len(groups) - 1].(map[string]interface{})
+	if n, ok := g["name"].(string); ok {
+		return n
+	}
+	return ""
+}
+
+func (p *Pvr) GetGroup(name string) (result string, err error) {
+	if name != "" {
+		if p.HasGroups() && !p.HasGroup(name) {
+			fmt.Printf("WARN: group \"%s\" does not exist in groups.json\n", name);
+		}
+		result = name
+	} else {
+		defaultGroup := p.GetDefaultGroup()
+		if defaultGroup != "" {
+			fmt.Printf("Using default group \"%s\" from groups.json", defaultGroup)
+			result = defaultGroup
+		} else {
+			err = errors.New("cannot use default group")
+		}
+	}
+	return
 }
 
 // create the canonical json for the working directory
@@ -319,8 +428,10 @@ func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 				return nil
 			}
 		}
+
 		// inline json
-		if strings.HasSuffix(filepath.Base(filePath), ".json") {
+		if isInlineJson(relPath, p.PristineJsonMap[relPath]) &&
+			!p.NewFiles[relPath].ForceObject {
 			var jsonFile interface{}
 
 			data, err := ioutil.ReadFile(filePath)
@@ -485,7 +596,7 @@ func (p *Pvr) prepCommitCheckpoint() error {
 	fNewPath := fPath + ".new"
 	var fd *os.File
 
-	p.NewFiles[PvrCheckpointFilename] = ""
+	p.NewFiles[PvrCheckpointFilename] = PvrFileAddInfo{}
 	checkpointInfo := map[string]interface{}{
 		"major": time.Now().Format(time.RFC3339),
 	}
@@ -514,8 +625,10 @@ func (p *Pvr) prepCommitCheckpoint() error {
 	}
 
 	// lets remember this file as NEW file right away ...
-	if p.NewFiles[PvrCheckpointFilename] == "" {
-		p.NewFiles[PvrCheckpointFilename] = "NO SHA NEEDED FOR JSON"
+	if p.NewFiles[PvrCheckpointFilename].Sha == "" {
+		m := p.NewFiles[PvrCheckpointFilename]
+		m.Sha = "NO SHA, BUT NEEDED FOR JSON"
+		p.NewFiles[PvrCheckpointFilename] = m
 	}
 
 exit:
@@ -538,16 +651,34 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 		return err
 	}
 
+	var wMap map[string]interface{}
+	wJson, _, err := p.GetWorkingJson()
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(wJson, &wMap)
+	if err != nil {
+		return err
+	}
 	for _, v := range status.ChangedFiles {
-		fmt.Fprintln(os.Stderr, "Committing "+filepath.Join(p.Objdir, v))
-		if strings.HasSuffix(v, ".json") {
+		iface := wMap[v]
+
+		if isInlineJson(v, iface) {
+			fmt.Fprintln(os.Stderr, "Committing (inline): "+filepath.Join(p.Dir, v))
 			continue
 		}
+		fmt.Fprintln(os.Stderr, "Committing (raw): "+filepath.Join(p.Dir, v))
+
 		sha, err := FiletoSha(v)
 		if err != nil {
 			return err
 		}
-		err = Copy(filepath.Join(p.Objdir, sha), v)
+		err = Copy(filepath.Join(p.Objdir, sha+".new"), v)
+		if err != nil {
+			return err
+		}
+		err = os.Rename(filepath.Join(p.Objdir, sha+".new"),
+			path.Join(p.Objdir, sha))
 		if err != nil {
 			return err
 		}
@@ -555,15 +686,19 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 
 	// copy all objects with atomic commit
 	for _, v := range status.NewFiles {
-		fmt.Fprintln(os.Stderr, "Adding "+v)
 		if strings.HasSuffix(v, ".json") {
-			continue
+			addInfo, ok := p.NewFiles[v]
+			if !ok || !addInfo.ForceObject {
+				fmt.Fprintln(os.Stderr, "Adding inline "+v)
+				continue
+			}
 		}
 		v = filepath.Join(p.Dir, v)
 		sha, err := FiletoSha(v)
 		if err != nil {
 			return err
 		}
+		fmt.Fprintln(os.Stderr, "Adding raw "+v+" with "+sha)
 		_, err = os.Stat(filepath.Join(p.Objdir, sha))
 		// if not exists, then copy; otherwise continue
 		if err != nil {
@@ -651,13 +786,12 @@ func (p *Pvr) PutLocal(repoPath string) error {
 	}
 
 	// push all objects
-	for k := range p.PristineJsonMap {
-		if strings.HasSuffix(k, ".json") {
+	for k, v := range p.PristineJsonMap {
+		if isInlineJson(k, v) {
 			continue
 		}
-		v := p.PristineJsonMap[k].(string)
-		Copy(filepath.Join(objectsPath, v)+".new", filepath.Join(p.Dir, ".pvr", v))
-
+		vs := p.PristineJsonMap[k].(string)
+		Copy(filepath.Join(objectsPath, vs)+".new", filepath.Join(p.Dir, ".pvr", vs))
 	}
 	err = filepath.Walk(p.Objdir, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -749,7 +883,7 @@ func listFilesAndObjectsFromJson(json map[string]interface{}, parts []string) (m
 	filesAndObjects := map[string]string{}
 	// push all objects
 	for k, v := range json {
-		if strings.HasSuffix(k, ".json") {
+		if isInlineJson(k, v) {
 			continue
 		}
 		if strings.HasPrefix(k, "#spec") {
@@ -781,6 +915,7 @@ func listFilesAndObjectsFromJson(json map[string]interface{}, parts []string) (m
 		if !ok {
 			return map[string]string{}, errors.New("bad object id for file '" + k + "' in pristine pvr json")
 		}
+
 		filesAndObjects[k] = objId
 	}
 	return filesAndObjects, nil
@@ -1396,10 +1531,15 @@ func (p *Pvr) postRemoteJson(remotePvr pvrapi.PvrRemote, pvrMap PvrMap, envelope
 		envJSON["post"] = pvrMap
 	}
 
+	// marshall as canonical json into []byte so resty does not reformat....
 	data, err := cjson.Marshal(envJSON)
 
 	if err != nil {
 		return nil, err
+	}
+
+	if IsDebugEnabled {
+		fmt.Fprintf(os.Stderr, "Posting JSON: %s\n", string(data))
 	}
 
 	response, err := p.Session.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
@@ -1729,7 +1869,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 	}
 
 	for k, v := range jsonMap {
-		if strings.HasSuffix(k, ".json") {
+		if isInlineJson(k, v) {
 			continue
 		}
 		if strings.HasPrefix(k, "#spec") {
@@ -2037,13 +2177,13 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 	grabs := make([]*grab.Request, 0)
 	shaMap := map[string]interface{}{}
 
-	for k := range jsonMap {
+	for k, v := range jsonMap {
 		var req *grab.Request
 		var remoteObject ObjectWithAccess
 		var response *resty.Response
 		var uri string
 
-		if strings.HasSuffix(k, ".json") {
+		if isInlineJson(k, v) {
 			continue
 		}
 		if strings.HasPrefix(k, "#spec") {
@@ -2423,7 +2563,7 @@ func (p *Pvr) resetInternal(hardlink bool, canonicalJson bool) error {
 			return err
 		}
 
-		if strings.HasSuffix(k, ".json") {
+		if isInlineJson(k, v) {
 			var data []byte
 			var err error
 

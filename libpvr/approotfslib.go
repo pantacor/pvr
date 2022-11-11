@@ -33,22 +33,17 @@ func UpdateRootFSApp(p *Pvr, app AppData) error {
 		return errors.New("application is not installed")
 	}
 
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
-
-	appManifest.RootFsURL = app.From
+	app.Appmanifest.RootFsURL = app.From
 
 	persistence, err := GetPersistence(&app)
 	if err != nil {
 		return err
 	}
-	appManifest.Persistence = persistence
+	app.Appmanifest.Persistence = persistence
 
 	if app.ConfigFile != "" {
-		if appManifest.DockerConfig == nil {
-			appManifest.DockerConfig = map[string]interface{}{}
+		if app.Appmanifest.DockerConfig == nil {
+			app.Appmanifest.DockerConfig = map[string]interface{}{}
 		}
 
 		config, err := GetDockerConfigFile(p, &app)
@@ -57,7 +52,7 @@ func UpdateRootFSApp(p *Pvr, app AppData) error {
 		}
 
 		for k, v := range config {
-			appManifest.DockerConfig[k] = v
+			app.Appmanifest.DockerConfig[k] = v
 		}
 	}
 
@@ -66,7 +61,7 @@ func UpdateRootFSApp(p *Pvr, app AppData) error {
 		return err
 	}
 
-	app.Appmanifest = appManifest
+	app.Appmanifest = app.Appmanifest
 	app.DestinationPath = appPath
 
 	if err = MakeSquash(fromPath, &app); err != nil {
@@ -89,8 +84,8 @@ func UpdateRootFSApp(p *Pvr, app AppData) error {
 		return nil
 	}
 
-	appManifest.RootFsDigest = rootfsDigest.String()
-	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
+	app.Appmanifest.RootFsDigest = rootfsDigest.String()
+	srcContent, err := json.MarshalIndent(app.Appmanifest, " ", " ")
 	if err != nil {
 		return err
 	}
@@ -104,19 +99,14 @@ func UpdateRootFSApp(p *Pvr, app AppData) error {
 }
 
 func InstallRootFsApp(p *Pvr, app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
 
 	dockerConfig := map[string]interface{}{}
-	if appManifest.DockerConfig != nil {
-		dockerConfig = appManifest.DockerConfig
+	if app.Appmanifest.DockerConfig != nil {
+		dockerConfig = app.Appmanifest.DockerConfig
 	}
 
-	app.Appmanifest = appManifest
 	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
-	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
+	err := p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
 	if err != nil {
 		return err
 	}
@@ -196,6 +186,8 @@ func AddRootFsApp(p *Pvr, app AppData) error {
 	if err = ioutil.WriteFile(srcFilePath, srcContent, 0644); err != nil {
 		return err
 	}
+
+	app.Appmanifest = &src
 
 	return p.InstallApplication(app)
 }

@@ -62,3 +62,54 @@ func ExampleSprintTmplStruct() {
 	fmt.Println(s)
 	// Output: Basic: Test1234
 }
+
+func ExampleFixupRef1() {
+	uristring, _ := FixupRepoRef("192.168.1.3")
+	fmt.Println(uristring)
+	// Output: http://192.168.1.3:12368/cgi-bin/pvr
+}
+
+func ExampleFixupRef2() {
+	uristring, _ := FixupRepoRef("192.168.1.3#hash,some")
+	fmt.Println(uristring)
+	// Output: http://192.168.1.3:12368/cgi-bin/pvr#hash,some
+}
+
+func ExampleFixupRef3() {
+	uristring, _ := FixupRepoRef("asacasa/test1234")
+	fmt.Println(uristring)
+	// Output: https://pvr.pantahub.com/asacasa/test1234
+}
+
+func ExampleFixupRef4() {
+	uristring, _ := FixupRepoRef("asacasa/test1234#something,fun")
+	fmt.Println(uristring)
+	// Output: https://pvr.pantahub.com/asacasa/test1234#something,fun
+}
+
+func ExampleTestIsValidUrl1() {
+	if IsValidUrl("asacasa/test") {
+		fmt.Println("yes")
+	} else {
+		fmt.Println("no")
+	}
+	// Output: no
+}
+
+func ExampleTestIsValidUrl2() {
+	if IsValidUrl("192.168.1.1") {
+		fmt.Println("yes")
+	} else {
+		fmt.Println("no")
+	}
+	// Output: no
+}
+
+func ExampleTestIsValidUrl3() {
+	if IsValidUrl("http://192.168.1.1") {
+		fmt.Println("yes")
+	} else {
+		fmt.Println("no")
+	}
+	// Output: yes
+}

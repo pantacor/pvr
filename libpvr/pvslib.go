@@ -1,5 +1,5 @@
 //
-// Copyright 2021  Pantacor Ltd.
+// Copyright 2021,2022  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -43,9 +44,11 @@ type PvsMatch struct {
 }
 
 type PvsOptions struct {
-	Algorithm    gojose.SignatureAlgorithm
-	X5cPath      string
-	ExtraHeaders map[string]interface{}
+	Algorithm      gojose.SignatureAlgorithm
+	X5cPath        string
+	ExtraHeaders   map[string]interface{}
+	IncludePayLoad bool
+	OutputFile     *os.File
 }
 
 type PvsPartSelection struct {
@@ -422,7 +425,10 @@ found:
 		return err
 	}
 
-	strippedBuf, err := stripPayloadFromRawJSON([]byte(sig.FullSerialize()))
+	strippedBuf := []byte(sig.FullSerialize())
+	if !options.IncludePayLoad {
+		strippedBuf, err = stripPayloadFromRawJSON(strippedBuf)
+	}
 
 	if err != nil {
 		return err
@@ -443,6 +449,13 @@ found:
 		return err
 	}
 
+	if options.OutputFile != nil {
+		_, err = options.OutputFile.Write(newJson)
+
+		if err != nil {
+			return err
+		}
+	}
 	err = os.MkdirAll(path.Join(p.Dir, "_sigs"), 0755)
 	if err != nil {
 		return err
@@ -457,9 +470,10 @@ found:
 }
 
 type JwsVerifySummary struct {
-	Protected []string `json:"protected,omitempty"`
-	Excluded  []string `json:"excluded,omitempty"`
-	NotSeen   []string `json:"notseen,omitempty"`
+	Protected       []string      `json:"protected,omitempty"`
+	Excluded        []string      `json:"excluded,omitempty"`
+	NotSeen         []string      `json:"notseen,omitempty"`
+	FullJSONWebSigs []interface{} `json:"sigs,omitempty"`
 }
 
 // JwsVerify will add or update a signature based using a private
@@ -471,7 +485,7 @@ type JwsVerifySummary struct {
 // special value for caCerts "_system_" hints at using the system cacert
 // store. Can be configured using SSH_CERT_FILE and SSH_CERTS_DIR on linux
 //
-func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*JwsVerifySummary, error) {
+func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, includePayload bool) (*JwsVerifySummary, error) {
 
 	var summary JwsVerifySummary
 	var err error
@@ -684,6 +698,23 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string) (*Jws
 	for k := range selection.NotSeen {
 		summary.NotSeen = append(summary.NotSeen, k)
 	}
+
+	var fullSig map[string]interface{}
+
+	err = json.Unmarshal([]byte(sig.FullSerialize()), &fullSig)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if includePayload {
+		buf := make([]byte, base64.StdEncoding.
+			WithPadding(base64.NoPadding).EncodedLen(len(payloadBuf)))
+		base64.StdEncoding.
+			WithPadding(base64.NoPadding).Encode(buf, payloadBuf)
+		fullSig["payload"] = string(buf)
+	}
+	summary.FullJSONWebSigs = append(summary.FullJSONWebSigs, fullSig)
 
 	return &summary, nil
 }

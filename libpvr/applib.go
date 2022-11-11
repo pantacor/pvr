@@ -71,27 +71,49 @@ type Source struct {
 	Spec         string                   `json:"#spec"`
 	Template     string                   `json:"template,omitempty"`
 	TemplateArgs map[string]interface{}   `json:"args,omitempty"`
+	DmEnabled    map[string]bool          `json:"dm_enabled,omitempty"`
 	Logs         []map[string]interface{} `json:"logs,omitempty"`
 	Exports      []string                 `json:"exports,omitempty"`
 	Config       map[string]interface{}   `json:"config,omitempty"`
 	DockerSource
 	PvrSource
 	RootFsSource
-	Persistence map[string]string `json:"persistence"`
+	Persistence map[string]string `json:"persistence,omitempty"`
 }
 
 // InstallApplication : Install Application from any type of source
 func (p *Pvr) InstallApplication(app AppData) error {
+	var err error
+
 	switch app.SourceType {
 	case models.SourceTypeDocker:
-		return InstallDockerApp(p, app)
+		err = InstallDockerApp(p, app)
 	case models.SourceTypeRootFs:
-		return InstallRootFsApp(p, app)
+		err = InstallRootFsApp(p, app)
 	case models.SourceTypePvr:
-		return InstallPVApp(p, app)
+		err = InstallPVApp(p, app)
 	default:
 		return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
 	}
+
+	if err != nil {
+		return err
+	}
+
+	diff, err := p.Diff()
+	if err != nil {
+		return err
+	}
+
+	// skip updating dm if nothing changed really ...
+	if diff != nil && len(*diff) == 2 {
+		return nil
+	}
+
+	if app.Appmanifest.DmEnabled != nil {
+		err = p.DmCVerityApply(app.Appname)
+	}
+	return err
 }
 
 // UpdateApplication : Update any application and any type
@@ -228,6 +250,31 @@ func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[
 	configValues := map[string]interface{}{}
 	configValues["Source"] = appManifestMap
 	configValues["Docker"] = dockerConfig
+
+	if appManifest.TemplateArgs["PV_GROUP"] != nil {
+		fmt.Fprintf(os.Stderr, "Setting new platform to group \"%s\"\n", appManifest.TemplateArgs["PV_GROUP"].(string))
+	}
+	if appManifest.TemplateArgs["PV_RUNLEVEL"] != nil {
+		fmt.Fprintf(os.Stderr, "Setting new platform to runlevel \"%s\"\n", appManifest.TemplateArgs["PV_RUNLEVEL"].(string))
+		fmt.Fprintf(os.Stderr, "WARN: using deprecated runlevel. Use --group instead for Pantavisor 015 or above\n")
+	}
+
+	if appManifest.TemplateArgs["PV_RUNLEVEL"] != nil && p.HasGroups() {
+		fmt.Fprintln(os.Stderr, "WARN: PV_RUNLEVEL used and groups.json found at the same time")
+	}
+
+	configValues["EffectiveGroup"] = appManifest.TemplateArgs["PV_GROUP"]
+	if configValues["EffectiveGroup"] != nil && !p.HasGroup(configValues["EffectiveGroup"].(string)) {
+		fmt.Fprintln(os.Stderr, "WARN: group does not exist in groups.json")
+	}
+
+	if configValues["EffectiveGroup"] == nil && appManifest.TemplateArgs["PV_RUNLEVEL"] == nil {
+		defaultGroup := p.GetDefaultGroup()
+		if defaultGroup != "" {
+			fmt.Fprintf(os.Stderr, "Setting new platform to default group \"%s\"\n", defaultGroup)
+			configValues["EffectiveGroup"] = defaultGroup
+		}
+	}
 
 	if appManifest.Template == "" {
 		return fmt.Errorf("empty template")

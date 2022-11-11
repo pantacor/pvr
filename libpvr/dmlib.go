@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 
 	cjson "github.com/gibson042/canonicaljson-go"
@@ -41,6 +42,34 @@ type DmVerityJson struct {
 	DataDevice string `json:"data_device"`
 	HashDevice string `json:"hash_device"`
 	RootHash   string `json:"root_hash"`
+}
+
+func (p *Pvr) dmifySrcJson(container, volume string) error {
+
+	appManifest, err := p.GetApplicationManifest(container)
+
+	if err != nil {
+		return err
+	}
+
+	if appManifest.DmEnabled == nil {
+		appManifest.DmEnabled = map[string]bool{}
+	}
+
+	appManifest.DmEnabled[volume] = true
+
+	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
+	if err != nil {
+		return err
+	}
+
+	srcFilePath := filepath.Join(p.Dir, container, SRC_FILE)
+	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *Pvr) dmifyRunJson(container, volume string) error {
@@ -103,7 +132,12 @@ func (p *Pvr) dmifyRunJson(container, volume string) error {
 
 func (p *Pvr) DmCVerityApply(prefix string) error {
 
-	for k, v := range p.PristineJsonMap {
+	workingJson, _, err := p.GetWorkingJsonMap()
+	if err != nil {
+		return err
+	}
+
+	for k, v := range workingJson {
 		if !strings.HasPrefix(k, prefix) {
 			continue
 		}
@@ -169,12 +203,9 @@ func (p *Pvr) DmCVerityApply(prefix string) error {
 				return err
 			}
 			os.Rename(manifestPath+".new", manifestPath)
-			p.AddFile([]string{path.Join(container, hashDevice)})
+			p.AddFile([]string{path.Join(container, hashDevice)}, false)
 
 			fmt.Println("- Updated " + manifestPath)
-
-			// update run.json
-			p.dmifyRunJson(container, volume)
 
 		}
 	}
@@ -218,7 +249,8 @@ func (p *Pvr) DmCVerityConvert(container string, volume string) error {
 	manifestMap["data_device"] = volume
 	manifestMap["hash_device"] = volume + ".hash"
 
-	cmd := exec.Command("veritysetup", "format", manifestMap["data_device"].(string), manifestMap["hash_device"].(string))
+	cmd := exec.Command("veritysetup", "format", manifestMap["data_device"].(string),
+		manifestMap["hash_device"].(string))
 	cmd.Dir = path.Join(p.Dir, container)
 	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
@@ -257,13 +289,14 @@ func (p *Pvr) DmCVerityConvert(container string, volume string) error {
 	}
 	os.Rename(manifestPath+".new", manifestPath)
 	p.AddFile([]string{path.Join(container, manifestMap["hash_device"].(string)),
-		path.Join(container, DmVolumes, volume+".json")})
+		path.Join(container, DmVolumes, volume+".json")}, false)
 
 	fmt.Println("- Updated " + manifestPath)
 
 	// update run.json
 
 	p.dmifyRunJson(container, volume)
+	p.dmifySrcJson(container, volume)
 
 	return nil
 }

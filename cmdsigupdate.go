@@ -65,6 +65,7 @@ func CommandSigUpdate() cli.Command {
 			}
 
 			ops := libpvr.PvsOptions{}
+			ops.IncludePayLoad = c.Parent().Bool("with-payload")
 
 			keyPath := c.Parent().String("key")
 			if keyPath == "" {
@@ -90,6 +91,17 @@ func CommandSigUpdate() cli.Command {
 				}
 			}
 
+			if c.Parent().IsSet("output") {
+				ops.OutputFile, err = os.OpenFile(c.Parent().String("output"),
+					os.O_CREATE|os.O_WRONLY, 0644)
+
+				if err != nil {
+					return cli.NewExitError(err, 127)
+				}
+
+				defer ops.OutputFile.Close()
+			}
+
 			for k, v := range pvr.PristineJsonMap {
 				vmap, ok := v.(map[string]interface{})
 				if !ok {
@@ -112,13 +124,13 @@ func CommandSigUpdate() cli.Command {
 						return cli.NewExitError(err, 123)
 					}
 					if m {
-						fmt.Print("Updating pvs signature @ " + k)
+						fmt.Fprint(os.Stderr, "Updating pvs signature @ "+k)
 						err = pvr.JwsSignPvs(keyPath, k, &ops)
 						if err != nil {
-							fmt.Print(" [ERROR]\n")
+							fmt.Fprint(os.Stderr, " [ERROR]\n")
 							return cli.NewExitError(err, 126)
 						}
-						fmt.Print(" [DONE]\n")
+						fmt.Fprint(os.Stderr, " [DONE]\n")
 
 						break
 					}

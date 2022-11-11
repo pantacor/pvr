@@ -197,6 +197,18 @@ $ pvr add lxc-platform.json pxc-platform.conf
 
 These files will then be part of the next commit.
 
+#### pvr add --raw [file1 ...]
+
+By default pvr inlines any .json file in the main system state and does not save it
+as an object. This implies that the exact formatting and order of elements in that .json
+might get lost and for large .json files this might artifically grow the state json.
+
+For those cases one might decide to hint at pvr that a .json file shall be added
+as a raw object instead. For that oe uses the pvr add --raw command flag.
+
+You can use that for new files but also to mark an already committed file for
+conversion to a raw object on next commit.
+
 ### pvr diff
 
 You can look at your current changes to working directory using the diff command to get RFCXXXX json patch format:
@@ -259,6 +271,14 @@ Alternatively you can get a specific revision:
 $ pvr clone https://api.pantahub.com/trails/<YOURDEVICE>/steps/<REV>
 ...
 ```
+
+### pvr clone <IP>
+
+When developing a device that has a pvr compatible cgi local 
+frontend (such as provided by pvr-sdk by default) installed
+you can use `pvr clone IP` directly.
+
+In that `pvr clone 1.2.3.4` is equivalent to `pvr clone http://1.2.3.4:12368/cgi-bin/pvr`.
 
 ### pvr fastcopy <SOURCE>[#part1,part2,path/part3] <DESTINATION>[#part1name,$part2name,...]
 
@@ -1266,6 +1286,56 @@ Date:   Wed Oct 20 17:58:50 2021 +0200
     ```
     pvr sig ls --part _sigs/nginx.json
     ```
+```
+
+## PVR sig options
+
+To allow easier integration in higher level tools, like external signing tools
+`pvr sig` offers a few options to make their live easier.
+
+The idea of making an external signing tool is to keep the logic that interprets
+the PVS headers and create the protected header and the payload of the jose token
+inside pvr itself, but allow for easy export of the complete jose token including
+payload which then external tools can inspect and sign.
+
+### pvr sig add/update with payload
+
+The first avenue is to produce a signature during signing that includes the full
+payload. This can be achieved through the `--with-payload` option for `pvr sig add`
+and `pvr sig update`. Example:
+
+```
+$ pvr clone pantahub-ci/rock64_initial_stable example
+$ cd example
+$ pvr sig --with-payload add --part awconnect
+```
+
+This will produce a jose signature file in _sigs/awconnect.json that
+includes the full payload and hence can be send to a service that resigns
+it in infrastructure.
+
+To make this more conveniebnt, the --output=- option allows to print that
+signature to stdout:
+
+```
+$ pvr sig --with-payload add --part awconnect
+```
+
+### pvr sig ls with full jose token
+
+The second approach that might be viable is to take a package that was
+already signed by a developer or CI system, inspect it and resign it with
+a production key.
+
+For that the `pvr sig ls` command offers some convenience to include the
+jose serialization found in the result summary with the `--with-sig` option.
+
+Combined with the `--with-payload` option this gives the user the ability
+to again a produce a complete jose token that an external system can
+resign without further business logic. Example:
+
+```
+$ pvr sig --with-payload ls --with-sig _sigs/awconnect.json 
 ```
 
 # PVR dm commands (device-mapper) (BETA)

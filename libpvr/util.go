@@ -25,6 +25,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -254,6 +255,17 @@ func FiletoSha(path string) (string, error) {
 	buf := hasher.Sum(nil)
 	shaBal := hex.EncodeToString(buf[:])
 	return shaBal, nil
+}
+
+func IsSha(sha string) bool {
+	if len(sha) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(sha)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func Min(x, y int) int {
@@ -960,26 +972,36 @@ func FixupRepoRef(repoUri string) (string, error) {
 	// uri recode things that are just for convenience allowed
 	// => http://URL#part##// is not a valid url so we transform it to http://URL#part%2F%2F%23%23
 	fixedUri := ""
+	poundSuffix := ""
+
 	// first split by #
 	poundParts := strings.Split(repoUri, "#")
 
 	fixedUri += poundParts[0]
-	if len(poundParts[1:]) == 0 {
-		goto out
+	// first: we auto expand IPs to local pvr-sdk urls
+	if net.ParseIP(fixedUri) != nil {
+		fixedUri = "http://" + fixedUri + ":12368/cgi-bin/pvr"
 	}
 
-	fixedUri += "#"
+	// if no pound we just skip to out
+	if len(poundParts[1:]) == 0 {
+		goto skip
+	}
 
+	poundSuffix += "#"
 	// from here we are in the part after # where / is invalid; we replace
-	fixedUri += strings.ReplaceAll(poundParts[1], "/", "%2F")
+	poundSuffix += strings.ReplaceAll(poundParts[1], "/", "%2F")
 	if len(poundParts[2:]) == 0 {
-		goto out
+		goto skip
 	}
 	for _, v := range poundParts[2:] {
-		fixedUri += "%23"
-		fixedUri += strings.ReplaceAll(v, "/", "%2F")
+		poundSuffix += "%23"
+		poundSuffix += strings.ReplaceAll(v, "/", "%2F")
 	}
 
+skip:
+
+	fixedUri += poundSuffix
 	uri, err = url.Parse(fixedUri)
 	if err != nil {
 		return "", err
@@ -1008,7 +1030,6 @@ func FixupRepoRef(repoUri string) (string, error) {
 		fixedUri = "https://pvr.pantahub.com/" + userNick + "/" + deviceNick
 	}
 
-out:
 	return fixedUri, nil
 }
 

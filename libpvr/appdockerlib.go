@@ -113,24 +113,23 @@ func AddDockerApp(p *Pvr, app AppData) error {
 		return err
 	}
 
+	app.Appmanifest = &src
+
 	return p.InstallApplication(app)
 }
 
 func UpdateDockerApp(p *Pvr, app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
-	}
+	var err error
 
 	if app.Source == "" {
-		app.Source = appManifest.DockerSource.DockerSource
+		app.Source = app.Appmanifest.DockerSource.DockerSource
 	}
 	if app.Platform == "" {
-		app.Platform = appManifest.DockerPlatform
+		app.Platform = app.Appmanifest.DockerPlatform
 	}
 
 	if app.From != "" {
-		updateDockerFromFrom(appManifest, app.From)
+		updateDockerFromFrom(app.Appmanifest, app.From)
 	}
 
 	err = p.FindDockerImage(&app)
@@ -138,24 +137,30 @@ func UpdateDockerApp(p *Pvr, app AppData) error {
 		return err
 	}
 
-	trackURL := appManifest.DockerName
-	if appManifest.DockerTag != "" {
-		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
+	trackURL := app.Appmanifest.DockerName
+	if app.Appmanifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", app.Appmanifest.DockerTag)
 	}
 
 	//	Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
-		appManifest.DockerDigest = app.LocalImage.DockerDigest
-		appManifest.DockerConfig = app.LocalImage.DockerConfig
+		app.Appmanifest.DockerDigest = app.LocalImage.DockerDigest
+		app.Appmanifest.DockerConfig = app.LocalImage.DockerConfig
 	} else if app.RemoteImage.Exists {
-		appManifest.DockerDigest = app.RemoteImage.DockerDigest
-		appManifest.DockerPlatform = app.RemoteImage.DockerPlatform
-		appManifest.DockerConfig = app.RemoteImage.DockerConfig
+		app.Appmanifest.DockerDigest = app.RemoteImage.DockerDigest
+		app.Appmanifest.DockerPlatform = app.RemoteImage.DockerPlatform
+		app.Appmanifest.DockerConfig = app.RemoteImage.DockerConfig
 	}
 
-	appManifest.DockerSource.DockerSource = app.Source
-	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
+	for k, v := range app.Appmanifest.DockerConfig {
+		if v == nil {
+			delete(app.RemoteImage.DockerConfig, k)
+		}
+	}
+
+	app.Appmanifest.DockerSource.DockerSource = app.Source
+	srcContent, err := json.MarshalIndent(app.Appmanifest, " ", " ")
 	if err != nil {
 		return err
 	}
@@ -170,26 +175,22 @@ func UpdateDockerApp(p *Pvr, app AppData) error {
 	if err != nil {
 		return err
 	}
-	if appManifest.DockerDigest == squashFSDigest {
+	if app.Appmanifest.DockerDigest == squashFSDigest {
 		fmt.Println("Application already up to date.")
 		return nil
 	}
 	return p.InstallApplication(app)
 }
 
-func InstallDockerApp(p *Pvr, app AppData) error {
-	appManifest, err := p.GetApplicationManifest(app.Appname)
-	if err != nil {
-		return err
+func InstallDockerApp(p *Pvr, app AppData) (err error) {
+
+	if app.Appmanifest.DockerName == "" {
+		return
 	}
 
-	if appManifest.DockerName == "" {
-		return err
-	}
-
-	trackURL := appManifest.DockerName
-	if appManifest.DockerTag != "" {
-		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
+	trackURL := app.Appmanifest.DockerName
+	if app.Appmanifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", app.Appmanifest.DockerTag)
 	}
 
 	app.DockerURL = trackURL
@@ -202,18 +203,19 @@ func InstallDockerApp(p *Pvr, app AppData) error {
 	// to a registry). The "else" codepath exists for src.json's that were
 	// generated previously. For those we will need to get dockerconfig from
 	// local or remote registry still.....
-	if appManifest.DockerConfig != nil {
-		dockerConfig = appManifest.DockerConfig
+	if app.Appmanifest.DockerConfig != nil {
+		dockerConfig = app.Appmanifest.DockerConfig
 	} else {
 		err = p.FindDockerImage(&app)
 
 		if err != nil {
 			fmt.Println("\nSeems like you have an invalid docker digest value in your " + app.Appname + "/src.json file\n")
 			fmt.Println("\nPlease run \"pvr app update " + app.Appname + " --source=" + app.Source + "\" to auto fix it or update docker_digest field by editing " + app.Appname + "/src.json  to fix it manually\n")
-			return cli.NewExitError(err, 3)
+			err = cli.NewExitError(err, 3)
+			return
 		}
 
-		fmt.Println("WARNING: The src.json for " + appManifest.Name + " has been genrated by old pvr; run pvr update " + appManifest.Name + " to get rid of this warning.")
+		fmt.Println("WARNING: The src.json for " + app.Appmanifest.Name + " has been genrated by old pvr; run pvr update " + app.Appmanifest.Name + " to get rid of this warning.")
 		//	Exists flag is true only if the image got loaded which will depend on
 		//  priority order provided in --source=local,remote
 		if app.LocalImage.Exists {
@@ -221,26 +223,27 @@ func InstallDockerApp(p *Pvr, app AppData) error {
 		} else if app.RemoteImage.Exists {
 			dockerConfig = app.RemoteImage.DockerConfig
 		} else {
-			return cli.NewExitError(errors.New("docker Name can not be resolved either from local docker or remote registries"), 4)
+			err = cli.NewExitError(errors.New("docker Name can not be resolved either from local docker or remote registries"), 4)
+			return
 		}
 	}
 
-	app.Appmanifest = appManifest
 	err = p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
 	if err != nil {
-		return err
+		return
 	}
 	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
 
 	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
 	if err != nil {
-		return err
+		return
 	}
 
-	if appManifest.DockerDigest == squashFSDigest {
+	if app.Appmanifest.DockerDigest == squashFSDigest {
 		fmt.Println("Application already up to date. Will skip generating new root.squashfs")
-		return nil
+		return
 	}
 
-	return p.GenerateApplicationSquashFS(app)
+	err = p.GenerateApplicationSquashFS(app)
+	return
 }
