@@ -601,12 +601,7 @@ func MakeSquash(rootfsPath string, app *AppData) error {
 	if makeSquashfsPath == "" {
 		return ErrMakeSquashFSNotFound
 	}
-
-	tempSquashFile := filepath.Join(app.DestinationPath, SQUASH_FILE+".new")
-	// Always Remove tempSquashfsFile
-	Remove(tempSquashFile)
-
-	squashFile := filepath.Join(app.DestinationPath, SQUASH_FILE)
+	tempSquashFile := filepath.Join(app.DestinationPath, app.SquashFile+".new")
 	squashFile := filepath.Join(app.DestinationPath, app.SquashFile)
 	squashExist, err := IsFileExists(squashFile)
 	if err != nil {
