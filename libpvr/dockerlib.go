@@ -1,18 +1,16 @@
-//
-// Copyright 2019  Pantacor Ltd.
+// Copyright 2022  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
-//
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package libpvr
 
 import (
@@ -30,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -49,8 +48,9 @@ const (
 	TOUCH_CMD                      = "touch"
 	MAKE_SQUASHFS_CMD              = "mksquashfs"
 	SQUASH_FILE                    = "root.squashfs"
-	DOCKER_DIGEST_FILE             = "root.squashfs.docker-digest"
-	ROOTFS_DIGEST_FILE             = "root.squashfs.rootfs-digest"
+	SQUASH_OVL_FILE                = "root.ovl.squashfs"
+	DOCKER_DIGEST_SUFFIX           = ".docker-digest"
+	ROOTFS_DIGEST_SUFFIX           = ".rootfs-digest"
 	DOCKER_DOMAIN                  = "docker.io"
 	DOCKER_DOMAIN_URL              = "https://" + DOCKER_DOMAIN
 	DOCKER_REGISTRY                = "https://index.docker.io/v1/"
@@ -462,6 +462,7 @@ func LoadLocalImage(app *AppData) error {
 
 // AppData : To hold all required App Information
 type AppData struct {
+	SquashFile      string
 	Appname         string
 	DockerURL       string
 	Username        string
@@ -478,10 +479,12 @@ type AppData struct {
 	Volumes         []string
 	FormatOptions   string
 	SourceType      string
+	DoOverlay       bool
+	Base            string
 }
 
-func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
-	digestFile := filepath.Join(app.DestinationPath, DOCKER_DIGEST_FILE)
+func (p *Pvr) GenerateApplicationSquashFS(app *AppData, appManifest *Source) error {
+	digestFile := filepath.Join(app.DestinationPath, app.SquashFile+DOCKER_DIGEST_SUFFIX)
 	digest := ""
 	//	Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
@@ -493,13 +496,15 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 
 	currentDigest, err := os.Open(digestFile)
 	if err == nil {
+		defer currentDigest.Close()
 		currentDigestContent, err := ioutil.ReadAll(currentDigest)
 		if err == nil {
-			if string(currentDigestContent) == string(digest) {
+			if string(currentDigestContent) == string(digest) && appManifest.Base == "" {
 				return nil
 			}
 		}
 	}
+
 	configDir := p.Session.configDir
 	cacheDir := filepath.Join(configDir, cacheFolder)
 	err = CreateFolder(cacheDir)
@@ -507,8 +512,6 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 	if err != nil {
 		return fmt.Errorf("couldn't create cache folder %v", err)
 	}
-
-	fmt.Println("Generating squashfs...")
 
 	tempdir, err := ioutil.TempDir(os.TempDir(), "download-layer-")
 	if err != nil {
@@ -613,6 +616,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 
 	extractPath := filepath.Join(tempdir, "rootfs")
 	MkdirAll(extractPath, 0777)
+	defer os.RemoveAll(extractPath)
 
 	tarPath, err := exec.LookPath(TAR_CMD)
 	if err != nil {
@@ -654,14 +658,45 @@ func (p *Pvr) GenerateApplicationSquashFS(app AppData) error {
 		os.MkdirAll(dirToMake, 0755)
 	}
 
-	err = MakeSquash(extractPath, &app)
+	// if we are using a different name, we generate an overlay
+	if app.SquashFile == SQUASH_OVL_FILE {
+		basePath, err := os.MkdirTemp("", "base-layer-*")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(basePath)
+		ovlPath, err := os.MkdirTemp("", "ovl-*")
+		if err != nil {
+			return err
+		}
+		from := path.Join(p.Dir, app.Appname, SQUASH_FILE)
+		if appManifest.Base != "" {
+			from = path.Join(p.Dir, appManifest.Base, SQUASH_FILE)
+		}
+		cmd := exec.Command("unsquashfs", "-f", "-d", basePath, from)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+		treeDiff := MkTreeDiff(basePath, extractPath)
+		treeDiff.MkOvl(ovlPath)
+		defer os.RemoveAll(ovlPath)
+		extractPath = ovlPath
+	} else if app.SquashFile != SQUASH_FILE {
+		return errors.New("Unsupported SquashFile: " + app.SquashFile + ". Supported: " + SQUASH_FILE + ", " + SQUASH_OVL_FILE)
+	}
+
+	err = MakeSquash(extractPath, app)
 	if err != nil {
 		return err
 	}
+
 	return ioutil.WriteFile(digestFile, []byte(digest), 0644)
 }
 
-//ProcessWhiteouts : FInd Whiteouts from a layer and process it in a given extract path
+// ProcessWhiteouts : FInd Whiteouts from a layer and process it in a given extract path
 func ProcessWhiteouts(extractPath string, layerPath string, layerNumber int) error {
 	whiteouts, err := FindWhiteoutsFromLayer(layerPath)
 	if err != nil {
@@ -699,7 +734,7 @@ func ProcessWhiteouts(extractPath string, layerPath string, layerNumber int) err
 	return nil
 }
 
-//FindWhiteoutsFromLayer : Find Whiteout Files From a Layer
+// FindWhiteoutsFromLayer : Find Whiteout Files From a Layer
 func FindWhiteoutsFromLayer(layerPath string) ([]string, error) {
 	whiteoutPaths := []string{}
 	tarFile, err := os.Open(layerPath)
@@ -740,8 +775,8 @@ func FindWhiteoutsFromLayer(layerPath string) ([]string, error) {
 	}
 	return whiteoutPaths, nil
 }
-func (p *Pvr) GetSquashFSDigest(appName string) (string, error) {
-	content, err := ioutil.ReadFile(filepath.Join(p.Dir, appName, DOCKER_DIGEST_FILE))
+func (p *Pvr) GetSquashFSDigest(squashFile, appName string) (string, error) {
+	content, err := ioutil.ReadFile(filepath.Join(p.Dir, appName, squashFile+DOCKER_DIGEST_SUFFIX))
 	if os.IsNotExist(err) {
 		return "", nil
 	}

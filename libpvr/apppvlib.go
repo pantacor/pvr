@@ -1,18 +1,16 @@
-//
-// Copyright 2021  Pantacor Ltd.
+// Copyright 2022  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
-//
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package libpvr
 
 import (
@@ -25,13 +23,13 @@ import (
 	"github.com/urfave/cli"
 )
 
-func AddPvApp(p *Pvr, app AppData) error {
-	destAppPath, srcJson, err := p.GetFromRepo(&app)
+func AddPvApp(p *Pvr, app *AppData) error {
+	destAppPath, srcJson, err := p.GetFromRepo(app)
 	if err != nil {
 		return err
 	}
 
-	persistence, err := GetPersistence(&app)
+	persistence, err := GetPersistence(app)
 	if err != nil {
 		return err
 	}
@@ -41,7 +39,7 @@ func AddPvApp(p *Pvr, app AppData) error {
 			srcJson.DockerConfig = map[string]interface{}{}
 		}
 
-		config, err := GetDockerConfigFile(p, &app)
+		config, err := GetDockerConfigFile(p, app)
 		if err != nil {
 			return err
 		}
@@ -69,8 +67,7 @@ func AddPvApp(p *Pvr, app AppData) error {
 	return p.InstallApplication(app)
 }
 
-func UpdatePvApp(p *Pvr, app AppData) error {
-
+func UpdatePvApp(p *Pvr, app *AppData, appManifest *Source) error {
 	var err error
 
 	if app.Source == "" {
@@ -81,13 +78,13 @@ func UpdatePvApp(p *Pvr, app AppData) error {
 		app.Platform = app.Appmanifest.DockerPlatform
 	}
 
-	if app.Appmanifest.PvrUrl == "" {
-		return UpdateDockerApp(p, app)
+	if appManifest.PvrUrl == "" {
+		return UpdateDockerApp(p, app, appManifest)
 	}
 
 	initialFrom := app.From
-	app.From = app.Appmanifest.PvrUrl
-	if _, app.Appmanifest, err = p.GetFromRepo(&app); err != nil {
+	app.From = appManifest.PvrUrl
+	if _, appManifest, err = p.GetFromRepo(app); err != nil {
 		return err
 	}
 	app.From = initialFrom
@@ -103,7 +100,7 @@ func UpdatePvApp(p *Pvr, app AppData) error {
 		return err
 	}
 
-	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	squashFSDigest, err := p.GetSquashFSDigest(app.SquashFile, app.Appname)
 	if err != nil {
 		return err
 	}
@@ -113,14 +110,18 @@ func UpdatePvApp(p *Pvr, app AppData) error {
 		return nil
 	}
 
-	return p.InstallApplication(app)
+	return nil
 }
 
-func InstallPVApp(p *Pvr, app AppData) error {
+func InstallPVApp(p *Pvr, app *AppData, appManifest *Source) error {
 
-	trackURL := app.Appmanifest.DockerName
-	if app.Appmanifest.DockerTag != "" {
-		trackURL += fmt.Sprintf(":%s", app.Appmanifest.DockerTag)
+	if appManifest.DockerName == "" {
+		return errors.New("no docker_name in app manifest")
+	}
+
+	trackURL := appManifest.DockerName
+	if appManifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
 	}
 
 	app.DockerURL = trackURL
@@ -139,13 +140,14 @@ func InstallPVApp(p *Pvr, app AppData) error {
 		}
 	}
 
+	app.Appmanifest = appManifest
 	err := p.GenerateApplicationTemplateFiles(app.Appname, dockerConfig, app.Appmanifest)
 	if err != nil {
 		return err
 	}
 	app.DestinationPath = filepath.Join(p.Dir, app.Appname)
 
-	squashFSDigest, err := p.GetSquashFSDigest(app.Appname)
+	squashFSDigest, err := p.GetSquashFSDigest(app.SquashFile, app.Appname)
 	if err != nil {
 		return err
 	}

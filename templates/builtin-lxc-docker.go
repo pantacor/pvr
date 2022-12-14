@@ -1,18 +1,16 @@
-//
-// Copyright 2019-2021  Pantacor Ltd.
+// Copyright 2019-2022  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
-//
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package templates
 
 const (
@@ -39,7 +37,15 @@ lxc.cgroup.devices.allow = a
 lxc.cgroup.{{ $v }}
 {{- end }}
 {{- end }}
-lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
+lxc.rootfs.path = overlayfs:
+	{{- if .Source.docker_ovl_digest -}}
+		/volumes/{{- .Source.name -}}/root.ovl.squashfs:
+	{{- end }}
+	{{- if .Source.base -}}
+		/volumes/{{- .Source.base -}}/root.squashfs:
+	{{- else -}}
+		/volumes/{{- .Source.name -}}/root.squashfs:
+	{{- end -}}/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
 {{- if .Docker.Entrypoint }}
 	{{- if pvr_isSlice .Docker.Entrypoint }}
@@ -253,7 +259,7 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	"roles": {{- .Source.args.PV_ROLES | sprig_toPrettyJson | sprig_indent 8 }},
 	{{- end }}
 	{{- end }}
-	"root-volume": "{{- if and (.Source.dm_enabled) (index .Source.dm_enabled "root.squashfs") }}dm:root.squashfs{{ else }}root.squashfs{{ end }}",
+	"root-volume": "{{- if and (.Source.dm_enabled) (index .Source.dm_enabled "root.squashfs") }}dm:{{ end }}{{- if and (.Source.docker_ovl_digest) (ne .Source.base "") }}root.ovl.squashfs{{ else }}root.squashfs{{ end }}",
 	"volumes":[
 		{{- $v := sprig_list }}
 		{{- if .Source.args.PV_EXTRA_VOLUMES }}
@@ -271,10 +277,15 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 			{{- $q := quote $j }}
 			{{- $n = sprig_append $n $q }}
 		{{- end }}
+		{{- if and .Source.docker_ovl_digest (eq .Source.base "") }}
+		{{- if not ( eq .Source.docker_ovl_digest "" ) }}
+			{{- $n = sprig_append $n "\"root.ovl.squashfs\"" }}
+		{{- end }}
+		{{- end}}
 		{{ $m := sprig_list}}
 		{{- range $i, $v := $n }}
 			{{- if and (.Source.dm_enabled) (index .Source.dm_enabled $v) }} {{ sprig_set $n $i (print "dm:" $v) }}{{ end }}
-		{{- end }}
+		{{- end}}
 		{{ join ",\\n" $n }}
 	]
 }`

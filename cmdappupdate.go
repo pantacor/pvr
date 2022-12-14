@@ -1,23 +1,22 @@
-//
-// Copyright 2019  Pantacor Ltd.
+// Copyright 2022  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
-//
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package main
 
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	"gitlab.com/pantacor/pvr/libpvr"
@@ -101,9 +100,18 @@ func CommandAppUpdate() cli.Command {
 				app.TemplateArgs["PV_RUNLEVEL"] = c.String("runlevel")
 			}
 
+			if (c.Bool("patch") || appManifest.DockerOvlDigest != "" || appManifest.Base != "") && !c.Bool("newbase") {
+				app.DoOverlay = true
+			}
+
 			err = pvr.UpdateApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
+			}
+
+			if !app.DoOverlay {
+				os.Remove(path.Join(pvr.Dir, appname, libpvr.SQUASH_OVL_FILE+libpvr.DOCKER_DIGEST_SUFFIX))
+				os.Remove(path.Join(pvr.Dir, appname, libpvr.SQUASH_OVL_FILE))
 			}
 
 			fmt.Println("Application updated")
@@ -137,6 +145,16 @@ func CommandAppUpdate() cli.Command {
 			Name:   "platform",
 			Usage:  "docker platform to resolve",
 			EnvVar: "PVR_PLATFORM",
+		},
+		cli.BoolFlag{
+			Name:   "newbase",
+			Usage:  "clean patch overlay",
+			EnvVar: "PVR_APP_UPDATE_PATCH_CLEAN",
+		},
+		cli.BoolFlag{
+			Name:   "patch",
+			Usage:  "update the patch overlay",
+			EnvVar: "PVR_APP_UPDATE_PATCH",
 		},
 		cli.StringFlag{
 			Name:   "from",
