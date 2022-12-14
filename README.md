@@ -1111,6 +1111,46 @@ Where the `pvwebstatus.config.json` is a JSON configuration.
 }
 ```
 
+### Add application that extends from another application
+
+PVR and pantavisor support application that uses another application rootfs system as base and just create a diff squashfs for the files that are different in the added application.
+
+That will allow to have smaller applications that share libraries or tools between several applications.
+
+In this case for this to work the base system should be created as a data application
+
+```
+pvr app add --group=data --status-goal=MOUNTED --from=ros:rolling-ros-base rolling-ros-base
+```
+
+Then the application that will depend of 
+
+```
+pvr app add --base rolling-ros-base --from=ANOTHER_CONTAINER extended_ros_app
+```
+
+Then after this if you want to sign or export the extended_ros_app we should signed with the base app.
+
+```
+pvr sig add --parts=rolling-ros-base,extended_ros_app
+```
+
+```
+pvr export --parts=rolling-ros-base,extended_ros_app /path/to/exports/extended_ros_app.tgz
+```
+
+Make sure the base app and the extended app use the same architecture, to make sure the diff is as small as posible.
+
+Example:
+
+```bash
+pvr app add --group=data --status-goal=MOUNTED --from=nginx:stable-alpine nginx_base
+
+pvr app add --base nginx_base --from=highercomve/hello_world_nginx:latest hello_world_nginx
+```
+
+and if you take a look on https://hub.docker.com/_/nginx you will see that has the same architectures as https://hub.docker.com/r/highercomve/hello_world_nginx and the diff is going to be only the index.html and the configuration for the nginx.
+
 ## How to use pvr type
 
 Another source that could be used as a source for an application is a device description inside your computer or from a PV repository URL.
@@ -1143,6 +1183,15 @@ example1$ $ pvr app info nginx-app
 }
 
 ```
+
+## pvr app install <APP_NAME>
+
+pvr app install rerun the template engine and reproduce any rootfs binary
+that is not present in the $APP_NAME directory.
+
+For docker app install will take the docker_digest and docker_ovl_digest
+value from $APP_NAME/src.json and generate the matching rootfs and ovr files.
+
 
 ## pvr app ls
 
@@ -1186,6 +1235,14 @@ example1$ $ pvr app update nginx-app
 Application updated
 
 ```
+
+If PVR_APP_UPDATE_PATCH=true (or --patch parameter) is set, pvr
+app update will add the docker_diget_ovl reference to the src.json
+and call `app install`.
+
+`app install` will generate a diff overlay squashfs allowing
+to ship minor updates as a diff layer.
+
 
 #### Update app from rootfs
 
