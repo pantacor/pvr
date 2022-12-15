@@ -98,6 +98,11 @@ func CommandAppInstall() cli.Command {
 
 			pvr.SetSourceTypeFromManifest(app, nil)
 
+			if c.String("base") != "" {
+				app.DoOverlay = true
+				app.Base = strings.Trim(c.String("base"), "/")
+			}
+
 			err = pvr.InstallApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
@@ -130,6 +135,11 @@ func CommandAppInstall() cli.Command {
 			Usage:  SourceFlagUsage,
 			EnvVar: "PVR_SOURCE",
 			Value:  "",
+		},
+		cli.StringFlag{
+			Name:   "base",
+			Usage:  "Base rootfs to create patch from",
+			EnvVar: "PVR_APP_ADD_BASE",
 		},
 		cli.StringFlag{
 			Name:   "runlevel",

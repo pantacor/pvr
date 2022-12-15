@@ -104,6 +104,11 @@ func CommandAppUpdate() cli.Command {
 				app.DoOverlay = true
 			}
 
+			if c.String("base") != "" && !c.Bool("newbase") {
+				app.DoOverlay = true
+				app.Base = strings.Trim(c.String("base"), "/")
+			}
+
 			err = pvr.UpdateApplication(app)
 			if err != nil {
 				return cli.NewExitError(err, 3)
@@ -155,6 +160,11 @@ func CommandAppUpdate() cli.Command {
 			Name:   "patch",
 			Usage:  "update the patch overlay",
 			EnvVar: "PVR_APP_UPDATE_PATCH",
+		},
+		cli.StringFlag{
+			Name:   "base",
+			Usage:  "Base rootfs to create patch from",
+			EnvVar: "PVR_APP_ADD_BASE",
 		},
 		cli.StringFlag{
 			Name:   "from",
