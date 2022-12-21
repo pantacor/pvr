@@ -186,7 +186,7 @@ func AddRootFsApp(p *Pvr, app *AppData) error {
 
 	app.Appmanifest = &src
 
-	return p.InstallApplication(app)
+	return err
 }
 
 func GetFromRootFs(app *AppData) (string, error) {

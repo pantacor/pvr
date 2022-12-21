@@ -64,7 +64,7 @@ func AddPvApp(p *Pvr, app *AppData) error {
 
 	app.Appmanifest = srcJson
 
-	return p.InstallApplication(app)
+	return err
 }
 
 func UpdatePvApp(p *Pvr, app *AppData, appManifest *Source) error {

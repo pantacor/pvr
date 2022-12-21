@@ -150,6 +150,9 @@ func (p *Pvr) InstallApplication(app *AppData) (err error) {
 			return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
 		}
 	}
+	if err != nil {
+		return err
+	}
 
 	diff, err := p.Diff()
 	if err != nil {
@@ -161,7 +164,7 @@ func (p *Pvr) InstallApplication(app *AppData) (err error) {
 		return nil
 	}
 
-	if app.Appmanifest.DmEnabled != nil {
+	if appManifest.DmEnabled != nil {
 		err = p.DmCVerityApply(app.Appname)
 	}
 
@@ -212,9 +215,9 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 
 	fmt.Printf("Searching for dependencies of %s\n", app.Appname)
 	for _, a := range apps {
-		if a.Appmanifest.Base == app.Appname {
+		if appManifest.Base == app.Appname {
 			fmt.Printf("Updating dependency %s\n", a.Appname)
-			if err := UpdateDockerApp(p, &a, a.Appmanifest); err != nil {
+			if err := UpdateDockerApp(p, &a, appManifest); err != nil {
 				return err
 			}
 			fmt.Printf("%s is up to date\n", a.Appname)
@@ -225,7 +228,7 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 }
 
 // AddApplication : Add application from several types of sources
-func (p *Pvr) AddApplication(app *AppData) error {
+func (p *Pvr) AddApplication(app *AppData) (err error) {
 	if app.SquashFile == "" {
 		app.SquashFile = SQUASH_FILE
 	}
@@ -235,14 +238,20 @@ func (p *Pvr) AddApplication(app *AppData) error {
 
 	switch app.SourceType {
 	case models.SourceTypeDocker:
-		return AddDockerApp(p, app)
+		err = AddDockerApp(p, app)
 	case models.SourceTypeRootFs:
-		return AddRootFsApp(p, app)
+		err = AddRootFsApp(p, app)
 	case models.SourceTypePvr:
-		return AddPvApp(p, app)
+		err = AddPvApp(p, app)
 	default:
-		return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
+		err = fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
 	}
+
+	if err != nil {
+		return err
+	}
+
+	return p.InstallApplication(app)
 }
 
 func (p *Pvr) isRunningAsRoot() bool {

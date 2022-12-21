@@ -127,20 +127,20 @@ func AddDockerApp(p *Pvr, app *AppData) error {
 
 	app.Appmanifest = &src
 
-	return p.InstallApplication(app)
+	return err
 }
 
 func UpdateDockerApp(p *Pvr, app *AppData, appManifest *Source) (err error) {
 
 	if app.Source == "" {
-		app.Source = app.Appmanifest.DockerSource.DockerSource
+		app.Source = appManifest.DockerSource.DockerSource
 	}
 	if app.Platform == "" {
-		app.Platform = app.Appmanifest.DockerPlatform
+		app.Platform = appManifest.DockerPlatform
 	}
 
 	if app.From != "" {
-		updateDockerFromFrom(app.Appmanifest, app.From)
+		updateDockerFromFrom(appManifest, app.From)
 	}
 
 	err = p.FindDockerImage(app)
@@ -148,9 +148,9 @@ func UpdateDockerApp(p *Pvr, app *AppData, appManifest *Source) (err error) {
 		return err
 	}
 
-	trackURL := app.Appmanifest.DockerName
-	if app.Appmanifest.DockerTag != "" {
-		trackURL += fmt.Sprintf(":%s", app.Appmanifest.DockerTag)
+	trackURL := appManifest.DockerName
+	if appManifest.DockerTag != "" {
+		trackURL += fmt.Sprintf(":%s", appManifest.DockerTag)
 	}
 
 	//	Exists flag is true only if the image got loaded which will depend on
@@ -178,14 +178,14 @@ func UpdateDockerApp(p *Pvr, app *AppData, appManifest *Source) (err error) {
 		}
 	}
 
-	for k, v := range app.Appmanifest.DockerConfig {
+	for k, v := range appManifest.DockerConfig {
 		if v == nil {
 			delete(app.RemoteImage.DockerConfig, k)
 		}
 	}
 
-	app.Appmanifest.DockerSource.DockerSource = app.Source
-	srcContent, err := json.MarshalIndent(app.Appmanifest, " ", " ")
+	appManifest.DockerSource.DockerSource = app.Source
+	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
 	if err != nil {
 		return err
 	}
@@ -219,8 +219,8 @@ func InstallDockerApp(p *Pvr, app *AppData, appManifest *Source) error {
 	// to a registry). The "else" codepath exists for src.json's that were
 	// generated previously. For those we will need to get dockerconfig from
 	// local or remote registry still.....
-	if app.Appmanifest.DockerConfig != nil {
-		dockerConfig = app.Appmanifest.DockerConfig
+	if appManifest.DockerConfig != nil {
+		dockerConfig = appManifest.DockerConfig
 	} else {
 		err = p.FindDockerImage(app)
 
@@ -231,7 +231,7 @@ func InstallDockerApp(p *Pvr, app *AppData, appManifest *Source) error {
 			return err
 		}
 
-		fmt.Println("WARNING: The src.json for " + app.Appmanifest.Name + " has been genrated by old pvr; run pvr update " + app.Appmanifest.Name + " to get rid of this warning.")
+		fmt.Println("WARNING: The src.json for " + appManifest.Name + " has been genrated by old pvr; run pvr update " + appManifest.Name + " to get rid of this warning.")
 		//	Exists flag is true only if the image got loaded which will depend on
 		//  priority order provided in --source=local,remote
 		if app.LocalImage.Exists {
@@ -256,8 +256,8 @@ func InstallDockerApp(p *Pvr, app *AppData, appManifest *Source) error {
 	}
 
 	var baseManifest *Source
-	if app.Appmanifest != nil && app.Appmanifest.Base != "" {
-		baseManifest, _ = p.GetApplicationManifest(app.Appmanifest.Base)
+	if appManifest != nil && appManifest.Base != "" {
+		baseManifest, _ = p.GetApplicationManifest(appManifest.Base)
 	}
 
 	if (app.SquashFile == SQUASH_FILE && appManifest.DockerDigest == squashFSDigest) ||
