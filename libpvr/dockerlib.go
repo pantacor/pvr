@@ -252,33 +252,36 @@ type DockerImage struct {
 }
 
 // FindDockerImage : Find Docker Image
-func (p *Pvr) FindDockerImage(app *AppData) error {
+func (p *Pvr) FindDockerImage(app *AppData) (err error) {
 	app.LocalImage.Exists = false
 	app.RemoteImage.Exists = false
 
 	sourceOrder := strings.Split(app.Source, ",")
 	for _, source := range sourceOrder {
-		if source == "local" {
-			err := LoadLocalImage(app)
-			if err != nil {
-				return err
-			}
+		switch source {
+		case "local":
+			err = LoadLocalImage(app)
 			if app.LocalImage.Exists {
 				return nil
 			}
-
-		} else if source == "remote" {
-			err := p.LoadRemoteImage(app)
-			if err != nil {
-				return err
-			}
+		case "remote":
+			err = p.LoadRemoteImage(app)
 			if app.RemoteImage.Exists {
 				return nil
 			}
-		} else {
-			return errors.New("Invalid source:" + source)
+		default:
+			return errors.New("source type not supported:" + source + "\n")
+		}
+
+		if err != nil {
+			fmt.Printf("%s source had an error, trying with other sources \n %s \n", source, err)
 		}
 	}
+
+	if err != nil {
+		return err
+	}
+
 	return errors.New("Image not found in source:" + app.Source + "\n")
 }
 
