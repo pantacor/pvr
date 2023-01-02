@@ -187,6 +187,18 @@ lxc.mount.entry = /volumes/{{- $sourceVol }}/{{- $src.name}} {{ $targetPath }} n
 lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} none bind,rw,create=dir 0 0
 {{- end }}
 {{- end }}
+{{- if .Source.args.PV_VOLUME_IMPORTS }}
+{{- range $k,$v := .Source.args.PV_VOLUME_IMPORTS }}
+{{- $sp := sprig_splitn ":" 4 $v }}
+{{- $source := $sp._0 }}
+{{- $origin := $sp._1 }}
+{{- $originsp := sprig_splitn "@" 2 $sp._1 }}
+{{- $dest := $sp._2 }}
+lxc.mount.entry = /volumes/{{- $source -}}/
+{{- if $originsp._1 }}{{ pvr_dockerVolumeName $originsp._1 }}/{{ $originsp._0 }}{{ else }}{{ pvr_dockerVolumeName $originsp._0 }}{{ end }} {{ $dest }} none bind,
+{{- pvr_ifNull "rw" $sp._3 }},create=dir 0 0
+{{- end }}
+{{- end }}
 {{ end }}`
 
 	RUN_JSON = `{{ "" -}}
