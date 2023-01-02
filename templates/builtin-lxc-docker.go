@@ -128,7 +128,7 @@ lxc.mount.entry = tmpfs {{ .Source.args.PV_RUN_TMPFS_PATH | pvr_ifNull "run" }} 
 {{- $src := .Source -}}
 {{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes $src.persistence -}}
 {{- if ne $key "lxc-overlay" }}
-lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | replace "/" "-" }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
+lxc.mount.entry = /volumes/{{ $src.name }}/{{ pvr_dockerVolumeName $key }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
 {{- end -}}
 {{- end }}
 {{- if .Source.args.PV_LXC_CAP_DROP }}
