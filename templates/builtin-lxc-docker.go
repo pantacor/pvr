@@ -195,7 +195,7 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 {{- $originsp := sprig_splitn "@" 2 $sp._1 }}
 {{- $dest := $sp._2 }}
 lxc.mount.entry = /volumes/{{- $source -}}/
-{{- if $originsp._1 }}{{ pvr_dockerVolumeName $originsp._1 }}/{{ $originsp._0 }}{{ else }}{{ pvr_dockerVolumeName $originsp._0 }}{{ end }} {{ $dest }} none bind,
+{{- if $originsp._1 }}{{ pvr_dockerVolumeName $originsp._1 }}/{{ $originsp._0 }}{{ else }}{{ pvr_dockerVolumeName $originsp._0 }}{{ end }} {{ trimPrefix "/" $dest }} none bind,
 {{- pvr_ifNull "rw" $sp._3 }},create=dir 0 0
 {{- end }}
 {{- end }}

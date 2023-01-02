@@ -21,20 +21,85 @@ import (
 )
 
 func TestCompileTemplate(t *testing.T) {
-	t.Run("empty LXC_CONTAINER_CONF", testLXCContainerConf)
+	t.Run("docker cmd", testLXCContainerConf__Docker_Cmd)
+	t.Run("docker cmd2", testLXCContainerConf__Docker_Cmd2)
+	t.Run("docker workingdir", testLXCContainerConf__Docker_WorkingDir)
+	t.Run("PV_IMPORT_VOLUMES LXC_CONTAINER_CONF", testLXCContainerConf_PV_VOLUME_IMPORTS)
 }
 
-func testLXCContainerConf(t *testing.T) {
+func ErrorIf(t *testing.T, test bool, args ...interface{}) {
+	if test {
+		t.Error(args...)
+	}
+}
+func ErrorIfNot(t *testing.T, test bool, args ...interface{}) {
+	if !test {
+		t.Error(args...)
+	}
+}
+
+func testLXCContainerConf__Docker_Cmd(t *testing.T) {
 	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+		"name": "container1",
+		"Docker": map[string]interface{}{
+			"Cmd": "run.sh",
+		},
+	})
+
+	ErrorIf(t, len(result) == 0, "error when compiling template")
+	ErrorIfNot(t, strings.Contains(string(result), "lxc.init.cmd = run.sh"), "pattern not found in generated string "+string(result))
+}
+
+func testLXCContainerConf__Docker_Cmd2(t *testing.T) {
+	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+		"name": "container1",
+		"Docker": map[string]interface{}{
+			"Cmd": "run.sh something",
+		},
+	})
+	ErrorIf(t, len(result) == 0, "error when compiling template")
+	ErrorIfNot(t, strings.Contains(string(result), "lxc.init.cmd = run.sh \"something\""), "pattern not found in generated string "+string(result))
+}
+
+func testLXCContainerConf__Docker_WorkingDir(t *testing.T) {
+	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+		"name": "container1",
 		"Docker": map[string]interface{}{
 			"WorkingDir": "/foo",
+		},
+	})
+	ErrorIf(t, len(result) == 0, "error when compiling template")
+	ErrorIfNot(t, strings.Contains(string(result), "lxc.init.cwd = /foo"), "pattern not found in generated string "+string(result))
+}
+
+// Source.args.PV_VOLUME_IMPORTS: [ <import1>, <import2>, ... ]
+//     import: <container>:[<subdir>@]<originvolume>:<destdir>[:<mountflags>]
+func testLXCContainerConf_PV_VOLUME_IMPORTS(t *testing.T) {
+	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+		"name": "container1",
+		"Source": map[string]interface{}{
+			"args": map[string]interface{}{
+				"PV_VOLUME_IMPORTS": []string{
+					"cont:/foo/fol:/faldara",
+					"cont:subdir@/foo/fol:/faldara-sub",
+					"cont:subdir@/foo/fol:/faldara-sub:ro",
+				},
+			},
 		},
 	})
 	if len(result) == 0 {
 		t.Error("error when compiling template with empty data")
 	}
 
-	if !strings.Contains(string(result), "lxc.init.cwd = /foo") {
-		t.Error("docker working dir was not found in generated string")
+	if !strings.Contains(string(result), "lxc.mount.entry = /volumes/cont/docker--foo-fol faldara none bind,rw,create=dir 0 0") {
+		t.Error("mount entry not set properly, but: " + string(result))
+	}
+
+	if !strings.Contains(string(result), "lxc.mount.entry = /volumes/cont/docker--foo-fol/subdir faldara-sub none bind,rw,create=dir 0 0") {
+		t.Error("mount entry not set properly, but: " + string(result))
+	}
+
+	if !strings.Contains(string(result), "lxc.mount.entry = /volumes/cont/docker--foo-fol/subdir faldara-sub none bind,ro,create=dir 0 0") {
+		t.Error("mount entry not set properly, but: " + string(result))
 	}
 }
