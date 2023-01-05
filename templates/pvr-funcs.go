@@ -98,6 +98,12 @@ var pvrFuncMap = map[string]interface{}{
 		}
 		return builder.String()
 	},
+	"dockerVolumeName": func(value string) interface{} {
+		value = "docker-" + value
+		value = strings.TrimSuffix(value, "/")
+		value = strings.ReplaceAll(value, "/", "-")
+		return value
+	},
 }
 
 func PvrFuncMap() map[string]interface{} {
