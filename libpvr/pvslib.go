@@ -672,7 +672,8 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR verifying: "+err.Error())
+		fmt.Fprintf(os.Stderr, "Error Validating payload: '%s'\n", string(payloadBuf))
+		fmt.Fprintf(os.Stderr, "ERROR: "+err.Error())
 	}
 
 	if !verified && err != nil && pubKeys != nil {
