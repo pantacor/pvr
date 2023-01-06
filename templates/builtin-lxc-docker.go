@@ -1,4 +1,4 @@
-// Copyright 2019-2022  Pantacor Ltd.
+// Copyright 2019-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -53,7 +53,11 @@ lxc.init.cmd =
 			{{- "" }} {{ pvr_sliceIndex .Docker.Entrypoint 0}}{{ range pvr_sliceFrom .Docker.Entrypoint 1 }} "{{ . }}"{{ end }}
 		{{- end }}
 		{{- if and (.Docker.Cmd) (pvr_isSlice .Docker.Cmd) }}
-			{{- "" }} {{ range pvr_sliceFrom .Docker.Cmd 0 }} "{{ . }}"{{ end }}
+			{{- "" }} {{ range pvr_sliceFrom .Docker.Cmd 0 -}} "{{ . }}"{{ end }}
+		{{- else }}
+			{{- if .Docker.Cmd }}
+				{{- "" }} "{{ .Docker.Cmd }}"
+			{{- end }}
 		{{- end }}
 	{{- else }}
 		{{- "" }} {{ .Docker.Entrypoint }}

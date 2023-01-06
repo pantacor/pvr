@@ -1,5 +1,5 @@
 //
-// Copyright 2019  Pantacor Ltd.
+// Copyright 2019-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,16 +23,23 @@ import (
 func TestCompileTemplate(t *testing.T) {
 	t.Run("docker cmd", testLXCContainerConf__Docker_Cmd)
 	t.Run("docker cmd2", testLXCContainerConf__Docker_Cmd2)
+	t.Run("docker entrypoint", testLXCContainerConf__Docker_Entrypoint)
+	t.Run("docker entrypoint2", testLXCContainerConf__Docker_Entrypoint2)
+	t.Run("docker entrypoint3", testLXCContainerConf__Docker_Entrypoint3)
+	t.Run("docker entrypointcmd", testLXCContainerConf__Docker_EntrypointCmd)
+	t.Run("docker entrypointcmd", testLXCContainerConf__Docker_EntrypointCmd2)
 	t.Run("docker workingdir", testLXCContainerConf__Docker_WorkingDir)
 	t.Run("PV_IMPORT_VOLUMES LXC_CONTAINER_CONF", testLXCContainerConf_PV_VOLUME_IMPORTS)
 }
 
 func ErrorIf(t *testing.T, test bool, args ...interface{}) {
+	t.Helper()
 	if test {
 		t.Error(args...)
 	}
 }
 func ErrorIfNot(t *testing.T, test bool, args ...interface{}) {
+	t.Helper()
 	if !test {
 		t.Error(args...)
 	}
@@ -54,11 +61,73 @@ func testLXCContainerConf__Docker_Cmd2(t *testing.T) {
 	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
 		"name": "container1",
 		"Docker": map[string]interface{}{
-			"Cmd": "run.sh something",
+			"Cmd": []interface{}{"run.sh", "something"},
 		},
 	})
 	ErrorIf(t, len(result) == 0, "error when compiling template")
 	ErrorIfNot(t, strings.Contains(string(result), "lxc.init.cmd = run.sh \"something\""), "pattern not found in generated string "+string(result))
+}
+
+func testLXCContainerConf__Docker_Entrypoint(t *testing.T) {
+	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+		"name": "container1",
+		"Docker": map[string]interface{}{
+			"Entrypoint": "run.sh",
+		},
+	})
+
+	ErrorIf(t, len(result) == 0, "error when compiling template")
+	ErrorIfNot(t, strings.Contains(string(result), "lxc.init.cmd = run.sh"), "pattern not found in generated string "+string(result))
+}
+
+func testLXCContainerConf__Docker_Entrypoint2(t *testing.T) {
+	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+		"name": "container1",
+		"Docker": map[string]interface{}{
+			"Entrypoint": []interface{}{"run.sh"},
+		},
+	})
+
+	ErrorIf(t, len(result) == 0, "error when compiling template")
+	ErrorIfNot(t, strings.Contains(string(result), "lxc.init.cmd = run.sh"), "pattern not found in generated string "+string(result))
+}
+
+func testLXCContainerConf__Docker_Entrypoint3(t *testing.T) {
+	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+		"name": "container1",
+		"Docker": map[string]interface{}{
+			"Entrypoint": []interface{}{"run.sh", "something"},
+		},
+	})
+
+	ErrorIf(t, len(result) == 0, "error when compiling template")
+	ErrorIfNot(t, strings.Contains(string(result), "lxc.init.cmd = run.sh \"something\""), "pattern not found in generated string "+string(result))
+}
+
+func testLXCContainerConf__Docker_EntrypointCmd(t *testing.T) {
+	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+		"name": "container1",
+		"Docker": map[string]interface{}{
+			"Entrypoint": []interface{}{"run.sh", "something"},
+			"Cmd":        []interface{}{"runit"},
+		},
+	})
+
+	ErrorIf(t, len(result) == 0, "error when compiling template")
+	ErrorIfNot(t, strings.Contains(string(result), "lxc.init.cmd = run.sh \"something\" \"runit\""), "pattern not found in generated string "+string(result))
+}
+
+func testLXCContainerConf__Docker_EntrypointCmd2(t *testing.T) {
+	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+		"name": "container1",
+		"Docker": map[string]interface{}{
+			"Entrypoint": []interface{}{"run.sh", "something"},
+			"Cmd":        "runit",
+		},
+	})
+
+	ErrorIf(t, len(result) == 0, "error when compiling template")
+	ErrorIfNot(t, strings.Contains(string(result), "lxc.init.cmd = run.sh \"something\" \"runit\""), "pattern not found in generated string "+string(result))
 }
 
 func testLXCContainerConf__Docker_WorkingDir(t *testing.T) {
