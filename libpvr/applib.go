@@ -467,8 +467,8 @@ func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 		return "", nil, err
 	}
 
-	part := url.Fragment
-	if part == "" {
+	parts := strings.Split(url.Fragment, ",")
+	if len(parts) == 0 {
 		return "", nil, ErrEmptyPart
 	}
 
@@ -489,7 +489,7 @@ func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 		return "", nil, err
 	}
 
-	srcAppPath := filepath.Join(p.Dir, part)
+	srcAppPath := filepath.Join(p.Dir, parts[0])
 	destAppPath := filepath.Join(p.Dir, app.Appname)
 	if srcAppPath != destAppPath {
 		if err = os.Rename(srcAppPath, destAppPath); err != nil {
