@@ -83,15 +83,16 @@ func CommandAppUpdate() cli.Command {
 			}
 
 			app := libpvr.AppData{
-				Appmanifest:  appManifest,
-				Appname:      appname,
-				From:         trackURL,
-				Source:       c.String("source"),
-				Platform:     c.String("platform"),
-				Username:     c.String("username"),
-				Password:     c.String("password"),
-				SourceType:   c.String("type"),
-				TemplateArgs: map[string]interface{}{},
+				Appmanifest:   appManifest,
+				Appname:       appname,
+				From:          trackURL,
+				Source:        c.String("source"),
+				Platform:      c.String("platform"),
+				Username:      c.String("username"),
+				Password:      c.String("password"),
+				FormatOptions: c.String("format-options"),
+				SourceType:    c.String("type"),
+				TemplateArgs:  map[string]interface{}{},
 			}
 
 			pvr.SetSourceTypeFromManifest(&app, nil)
@@ -171,6 +172,11 @@ func CommandAppUpdate() cli.Command {
 			Usage:  "Update docker_name and docker_tag fields before updating according to value",
 			EnvVar: "PVR_APP_FROM",
 			Value:  "",
+		},
+		cli.StringFlag{
+			Name:   "format-options,o",
+			Usage:  "Format Options for Target FS (e.g. \"-comp gzip\")",
+			EnvVar: "PVR_FORMAT_OPTIONS",
 		},
 	}
 

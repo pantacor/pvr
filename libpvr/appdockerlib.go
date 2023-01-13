@@ -260,9 +260,9 @@ func InstallDockerApp(p *Pvr, app *AppData, appManifest *Source) error {
 		baseManifest, _ = p.GetApplicationManifest(appManifest.Base)
 	}
 
-	if (app.SquashFile == SQUASH_FILE && appManifest.DockerDigest == squashFSDigest) ||
+	if app.FormatOptions == "" && ((app.SquashFile == SQUASH_FILE && appManifest.DockerDigest == squashFSDigest) ||
 		(app.SquashFile == SQUASH_OVL_FILE && baseManifest == nil && appManifest.DockerOvlDigest == squashFSDigest) ||
-		(app.SquashFile == SQUASH_OVL_FILE && baseManifest != nil && baseManifest.DockerDigest == appManifest.DockerDigest && appManifest.DockerOvlDigest == squashFSDigest) {
+		(app.SquashFile == SQUASH_OVL_FILE && baseManifest != nil && baseManifest.DockerDigest == appManifest.DockerDigest && appManifest.DockerOvlDigest == squashFSDigest)) {
 		fmt.Println(app.SquashFile + ": already up to date.")
 		return nil
 	}

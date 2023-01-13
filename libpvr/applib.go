@@ -91,7 +91,8 @@ func (p *Pvr) InstallApplication(app *AppData) (err error) {
 	}
 
 	targetApp := *app
-	targetManifest := appManifest
+	app.Appmanifest = appManifest
+	targetManifest := app.Appmanifest
 	if appManifest.Base != "" {
 		targetManifest, err = p.GetApplicationManifest(appManifest.Base)
 		if err != nil {
@@ -188,6 +189,11 @@ func (p *Pvr) UpdateApplication(app AppData) error {
 		app.SquashFile = SQUASH_OVL_FILE
 		fmt.Println("Update ovl: " + app.SquashFile)
 	}
+
+	if app.FormatOptions != "" {
+		appManifest.FormatOptions = app.FormatOptions
+	}
+
 	switch app.SourceType {
 	case models.SourceTypeDocker:
 		err = UpdateDockerApp(p, &app, appManifest)
@@ -634,7 +640,7 @@ func MakeSquash(rootfsPath string, app *AppData) error {
 	args := []string{makeSquashfsPath, rootfsPath, tempSquashFile}
 	args = append(args, comp...)
 
-	fmt.Println("Generating squashfs file: " + strings.Join(args, " "))
+	fmt.Println("Generating squashfs file: " + strings.Join(args, ","))
 	makeSquashfs := exec.Command(args[0], args[1:]...)
 	err = makeSquashfs.Run()
 	if err != nil {

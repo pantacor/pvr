@@ -502,7 +502,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app *AppData, appManifest *Source) err
 		defer currentDigest.Close()
 		currentDigestContent, err := ioutil.ReadAll(currentDigest)
 		if err == nil {
-			if string(currentDigestContent) == string(digest) && appManifest.Base == "" {
+			if string(currentDigestContent) == string(digest) && appManifest.Base == "" && app.FormatOptions == "" {
 				return nil
 			}
 		}
