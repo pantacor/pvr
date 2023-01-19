@@ -130,6 +130,8 @@ func CommandSigAdd() cli.Command {
 				if err != nil {
 					return cli.NewExitError(err, 127)
 				}
+			} else if ops.X5cPath == "no" {
+				ops.X5cPath = ""
 			}
 
 			if c.Parent().IsSet("output") {
