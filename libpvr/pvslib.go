@@ -342,6 +342,9 @@ func (p *Pvr) JwsSign(name string,
 	if parsedKey, err = x509.ParsePKCS8PrivateKey(privPemBytes); err == nil { // note this returns type `interface{}`
 		goto found
 	}
+	if parsedKey, err = x509.ParseECPrivateKey(privPemBytes); err == nil { // note this returns type `interface{}`
+		goto found
+	}
 
 	return errors.New("Private key cannot be parsed." + err.Error())
 
@@ -537,20 +540,20 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 					continue
 				}
 			}
-			var ok bool
 			var pubKey interface{}
-			pubKey, ok = parsedKey.(*rsa.PublicKey)
-
-			if pubKey == nil {
-				pubKey, ok = parsedKey.(*ecdsa.PublicKey)
-			}
-			if !ok {
-				fmt.Fprintf(os.Stderr, "WARNING: casting pubey key\n")
+			switch v := parsedKey.(type) {
+			case *rsa.PublicKey:
+				pubKey = v
+			case *ecdsa.PublicKey:
+				pubKey = v
+			default:
+				fmt.Fprintf(os.Stderr, "WARNING: casting pubKey key of type "+reflect.TypeOf(parsedKey).String())
 				continue
 			}
+
 			pubKeys = append(pubKeys, pubKey)
 			if IsDebugEnabled {
-				fmt.Fprintf(os.Stderr, "INFO: added pubey: %d\n", len(pubKeys))
+				fmt.Fprintf(os.Stderr, "INFO: added pubkey: %d\n", len(pubKeys))
 			}
 		}
 	} else if caCerts == "_system_" {
@@ -627,11 +630,12 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 	var verified bool
 
 	for _, pk := range pubKeys {
-
 		err = sig.DetachedVerify(payloadBuf, pk)
-		if err != nil {
-			continue
+		if err == nil {
+			verified = true
+			break
 		}
+		fmt.Fprintf(os.Stderr, "detached verify with pubkey failed %s\n", err.Error())
 	}
 
 	var pemcerts [][]*x509.Certificate

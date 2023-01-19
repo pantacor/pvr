@@ -43,7 +43,7 @@ func CommandSig() cli.Command {
 			cli.StringFlag{
 				Name:   "x5c, x",
 				EnvVar: "PVR_X5C_PATH",
-				Usage:  "path to cert chain to include in jws x5c header. Note: we will not validate that the actual signature can be validated with this one.",
+				Usage:  "path to cert chain to include in jws x5c header. Use 'no' to not include any.",
 			},
 			cli.StringFlag{
 				Name:   "pubkey, p",
