@@ -466,17 +466,7 @@ func (s *Session) CreateDevice(baseURL string, deviceNick string) (
 	*resty.Response,
 	error,
 ) {
-	u, err := url.Parse(baseURL)
-	if err != nil {
-		return nil, err
-	}
 	//Get User Access token
-	host := u.Scheme + "://" + u.Host
-	authHeader := "JWT realm=\"pantahub services\", ph-aeps=\"" + host + "/auth\""
-	accessToken, err := s.auth.getCachedAccessToken(authHeader)
-	if err != nil {
-		return nil, err
-	}
 	response, err := s.DoAuthCall(false, func(req *resty.Request) (*resty.Response, error) {
 		body := map[string]interface{}{}
 		if deviceNick != "" {
@@ -484,7 +474,6 @@ func (s *Session) CreateDevice(baseURL string, deviceNick string) (
 		}
 		return req.
 			SetBody(body).
-			SetAuthToken(accessToken).
 			Post(baseURL + "/devices/")
 	})
 	if err != nil {
