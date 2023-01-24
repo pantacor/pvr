@@ -39,10 +39,11 @@ import (
 	"text/template"
 	"time"
 
+	cjson "github.com/gibson042/canonicaljson-go"
 	"github.com/udhos/equalfile"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 
 	"github.com/Masterminds/sprig"
-	cjson "github.com/gibson042/canonicaljson-go"
 	"github.com/go-resty/resty"
 )
 
@@ -222,7 +223,7 @@ func FormatJson(data []byte) ([]byte, error) {
 
 func FormatJsonC(data []byte) ([]byte, error) {
 	var value interface{}
-	err := json.Unmarshal(data, &value)
+	err := pvjson.Unmarshal(data, &value)
 
 	if err != nil {
 		return nil, err
@@ -453,7 +454,7 @@ func StructToMap(s interface{}) (map[string]interface{}, error) {
 
 	result := map[string]interface{}{}
 
-	err = json.Unmarshal(b, &result)
+	err = pvjson.Unmarshal(b, &result)
 
 	if err != nil {
 		return nil, err
@@ -521,7 +522,7 @@ func LoginDevice(
 	}
 	if response.StatusCode() == http.StatusOK {
 		responseData := map[string]interface{}{}
-		err = json.Unmarshal(response.Body(), &responseData)
+		err = pvjson.Unmarshal(response.Body(), &responseData)
 		if err != nil {
 			return "", err
 		}
@@ -562,7 +563,7 @@ func CreateTrail(baseURL string,
 // LogPrettyJSON : Pretty print Json content
 func LogPrettyJSON(content []byte) error {
 	var data interface{}
-	err := json.Unmarshal(content, &data)
+	err := pvjson.Unmarshal(content, &data)
 	if err != nil {
 		return err
 	}
@@ -825,7 +826,7 @@ func (s *Session) SuggestDeviceNicks(userNick, searchTerm string, baseURL string
 		return
 	}
 	responseData := []interface{}{}
-	err = json.Unmarshal(devicesResponse.Body(), &responseData)
+	err = pvjson.Unmarshal(devicesResponse.Body(), &responseData)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error()+"\n")
 		return
@@ -861,7 +862,7 @@ func (s *Session) SuggestUserNicks(searchTerm string, baseURL string) {
 		return
 	}
 	responseData := []interface{}{}
-	err = json.Unmarshal(profilesResponse.Body(), &responseData)
+	err = pvjson.Unmarshal(profilesResponse.Body(), &responseData)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error()+"\n")
 		return

@@ -39,6 +39,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/genuinetools/reg/registry"
 	"github.com/genuinetools/reg/repoutils"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 )
 
 const (
@@ -167,7 +168,7 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 		}
 
 		var tokenResponse map[string]interface{}
-		err = json.Unmarshal(content, &tokenResponse)
+		err = pvjson.Unmarshal(content, &tokenResponse)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +209,7 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 	}
 
 	var blob map[string]interface{}
-	err = json.Unmarshal(blobContent, &blob)
+	err = pvjson.Unmarshal(blobContent, &blob)
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +457,7 @@ func LoadLocalImage(app *AppData) error {
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal(configData, &app.LocalImage.DockerConfig)
+	err = pvjson.Unmarshal(configData, &app.LocalImage.DockerConfig)
 	if err != nil {
 		return err
 	}
@@ -568,7 +569,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app *AppData, appManifest *Source) err
 			return err
 		}
 		manifestData := []map[string]interface{}{}
-		err = json.Unmarshal([]byte(manifestFile), &manifestData)
+		err = pvjson.Unmarshal([]byte(manifestFile), &manifestData)
 		if err != nil {
 			return err
 		}
