@@ -17,6 +17,7 @@
 package libpvr
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -147,7 +148,8 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "Successfully posted Revision %d (%s) to device id %s\n", int(responseMap["rev"].(float64)),
+	revNumber := responseMap["rev"].(json.Number)
+	fmt.Fprintf(os.Stderr, "Successfully posted Revision %s (%s) to device id %s\n", revNumber.String(),
 		responseMap["state-sha"].(string)[:8], responseMap["trail-id"])
 
 	return nil
