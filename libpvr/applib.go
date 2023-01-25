@@ -28,6 +28,7 @@ import (
 
 	"gitlab.com/pantacor/pvr/models"
 	"gitlab.com/pantacor/pvr/templates"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 )
 
 const (
@@ -332,7 +333,7 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 		},
 	}
 
-	err = json.Unmarshal(js, &result)
+	err = pvjson.Unmarshal(js, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -503,7 +504,7 @@ func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 	}
 
 	srcJson := Source{}
-	if err = json.Unmarshal(srcContent, &srcJson); err != nil {
+	if err = pvjson.Unmarshal(srcContent, &srcJson); err != nil {
 		return "", nil, err
 	}
 
@@ -568,7 +569,7 @@ func (p *Pvr) GetApplicationInfo(appname string) error {
 	}
 	src, _ := ioutil.ReadFile(srcFilePath)
 	var fileData interface{}
-	err := json.Unmarshal(src, &fileData)
+	err := pvjson.Unmarshal(src, &fileData)
 	if err != nil {
 		return err
 	}
@@ -672,7 +673,7 @@ func GetDockerConfigFile(p *Pvr, app *AppData) (map[string]interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = json.Unmarshal(config, &dockerConfig)
+		err = pvjson.Unmarshal(config, &dockerConfig)
 		if err != nil {
 			return nil, err
 		}

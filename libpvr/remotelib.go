@@ -1,22 +1,19 @@
-//
 // Copyright 2020-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
-//
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package libpvr
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -24,6 +21,7 @@ import (
 	"strings"
 
 	pvrapi "gitlab.com/pantacor/pvr/api"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 )
 
 // RemoteCopy will perform a remote only copy
@@ -96,12 +94,12 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 	var srcJson map[string]interface{}
 	var destJson map[string]interface{}
 
-	err = json.Unmarshal(srcJsonBuf, &srcJson)
+	err = pvjson.Unmarshal(srcJsonBuf, &srcJson)
 	if err != nil {
 		return err
 	}
 
-	err = json.Unmarshal(destJsonBuf, &destJson)
+	err = pvjson.Unmarshal(destJsonBuf, &destJson)
 	if err != nil {
 		return err
 	}
@@ -140,7 +138,7 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 
 	responseMap := map[string]interface{}{}
 
-	err = json.Unmarshal(buf, &responseMap)
+	err = pvjson.Unmarshal(buf, &responseMap)
 
 	if err != nil {
 		return err

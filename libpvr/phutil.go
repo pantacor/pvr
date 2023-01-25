@@ -1,22 +1,19 @@
-//
 // Copyright 2018-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
-//
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package libpvr
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -27,6 +24,7 @@ import (
 	"github.com/go-resty/resty"
 	"github.com/skratchdot/open-golang/open"
 	"gitlab.com/pantacor/pantahub-base/logs"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 )
 
 const (
@@ -115,7 +113,7 @@ func GetEncryptedAccount(authEp, email, username, password string) (*EncryptedAc
 	}
 
 	m1 := EncryptedAccountData{}
-	err = json.Unmarshal(response.Body(), &m1)
+	err = pvjson.Unmarshal(response.Body(), &m1)
 
 	if err != nil {
 		log.Fatal("Error parsing Register body(" + err.Error() + ") for " + accountsEp + ": " + string(response.Body()))
@@ -163,7 +161,7 @@ func (p *Session) DoPs(baseurl string) ([]PantahubDevice, error) {
 	}
 
 	var resultSet []PantahubDevice
-	err = json.Unmarshal(res.Body(), &resultSet)
+	err = pvjson.Unmarshal(res.Body(), &resultSet)
 
 	if err != nil {
 		return nil, errors.New("ERROR: cannot decode result of authenticated call to " + baseurl + ": " + err.Error())
@@ -199,7 +197,7 @@ func (p *Session) DoLogsCursor(baseurl string, cursor string) (logEntries []*log
 	}
 
 	var resultPage logs.Pager
-	err = json.Unmarshal(res.Body(), &resultPage)
+	err = pvjson.Unmarshal(res.Body(), &resultPage)
 
 	if err != nil {
 		return nil, "", errors.New("ERROR: cannot decode result of authenticated call to " + baseurl + ": " + err.Error())
@@ -281,7 +279,7 @@ func (p *Session) DoLogs(
 	}
 
 	var resultPage logs.Pager
-	err = json.Unmarshal(res.Body(), &resultPage)
+	err = pvjson.Unmarshal(res.Body(), &resultPage)
 
 	if err != nil {
 		return nil, "", errors.New("ERROR: cannot decode result of authenticated call to " + baseurl + ": " + err.Error())

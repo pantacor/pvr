@@ -1,22 +1,19 @@
-//
 // Copyright 2019-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
-//
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -24,6 +21,7 @@ import (
 
 	"github.com/urfave/cli"
 	"gitlab.com/pantacor/pvr/libpvr"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 )
 
 func CommandDeviceSet() cli.Command {
@@ -81,7 +79,7 @@ func CommandDeviceSet() cli.Command {
 				return cli.NewExitError(err, 2)
 			}
 			authResponseData := map[string]interface{}{}
-			err = json.Unmarshal(authResponse.Body(), &authResponseData)
+			err = pvjson.Unmarshal(authResponse.Body(), &authResponseData)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}

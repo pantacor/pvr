@@ -1,18 +1,16 @@
-//
 // Copyright 2021,2022  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
-//
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package libpvr
 
 import (
@@ -36,6 +34,7 @@ import (
 	cjson "github.com/gibson042/canonicaljson-go"
 	gojose "github.com/go-jose/go-jose/v3"
 	"github.com/go-resty/resty"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 )
 
 type PvsMatch struct {
@@ -123,7 +122,7 @@ func selectPayload(buf []byte, match *PvsMatch) (*PvsPartSelection, error) {
 	selection.NotSelected = map[string]interface{}{}
 	selection.NotSeen = map[string]interface{}{}
 
-	err := json.Unmarshal(buf, &bufMap)
+	err := pvjson.Unmarshal(buf, &bufMap)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +194,7 @@ func stripPayloadFromRawJSON(buf []byte) ([]byte, error) {
 
 	var m map[string]interface{}
 
-	err := json.Unmarshal(buf, &m)
+	err := pvjson.Unmarshal(buf, &m)
 
 	if err != nil {
 		return nil, err
@@ -276,7 +275,7 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 	}
 
 	var match *PvsMatch
-	err = json.Unmarshal(jsonBuf, &match)
+	err = pvjson.Unmarshal(jsonBuf, &match)
 	if err != nil {
 		return err
 	}
@@ -439,7 +438,7 @@ found:
 
 	sigMap := map[string]interface{}{}
 
-	err = json.Unmarshal(strippedBuf, &sigMap)
+	err = pvjson.Unmarshal(strippedBuf, &sigMap)
 
 	if err != nil {
 		return err
@@ -529,7 +528,6 @@ type JwsVerifySummary struct {
 //
 // special value for caCerts "_system_" hints at using the system cacert
 // store. Can be configured using SSH_CERT_FILE and SSH_CERTS_DIR on linux
-//
 func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, includePayload bool) (*JwsVerifySummary, error) {
 
 	var summary JwsVerifySummary
@@ -623,7 +621,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 	}
 
 	var previewSig map[string]interface{}
-	err = json.Unmarshal(fileBuf, &previewSig)
+	err = pvjson.Unmarshal(fileBuf, &previewSig)
 
 	if err != nil {
 		return nil, err
@@ -652,7 +650,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 	}
 
 	var match *PvsMatch
-	err = json.Unmarshal(jsonBuf, &match)
+	err = pvjson.Unmarshal(jsonBuf, &match)
 	if err != nil {
 		return nil, err
 	}
@@ -745,7 +743,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 
 	var fullSig map[string]interface{}
 
-	err = json.Unmarshal([]byte(sig.FullSerialize()), &fullSig)
+	err = pvjson.Unmarshal([]byte(sig.FullSerialize()), &fullSig)
 
 	if err != nil {
 		return nil, err

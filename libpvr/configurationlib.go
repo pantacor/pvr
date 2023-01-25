@@ -1,17 +1,16 @@
-//
 // Copyright 2019-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package libpvr
 
 import (
@@ -21,6 +20,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 )
 
 const (
@@ -50,7 +51,7 @@ func LoadConfiguration(filePath string) (*PvrGlobalConfig, error) {
 			return nil, errors.New("OS error writing LoadConfiguration: " + err.Error())
 		}
 	} else {
-		err = json.Unmarshal(*fileContent, &config)
+		err = pvjson.Unmarshal(*fileContent, &config)
 		if err != nil {
 			return nil, errors.New("JSON Unmarshal error parsing config file in LoadConfiguration (" + filePath + "): " + err.Error())
 		}
@@ -89,7 +90,7 @@ func (pvr *Pvr) SetConfiguration(arguments []string) (*PvrGlobalConfig, error) {
 
 	var configMap map[string]interface{}
 	inrec, _ := json.Marshal(pvr.Session.Configuration)
-	json.Unmarshal(inrec, &configMap)
+	pvjson.Unmarshal(inrec, &configMap)
 
 	for _, variable := range arguments {
 		value := re.FindStringSubmatch(variable)
