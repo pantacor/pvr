@@ -1627,7 +1627,8 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	}
 
 	stateSha := responseMap["state-sha"].(string)
-	revLocal := fmt.Sprintf("%d", int(responseMap["rev"].(float64)))
+	revLocalNumber := responseMap["rev"].(json.Number)
+	revLocal := fmt.Sprintf("%s", revLocalNumber)
 	if revLocal == "-1" {
 		revLocal = responseMap["revlocal"].(string)
 	}
