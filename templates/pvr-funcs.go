@@ -105,6 +105,17 @@ var pvrFuncMap = map[string]interface{}{
 		value = strings.ReplaceAll(value, "/", "-")
 		return value
 	},
+	"isEmpty": func(value interface{}) bool {
+		if value == nil {
+			return true
+		}
+		switch v := value.(type) {
+		case string:
+			return v == ""
+		default:
+			return false
+		}
+	},
 }
 
 func PvrFuncMap() map[string]interface{} {

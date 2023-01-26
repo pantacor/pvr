@@ -36,16 +36,16 @@ func prefixFuncMap(funcMap map[string]interface{}, prefix string, keep bool) map
 	return newMap
 }
 
-func compileTemplate(content string, values map[string]interface{}) (result []byte) {
+func compileTemplate(content string, values map[string]interface{}) (result []byte, err error) {
 	buffer := bytes.NewBuffer(result)
 	templ := template.Must(template.New("compiled-template").
 		Funcs(prefixFuncMap(sprig.TxtFuncMap(), "sprig", true)).
 		Funcs(prefixFuncMap(gtf.GtfTextFuncMap, "gtf", false)).
 		Funcs(prefixFuncMap(PvrFuncMap(), "pvr", false)).
 		Parse(content))
-	err := templ.Execute(buffer, values)
+	err = templ.Execute(buffer, values)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return buffer.Bytes()
+	return buffer.Bytes(), nil
 }

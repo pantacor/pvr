@@ -47,7 +47,7 @@ func ErrorIfNot(t *testing.T, test bool, args ...interface{}) {
 }
 
 func testLXCContainerConf__Docker_Cmd(t *testing.T) {
-	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+	result, _ := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
 		"name": "container1",
 		"Docker": map[string]interface{}{
 			"Cmd": "run.sh",
@@ -59,7 +59,7 @@ func testLXCContainerConf__Docker_Cmd(t *testing.T) {
 }
 
 func testLXCContainerConf__Docker_Cmd2(t *testing.T) {
-	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+	result, _ := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
 		"name": "container1",
 		"Docker": map[string]interface{}{
 			"Cmd": []interface{}{"run.sh", "something"},
@@ -70,7 +70,7 @@ func testLXCContainerConf__Docker_Cmd2(t *testing.T) {
 }
 
 func testLXCContainerConf__Docker_Entrypoint(t *testing.T) {
-	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+	result, _ := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
 		"name": "container1",
 		"Docker": map[string]interface{}{
 			"Entrypoint": "run.sh",
@@ -82,7 +82,7 @@ func testLXCContainerConf__Docker_Entrypoint(t *testing.T) {
 }
 
 func testLXCContainerConf__Docker_Entrypoint2(t *testing.T) {
-	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+	result, _ := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
 		"name": "container1",
 		"Docker": map[string]interface{}{
 			"Entrypoint": []interface{}{"run.sh"},
@@ -94,7 +94,7 @@ func testLXCContainerConf__Docker_Entrypoint2(t *testing.T) {
 }
 
 func testLXCContainerConf__Docker_Entrypoint3(t *testing.T) {
-	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+	result, _ := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
 		"name": "container1",
 		"Docker": map[string]interface{}{
 			"Entrypoint": []interface{}{"run.sh", "something"},
@@ -106,7 +106,7 @@ func testLXCContainerConf__Docker_Entrypoint3(t *testing.T) {
 }
 
 func testLXCContainerConf__Docker_EntrypointCmd(t *testing.T) {
-	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+	result, _ := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
 		"name": "container1",
 		"Docker": map[string]interface{}{
 			"Entrypoint": []interface{}{"run.sh", "something"},
@@ -119,7 +119,7 @@ func testLXCContainerConf__Docker_EntrypointCmd(t *testing.T) {
 }
 
 func testLXCContainerConf__Docker_EntrypointCmd2(t *testing.T) {
-	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+	result, _ := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
 		"name": "container1",
 		"Docker": map[string]interface{}{
 			"Entrypoint": []interface{}{"run.sh", "something"},
@@ -132,7 +132,7 @@ func testLXCContainerConf__Docker_EntrypointCmd2(t *testing.T) {
 }
 
 func testLXCContainerConf__Docker_WorkingDir(t *testing.T) {
-	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+	result, _ := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
 		"name": "container1",
 		"Docker": map[string]interface{}{
 			"WorkingDir": "/foo",
@@ -143,9 +143,10 @@ func testLXCContainerConf__Docker_WorkingDir(t *testing.T) {
 }
 
 // Source.args.PV_VOLUME_IMPORTS: [ <import1>, <import2>, ... ]
-//     import: <container>:[<subdir>@]<originvolume>:<destdir>[:<mountflags>]
+//
+//	import: <container>:[<subdir>@]<originvolume>:<destdir>[:<mountflags>]
 func testLXCContainerConf_PV_VOLUME_IMPORTS(t *testing.T) {
-	result := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
+	result, _ := compileTemplate(LXC_CONTAINER_CONF, map[string]interface{}{
 		"name": "container1",
 		"Source": map[string]interface{}{
 			"args": map[string]interface{}{
