@@ -118,7 +118,7 @@ func UpdatePvApp(p *Pvr, app *AppData, appManifest *Source) error {
 
 func InstallPVApp(p *Pvr, app *AppData, appManifest *Source) error {
 	if appManifest.DockerName == "" {
-		fmt.Println("The application is not a docker app, and doesn't need to be installed.")
+		fmt.Println("The application is not a docker app, therefore doesn't need to be installed.")
 		return nil
 	}
 
