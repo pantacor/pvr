@@ -87,12 +87,12 @@ func UpdatePvApp(p *Pvr, app *AppData, appManifest *Source) error {
 
 	initialFrom := app.From
 	app.From = appManifest.PvrUrl
-	if _, appManifest, err = p.GetFromRepo(app); err != nil {
+	if _, _, err = p.GetFromRepo(app); err != nil {
 		return err
 	}
 	app.From = initialFrom
 
-	srcContent, err := json.MarshalIndent(app.Appmanifest, " ", " ")
+	srcContent, err := json.MarshalIndent(appManifest, " ", " ")
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func UpdatePvApp(p *Pvr, app *AppData, appManifest *Source) error {
 		return err
 	}
 
-	if app.Appmanifest.DockerDigest == squashFSDigest {
+	if appManifest.DockerDigest == squashFSDigest {
 		fmt.Println("Application already up to date.")
 		return nil
 	}
