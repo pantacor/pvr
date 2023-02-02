@@ -526,7 +526,7 @@ func (p *Pvr) ListApplications() error {
 	}
 
 	for _, f := range files {
-		containerConfPath := filepath.Join(p.Dir, f.Name(), "lxc.container.conf")
+		containerConfPath := filepath.Join(p.Dir, f.Name(), "src.json")
 		if _, err := os.Stat(containerConfPath); err == nil {
 			fmt.Println(f.Name())
 		}
