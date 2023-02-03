@@ -331,9 +331,7 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 		Config:       map[string]interface{}{},
 		Logs:         []map[string]interface{}{},
 		Exports:      []string{},
-		DockerSource: DockerSource{
-			DockerSource: "remote,local",
-		},
+		DockerSource: DockerSource{},
 	}
 
 	err = pvjson.Unmarshal(js, &result)
