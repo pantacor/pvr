@@ -105,7 +105,7 @@ func CommandDeploy() cli.Command {
 					}
 					fmt.Println("   - deploying " + repoPath)
 
-					_, err = deployPvr.GetRepo(repoPath, merge, true)
+					_, err = deployPvr.GetRepo(repoPath, merge, true, nil)
 					if err != nil {
 						return cli.NewExitError(err, 6)
 					}
@@ -117,7 +117,7 @@ func CommandDeploy() cli.Command {
 				}
 				// wd repo gets deployed in this branch
 				fmt.Println("   - deploying single " + repoPath)
-				_, err = deployPvr.GetRepo(repoPath, merge, true)
+				_, err = deployPvr.GetRepo(repoPath, merge, true, nil)
 				if err != nil {
 					return cli.NewExitError(err, 6)
 				}

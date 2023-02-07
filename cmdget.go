@@ -80,7 +80,7 @@ func CommandGet() cli.Command {
 				}
 			}
 
-			objectsCount, err := pvr.GetRepo(repoUri, false, true)
+			objectsCount, err := pvr.GetRepo(repoUri, false, true, nil)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
