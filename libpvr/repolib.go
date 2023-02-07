@@ -1766,10 +1766,15 @@ func (p *Pvr) GetJson(uri string) (
 	return
 }
 
-func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
+func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool, state *PvrMap) (
 	objectsCount int,
 	err error) {
 
+	updatePristineJson := true
+	if state == nil {
+		updatePristineJson = false
+		state = &p.PristineJsonMap
+	}
 	jsonMap := map[string]interface{}{}
 
 	objectsCount = 0
@@ -1929,7 +1934,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 
 	var jsonMerged []byte
 	if merge {
-		pJSONMap := p.PristineJsonMap
+		pJSONMap := *state
 		for _, unpartPrefix := range unpartPrefixes {
 			// remove all files for name "app/"
 			for k := range pJSONMap {
@@ -1954,7 +1959,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		}
 	} else {
 		// manually remove everything not matching the part from fragement ...
-		pJSONMap := p.PristineJsonMap
+		pJSONMap := *state
 
 		if len(partPrefixes) == 0 {
 			partPrefixes = append(partPrefixes, "")
@@ -1990,28 +1995,28 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool) (
 		return objectsCount, err
 	}
 
-	p.PristineJson = jsonMerged
-	p.PristineJsonMap = map[string]interface{}{}
-
-	err = pvjson.Unmarshal(p.PristineJson, &p.PristineJsonMap)
+	err = pvjson.Unmarshal(jsonMerged, state)
 	if err != nil {
 		return objectsCount, err
 	}
 
-	jsonMerged, err = cjson.Marshal(p.PristineJsonMap)
-
-	if err != nil {
-		return objectsCount, err
-	}
-
-	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
+	jsonMerged, err = cjson.Marshal(state)
 
 	if err != nil {
 		return objectsCount, err
 	}
 
-	// all succeeded, atomically commiting the json
-	err = os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
+	if updatePristineJson {
+		p.PristineJson = jsonMerged
+		p.PristineJsonMap = *state
+		err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
+		if err != nil {
+			return objectsCount, err
+		}
+
+		// all succeeded, atomically commiting the json
+		err = os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
+	}
 
 	return objectsCount, err
 }
@@ -2266,11 +2271,16 @@ func (p *Pvr) getObjects(showFilenames bool, pvrRemote pvrapi.PvrRemote, jsonMap
 	return objectsCount, err
 }
 
-func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
+func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool, state *PvrMap) (
 	objectsCount int,
 	err error,
 ) {
 
+	updatePrinstineJson := false
+	if state == nil {
+		updatePrinstineJson = true
+		state = &p.PristineJsonMap
+	}
 	objectsCount = 0
 
 	if url.Scheme == "" {
@@ -2341,7 +2351,7 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 	var jsonMerged []byte
 	if merge {
 
-		pJSONMap := p.PristineJsonMap
+		pJSONMap := *state
 
 		for _, unpartPrefix := range unpartPrefixes {
 			// remove all files for name "app/"
@@ -2352,7 +2362,7 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 			}
 		}
 
-		p.PristineJson, err = cjson.Marshal(pJSONMap)
+		json, err := cjson.Marshal(pJSONMap)
 		if err != nil {
 			return objectsCount, err
 		}
@@ -2362,13 +2372,13 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 			return objectsCount, err
 		}
 
-		jsonMerged, err = jsonpatch.MergePatch(p.PristineJson, jsonDataSelect)
+		jsonMerged, err = jsonpatch.MergePatch(json, jsonDataSelect)
 		if err != nil {
 			return objectsCount, err
 		}
 	} else {
 		// manually remove everything not matching the part from fragment ...
-		pJSONMap := p.PristineJsonMap
+		pJSONMap := *state
 
 		if len(partPrefixes) == 0 {
 			partPrefixes = append(partPrefixes, "")
@@ -2405,31 +2415,32 @@ func (p *Pvr) GetRepoRemote(url *url.URL, merge bool, showFilenames bool) (
 		return objectsCount, err
 	}
 
-	p.PristineJson = jsonMerged
-	p.PristineJsonMap = map[string]interface{}{}
-
-	err = pvjson.Unmarshal(p.PristineJson, &p.PristineJsonMap)
-
+	err = pvjson.Unmarshal(jsonMerged, state)
 	if err != nil {
 		return objectsCount, err
 	}
 
-	jsonMerged, err = cjson.Marshal(p.PristineJsonMap)
-
+	jsonMerged, err = cjson.Marshal(state)
 	if err != nil {
 		return objectsCount, err
 	}
 
-	err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
+	if updatePrinstineJson {
+		p.PristineJson = jsonMerged
+		p.PristineJsonMap = *state
+		err = ioutil.WriteFile(filepath.Join(p.Pvrdir, "json.new"), jsonMerged, 0644)
+		if err != nil {
+			return objectsCount, err
+		}
 
-	if err != nil {
-		return objectsCount, err
+		// all succeeded, atomically commiting the json
+		err = os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
 	}
 
-	return objectsCount, os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
+	return objectsCount, err
 }
 
-func (p *Pvr) GetRepo(uri string, merge bool, showFilenames bool) (
+func (p *Pvr) GetRepo(uri string, merge bool, showFilenames bool, state *PvrMap) (
 	objectsCount int,
 	err error,
 ) {
@@ -2452,7 +2463,7 @@ func (p *Pvr) GetRepo(uri string, merge bool, showFilenames bool) (
 	//  2. if a path with one or two elements -> Prepend https://pvr.pantahub.com
 	//  3. if a first dir of path is resolvable host -> Prepend https://
 	if url.Scheme == "" {
-		objectsCount, err = p.GetRepoLocal(uri, merge, showFilenames)
+		objectsCount, err = p.GetRepoLocal(uri, merge, showFilenames, state)
 
 		// if we get pointed at a pvr repo on disk, go local
 		if err == nil {
@@ -2482,7 +2493,7 @@ func (p *Pvr) GetRepo(uri string, merge bool, showFilenames bool) (
 		p.Pvrconfig.DefaultPostUrl = uri
 	}
 
-	objectsCount, err = p.GetRepoRemote(url, merge, showFilenames)
+	objectsCount, err = p.GetRepoRemote(url, merge, showFilenames, state)
 
 	if err != nil {
 		return objectsCount, err
@@ -2526,27 +2537,34 @@ func (p *Pvr) Cleanup() error {
 }
 
 func (p *Pvr) Reset(canonicalJson bool) error {
-	return p.resetInternal(false, canonicalJson)
+	return p.resetInternal(false, canonicalJson, nil)
 }
 
 func (p *Pvr) ResetWithHardlink() error {
-	return p.resetInternal(true, true)
+	return p.resetInternal(true, true, nil)
 }
 
-func (p *Pvr) resetInternal(hardlink bool, canonicalJson bool) error {
-	data, err := ioutil.ReadFile(filepath.Join(p.Pvrdir, "json"))
+func (p *Pvr) ResetWithState(state *PvrMap) error {
+	return p.resetInternal(true, true, state)
+}
 
-	if err != nil {
-		return err
-	}
+func (p *Pvr) resetInternal(hardlink bool, canonicalJson bool, state *PvrMap) (err error) {
 	jsonMap := map[string]interface{}{}
+	if state == nil {
+		data, err := ioutil.ReadFile(filepath.Join(p.Pvrdir, "json"))
 
-	err = pvjson.Unmarshal(data, &jsonMap)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return errors.New("JSON Unmarshal (" +
-			strings.TrimPrefix(filepath.Join(p.Pvrdir, "json"), p.Dir) + "): " +
-			err.Error())
+		err = pvjson.Unmarshal(data, &jsonMap)
+		if err != nil {
+			return errors.New("JSON Unmarshal (" +
+				strings.TrimPrefix(filepath.Join(p.Pvrdir, "json"), p.Dir) + "): " +
+				err.Error())
+		}
+	} else {
+		jsonMap = *state
 	}
 
 	for k, v := range jsonMap {

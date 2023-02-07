@@ -60,7 +60,7 @@ func CommandMerge() cli.Command {
 				repoPath = c.Args()[0]
 			}
 
-			objectsCount, err := pvr.GetRepo(repoPath, true, true)
+			objectsCount, err := pvr.GetRepo(repoPath, true, true, nil)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}

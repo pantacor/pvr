@@ -474,7 +474,8 @@ func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 		return "", nil, ErrEmptyPart
 	}
 
-	objectsCount, err := p.GetRepo(app.From, true, true)
+	state := PvrMap{}
+	objectsCount, err := p.GetRepo(app.From, false, true, &state)
 	if err != nil {
 		return "", nil, err
 	}
@@ -486,7 +487,7 @@ func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 
 	fmt.Println("\nImported " + strconv.Itoa(objectsCount) + " objects to " + p.Objdir)
 
-	err = p.Reset(false)
+	err = p.ResetWithState(&state)
 	if err != nil {
 		return "", nil, err
 	}
