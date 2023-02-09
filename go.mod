@@ -4,28 +4,17 @@ go 1.16
 
 require (
 	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
-	github.com/DataDog/zstd v1.4.4 // indirect
-	github.com/Masterminds/goutils v1.1.0 // indirect
-	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
-	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
-	github.com/asac/go-json-rest v3.3.2+incompatible // indirect
 	github.com/asac/json-patch v0.0.0-20201120095033-59358024a068
 	github.com/bmatcuk/doublestar v1.3.4
-	github.com/bmatcuk/doublestar/v4 v4.0.2 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/cavaliercoder/grab v2.0.0+incompatible
 	github.com/channelmeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61 // indirect
 	github.com/containerd/containerd v1.3.3 // indirect
 	github.com/containerd/continuity v0.0.0-20200413184840-d3ef23f19fbb // indirect
-	github.com/coreos/clair v2.0.8+incompatible // indirect
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.12+incompatible
-	github.com/docker/docker-ce v0.0.0-20190724010320-53720a99f3c5 // indirect
-	github.com/docker/go-metrics v0.0.1 // indirect
-	github.com/emicklei/go-restful v2.10.0+incompatible // indirect
-	github.com/emicklei/go-restful-openapi v1.2.0 // indirect
 	github.com/facebookgo/ensure v0.0.0-20160127193407-b4ab57deab51 // indirect
 	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
 	github.com/facebookgo/subset v0.0.0-20150612182917-8dac2c3c4870 // indirect
@@ -33,36 +22,23 @@ require (
 	github.com/gibson042/canonicaljson-go v1.0.3
 	github.com/go-jose/go-jose/v3 v3.0.0-rc.1
 	github.com/go-resty/resty v1.12.0
-	github.com/golang/lint v0.0.0-20190409202823-959b441ac422 // indirect
-	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/grandcat/zeroconf v1.0.0
 	github.com/huandu/xstrings v1.3.1 // indirect
-	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/justincampbell/bigduration v0.0.0-20160531141349-e45bf03c0666 // indirect
 	github.com/justincampbell/timeago v0.0.0-20160528003754-027f40306f1d
 	github.com/leekchan/gtf v0.0.0-20190214083521-5fba33c5b00b
 	github.com/miekg/dns v1.1.29 // indirect
-	github.com/mitchellh/copystructure v1.0.0 // indirect
-	github.com/mitchellh/reflectwalk v1.0.1 // indirect
-	github.com/moby/moby v20.10.12+incompatible // indirect
-	github.com/mongodb/mongo-go-driver v1.0.4 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/peterhellberg/link v1.1.0 // indirect
-	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/urfave/cli v1.22.5
 	gitlab.com/pantacor/pantahub-base v0.0.0-20220922224408-d1e8099e66c0
-	gitlab.com/pantacor/pantahub-gc v0.0.0-20190719115544-466a41727898 // indirect
-	gitlab.com/pantacor/pantahub-testharness v0.0.0-20190311155708-e39aa76a7650 // indirect
 	go.mongodb.org/mongo-driver v1.9.0
-	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
-	gopkg.in/resty.v1 v1.12.0
-	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
 replace github.com/ant0ine/go-json-rest => github.com/asac/go-json-rest v3.3.3-0.20191004094541-40429adaafcb+incompatible
