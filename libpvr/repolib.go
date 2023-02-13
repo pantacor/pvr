@@ -1770,9 +1770,9 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool, state
 	objectsCount int,
 	err error) {
 
-	updatePristineJson := true
+	updatePristineJson := false
 	if state == nil {
-		updatePristineJson = false
+		updatePristineJson = true
 		state = &p.PristineJsonMap
 	}
 	jsonMap := map[string]interface{}{}
@@ -1943,7 +1943,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool, state
 				}
 			}
 		}
-		p.PristineJson, err = cjson.Marshal(pJSONMap)
+		jsonBytes, err := cjson.Marshal(pJSONMap)
 		if err != nil {
 			return objectsCount, err
 		}
@@ -1953,7 +1953,7 @@ func (p *Pvr) GetRepoLocal(getPath string, merge bool, showFilenames bool, state
 			return objectsCount, err
 		}
 
-		jsonMerged, err = jsonpatch.MergePatchIndent(p.PristineJson, jsonDataSelect, "", "	")
+		jsonMerged, err = jsonpatch.MergePatchIndent(jsonBytes, jsonDataSelect, "", "	")
 		if err != nil {
 			return objectsCount, err
 		}
