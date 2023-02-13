@@ -132,6 +132,48 @@ func (p *Pvr) dmifyRunJson(container, volume string) error {
 	return nil
 }
 
+func verityOutputParse(outS string, vm map[string]interface{}) error {
+	var tmpString string
+	idx := strings.Index(outS, "Root hash:")
+	if idx < 0 {
+		return errors.New("no root hash found in out: " + outS)
+	}
+
+	idx2 := strings.Index(outS[idx+10:], "\n")
+	if idx2 < 0 {
+		tmpString = outS[idx+10:]
+	} else {
+		tmpString = outS[idx+10 : idx+10+idx2]
+	}
+	vm["root_hash"] = strings.Trim(tmpString, " \t")
+
+	idx = strings.Index(outS, "UUID:")
+	if idx < 0 {
+		return errors.New("no UUID found in out: " + outS)
+	}
+	idx2 = strings.Index(outS[idx+5:], "\n")
+	if idx2 < 0 {
+		tmpString = outS[idx+5:]
+	} else {
+		tmpString = outS[idx+5 : idx+5+idx2]
+	}
+	vm["uuid"] = strings.Trim(tmpString, " \t")
+
+	idx = strings.Index(outS, "Salt:")
+	if idx < 0 {
+		return errors.New("no Salt found in out: " + outS)
+	}
+	idx2 = strings.Index(outS[idx+5:], "\n")
+	if idx2 < 0 {
+		tmpString = outS[idx+5:]
+	} else {
+		tmpString = outS[idx+5 : idx+5+idx2]
+	}
+	vm["salt"] = strings.Trim(tmpString, " \t")
+
+	return nil
+}
+
 func (p *Pvr) DmCVerityApply(prefix string) error {
 
 	workingJson, _, err := p.GetWorkingJsonMap()
@@ -147,7 +189,6 @@ func (p *Pvr) DmCVerityApply(prefix string) error {
 		if idx > 0 {
 			var dataDevice string
 			var hashDevice string
-			var rootHash string
 
 			container := k[:idx]
 			volume := k[idx+len("/"+DmVolumes+"/"):]
@@ -158,7 +199,18 @@ func (p *Pvr) DmCVerityApply(prefix string) error {
 			dataDevice = vm["data_device"].(string)
 			hashDevice = vm["hash_device"].(string)
 
-			cmd := exec.Command("veritysetup", "format", dataDevice, hashDevice)
+			flags := []string{}
+
+			flags = append(flags, "format")
+			if vm["salt"] != nil {
+				flags = append(flags, "--salt", vm["salt"].(string))
+			}
+			if vm["uuid"] != nil {
+				flags = append(flags, "--uuid", vm["uuid"].(string))
+			}
+			flags = append(flags, dataDevice)
+			flags = append(flags, hashDevice)
+			cmd := exec.Command("veritysetup", flags...)
 			cmd.Dir = path.Join(p.Dir, container)
 			outPipe, err := cmd.StdoutPipe()
 			if err != nil {
@@ -173,27 +225,25 @@ func (p *Pvr) DmCVerityApply(prefix string) error {
 			if err != nil {
 				return err
 			}
+
+			manifestPath := path.Join(p.Dir, container, DmVolumes, volume+".json")
+
+			if len(out) == 0 {
+				fmt.Println("- Unchanged verity format " + manifestPath)
+				return nil
+			}
 			outS := string(out)
 
-			idx := strings.Index(outS, "Root hash:")
-			if idx < 0 {
-				return errors.New("no root hash found in out: " + outS)
-			}
+			err = verityOutputParse(outS, vm)
 
-			idx2 := strings.Index(outS[idx+10:], "\n")
-			if idx2 < 0 {
-				rootHash = outS[idx+10:]
-			} else {
-				rootHash = outS[idx+10 : idx+10+idx2]
-			}
-
-			vm["root_hash"] = strings.Trim(rootHash, " \t")
-			outB, err := cjson.Marshal(vm)
 			if err != nil {
 				return err
 			}
 
-			manifestPath := path.Join(p.Dir, container, DmVolumes, volume+".json")
+			outB, err := cjson.Marshal(vm)
+			if err != nil {
+				return err
+			}
 
 			err = os.MkdirAll(path.Dir(manifestPath), 0755)
 			if err != nil {
@@ -268,17 +318,9 @@ func (p *Pvr) DmCVerityConvert(container string, volume string) error {
 		return err
 	}
 	outS := string(out)
-
-	idx := strings.Index(outS, "Root hash:")
-	if idx < 0 {
-		return errors.New("no root hash found in out: " + outS)
-	}
-
-	idx2 := strings.Index(outS[idx+10:], "\n")
-	if idx2 < 0 {
-		manifestMap["root_hash"] = strings.TrimSpace(outS[idx+10:])
-	} else {
-		manifestMap["root_hash"] = strings.TrimSpace(outS[idx+10 : idx+10+idx2])
+	err = verityOutputParse(outS, manifestMap)
+	if err != nil {
+		return err
 	}
 
 	outB, err := cjson.Marshal(manifestMap)
