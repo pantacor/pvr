@@ -27,6 +27,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"path"
@@ -47,7 +48,9 @@ import (
 	"gopkg.in/cheggaaa/pb.v1"
 )
 
-const PvrCheckpointFilename = "checkpoint.json"
+const (
+	PvrCheckpointFilename = "checkpoint.json"
+)
 
 type PvrStatus struct {
 	NewFiles       []string
@@ -1077,7 +1080,7 @@ func (a *AsyncBody) Read(p []byte) (n int, err error) {
 }
 
 func worker(jobs chan FilePut, done chan FilePut) {
-
+	debug := resty.DefaultClient.Debug
 	for j := range jobs {
 		fstat, err := os.Stat(j.sourceFile)
 		if err != nil {
@@ -1105,30 +1108,25 @@ func worker(jobs chan FilePut, done chan FilePut) {
 			bar:      j.bar,
 		}
 
-		var res *http.Response
-		if resty.DefaultClient.Debug {
-			var restyresponse *resty.Response
-			r := resty.
-				R().
-				SetBody(r).
-				SetContentLength(true).
-				SetHeader("Content-Length", strconv.FormatInt(fstat.Size(), 10))
+		req, err := http.NewRequest(http.MethodPut, j.putUrl, r)
+		if err != nil {
+			j.bar.Finish()
+			j.err = err
+			j.res = nil
 
-			restyresponse, err = r.Put(j.putUrl)
-			res = restyresponse.RawResponse
-		} else {
-			req, err := http.NewRequest(http.MethodPut, j.putUrl, r)
-			req.ContentLength = fstat.Size()
-			if err != nil {
-				j.bar.Finish()
-				j.err = err
-				j.res = nil
-
-				done <- j
-				continue
-			}
-			res, err = http.DefaultClient.Do(req)
+			done <- j
+			continue
 		}
+
+		req.Header.Add("Content-Length", strconv.FormatInt(fstat.Size(), 10))
+		req.ContentLength = fstat.Size()
+		if fstat.Size() <= 0 {
+			req.Body = nil
+		}
+
+		logRequestMiddleware(req, debug)
+		res, err := http.DefaultClient.Do(req)
+		logResponseMiddleware(res, debug)
 
 		if err != nil {
 			j.bar.Postfix(" [ERROR]")
@@ -1158,10 +1156,43 @@ func worker(jobs chan FilePut, done chan FilePut) {
 	}
 }
 
+func logRequestMiddleware(req *http.Request, debug bool) {
+	if !debug {
+		return
+	}
+	reqDump, err := httputil.DumpRequestOut(req, false)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Fprintln(os.Stdout, "---------------------- REQUEST LOG -----------------------")
+	fmt.Fprintf(os.Stdout, "%s", string(reqDump))
+	if len(req.Header) > 0 {
+		fmt.Fprintf(os.Stdout, "Headers: \n")
+		for key, value := range req.Header {
+			fmt.Fprintf(os.Stdout, "%s: %s\n", key, strings.Join(value, ", "))
+		}
+	}
+	fmt.Fprintln(os.Stdout, "----------------------------------------------------------")
+}
+
+func logResponseMiddleware(resp *http.Response, debug bool) {
+	if !debug {
+		return
+	}
+	respDump, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Fprintln(os.Stdout, "---------------------- RESPONSE LOG -----------------------")
+	fmt.Fprintf(os.Stdout, "%s", string(respDump))
+	fmt.Fprintln(os.Stdout, "----------------------------------------------------------")
+}
+
 func (p *Pvr) putFiles(filePut ...FilePut) []FilePut {
 	jobs := make(chan FilePut, 100)
 	results := make(chan FilePut, 100)
-
 	fileOutPut := []FilePut{}
 
 	pool, err := pb.StartPool()
