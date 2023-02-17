@@ -1,5 +1,5 @@
 //
-// Copyright 2021,2022  Pantacor Ltd.
+// Copyright 2017-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -7,12 +7,13 @@
 //
 //   http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 //
+
 package libpvr
 
 import (
@@ -36,6 +37,7 @@ import (
 	cjson "github.com/gibson042/canonicaljson-go"
 	gojose "github.com/go-jose/go-jose/v3"
 	"github.com/go-resty/resty"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 )
 
 type PvsMatch struct {
@@ -123,7 +125,7 @@ func selectPayload(buf []byte, match *PvsMatch) (*PvsPartSelection, error) {
 	selection.NotSelected = map[string]interface{}{}
 	selection.NotSeen = map[string]interface{}{}
 
-	err := json.Unmarshal(buf, &bufMap)
+	err := pvjson.Unmarshal(buf, &bufMap)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +197,7 @@ func stripPayloadFromRawJSON(buf []byte) ([]byte, error) {
 
 	var m map[string]interface{}
 
-	err := json.Unmarshal(buf, &m)
+	err := pvjson.Unmarshal(buf, &m)
 
 	if err != nil {
 		return nil, err
@@ -276,7 +278,7 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 	}
 
 	var match *PvsMatch
-	err = json.Unmarshal(jsonBuf, &match)
+	err = pvjson.Unmarshal(jsonBuf, &match)
 	if err != nil {
 		return err
 	}
@@ -340,6 +342,9 @@ func (p *Pvr) JwsSign(name string,
 		goto found
 	}
 	if parsedKey, err = x509.ParsePKCS8PrivateKey(privPemBytes); err == nil { // note this returns type `interface{}`
+		goto found
+	}
+	if parsedKey, err = x509.ParseECPrivateKey(privPemBytes); err == nil { // note this returns type `interface{}`
 		goto found
 	}
 
@@ -436,7 +441,7 @@ found:
 
 	sigMap := map[string]interface{}{}
 
-	err = json.Unmarshal(strippedBuf, &sigMap)
+	err = pvjson.Unmarshal(strippedBuf, &sigMap)
 
 	if err != nil {
 		return err
@@ -469,6 +474,48 @@ found:
 	return nil
 }
 
+type PvsCertPool struct {
+	certPool *x509.CertPool
+	certsRaw [][]byte
+}
+
+func NewPvsCertPool() *PvsCertPool {
+	return &PvsCertPool{
+		certPool: x509.NewCertPool(),
+	}
+}
+
+func (s *PvsCertPool) GetCertsRaw() [][]byte {
+	return s.certsRaw
+}
+
+func (s *PvsCertPool) AppendCertsFromPEM(pemCerts []byte) (ok bool) {
+	ok = s.certPool.AppendCertsFromPEM(pemCerts)
+	if !ok {
+		return ok
+	}
+	for len(pemCerts) > 0 {
+		var block *pem.Block
+		block, pemCerts = pem.Decode(pemCerts)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			continue
+		}
+
+		certBytes := block.Bytes
+		_, err := x509.ParseCertificate(certBytes)
+		if err != nil {
+			continue
+		}
+		s.certsRaw = append(s.certsRaw, certBytes)
+		ok = true
+	}
+
+	return ok
+}
+
 type JwsVerifySummary struct {
 	Protected       []string      `json:"protected,omitempty"`
 	Excluded        []string      `json:"excluded,omitempty"`
@@ -484,7 +531,6 @@ type JwsVerifySummary struct {
 //
 // special value for caCerts "_system_" hints at using the system cacert
 // store. Can be configured using SSH_CERT_FILE and SSH_CERTS_DIR on linux
-//
 func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, includePayload bool) (*JwsVerifySummary, error) {
 
 	var summary JwsVerifySummary
@@ -497,7 +543,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 	}
 
 	var pubKeys []interface{}
-	var certPool *x509.CertPool
+	var certPool *PvsCertPool
 
 	if keyPath != "" {
 		f, err := os.Open(keyPath)
@@ -537,30 +583,26 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 					continue
 				}
 			}
-			var ok bool
 			var pubKey interface{}
-			pubKey, ok = parsedKey.(*rsa.PublicKey)
-
-			if pubKey == nil {
-				pubKey, ok = parsedKey.(*ecdsa.PublicKey)
-			}
-			if !ok {
-				fmt.Fprintf(os.Stderr, "WARNING: casting pubey key\n")
+			switch v := parsedKey.(type) {
+			case *rsa.PublicKey:
+				pubKey = v
+			case *ecdsa.PublicKey:
+				pubKey = v
+			default:
+				fmt.Fprintf(os.Stderr, "WARNING: casting pubKey key of type "+reflect.TypeOf(parsedKey).String())
 				continue
 			}
+
 			pubKeys = append(pubKeys, pubKey)
 			if IsDebugEnabled {
-				fmt.Fprintf(os.Stderr, "INFO: added pubey: %d\n", len(pubKeys))
+				fmt.Fprintf(os.Stderr, "INFO: added pubkey: %d\n", len(pubKeys))
 			}
 		}
 	} else if caCerts == "_system_" {
-		certPool, err = x509.SystemCertPool()
-		if err != nil {
-			return nil, err
-		}
-		fmt.Fprintln(os.Stderr, "Using system cert pool")
+		return nil, fmt.Errorf("Using system cert pool not supported anymore")
 	} else if caCerts != "" {
-		certPool = x509.NewCertPool()
+		certPool = NewPvsCertPool()
 		if err != nil {
 			return nil, err
 		}
@@ -582,7 +624,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 	}
 
 	var previewSig map[string]interface{}
-	err = json.Unmarshal(fileBuf, &previewSig)
+	err = pvjson.Unmarshal(fileBuf, &previewSig)
 
 	if err != nil {
 		return nil, err
@@ -611,7 +653,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 	}
 
 	var match *PvsMatch
-	err = json.Unmarshal(jsonBuf, &match)
+	err = pvjson.Unmarshal(jsonBuf, &match)
 	if err != nil {
 		return nil, err
 	}
@@ -625,68 +667,71 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 	payloadBuf, err := selectPayloadBuf(buf, match)
 
 	var verified bool
-
-	for _, pk := range pubKeys {
-
-		err = sig.DetachedVerify(payloadBuf, pk)
-		if err != nil {
-			continue
-		}
-	}
-
 	var pemcerts [][]*x509.Certificate
 
-	if !verified && certPool != nil {
+	if certPool != nil {
 		ku := []x509.ExtKeyUsage{
 			x509.ExtKeyUsageCodeSigning,
 		}
 
 		pemcerts, err = sig.Signatures[0].Header.
 			Certificates(x509.VerifyOptions{
-				Roots:     certPool,
+				Roots:     certPool.certPool,
 				KeyUsages: ku,
 			})
 
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error setting up and validating certificates %s\n", err.Error())
-		} else {
-			var pubKey interface{}
-			var ok bool
-			pubKey, ok = pemcerts[0][0].PublicKey.(*rsa.PublicKey)
-			if !ok || pubKey == nil {
-				pubKey, ok = pemcerts[0][0].PublicKey.(*ecdsa.PublicKey)
-			}
-			if ok {
-				if IsDebugEnabled {
-					fmt.Fprintf(os.Stderr, "Validating payload: '%s'\n", string(payloadBuf))
+		// if we had x5c and chain could be validated we use just that cert
+		if err == nil {
+			pubKeys = append(pubKeys, pemcerts[0][0].PublicKey)
+		} else if err != nil && err.Error() == "go-jose/go-jose: no x5c header present in message" {
+			// we manuall iterate the system pool if x5c is not there....
+			err = nil
+			for _, derCandidate := range certPool.certsRaw {
+				cert, err := x509.ParseCertificate(derCandidate)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "a cert in the pool cannot be parsed %s\n", err.Error())
+					continue
 				}
-				err = sig.DetachedVerify(payloadBuf, pubKey)
-			} else {
-				err = errors.New("error retrieving public from certs key")
+				pemcerts, err = cert.Verify(x509.VerifyOptions{
+					Roots:     certPool.certPool,
+					KeyUsages: ku,
+				})
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "could not validate cert in pool against the pool itself %s\n", err.Error())
+					continue
+				}
+				pubKeys = append(pubKeys, pemcerts[0][0].PublicKey)
 			}
+		} else {
+			// we just continue as we allow to still validate through manually set pubKeys below...
+		}
+	}
+
+	for _, pubKey := range pubKeys {
+		switch pubKey.(type) {
+		case *rsa.PublicKey:
+		case *ecdsa.PublicKey:
+		default:
+			fmt.Fprintf(os.Stderr, "WARNING: validation pub key not of supported type: '%s'\n", reflect.TypeOf(pubKey).String())
+			continue
 		}
 
+		if IsDebugEnabled {
+			fmt.Fprintf(os.Stderr, "Validating payload: '%s'\n", string(payloadBuf))
+		}
+		err = sig.DetachedVerify(payloadBuf, pubKey)
 		if err == nil {
 			verified = true
+			break
 		}
 	}
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR verifying: "+err.Error())
-	}
-
-	if !verified && err != nil && pubKeys != nil {
-		for _, pubKey := range pubKeys {
-			if err = sig.DetachedVerify(payloadBuf, pubKey); err == nil {
-				verified = true
-				fmt.Fprintf(os.Stderr, "ERROR verifying payload: "+err.Error())
-				break
-			}
-		}
+	if len(pubKeys) == 0 {
+		return nil, fmt.Errorf("no pubKeys available. Neither as parameters nor from x5c header nor from root pool")
 	}
 
 	if !verified {
-		return nil, errors.New("error validating signature from system cert pool and from provided pubKey file.")
+		return nil, fmt.Errorf("could not verify payload %s (error= %w)", string(payloadBuf), err)
 	}
 
 	for k := range selection.Selected {
@@ -701,7 +746,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 
 	var fullSig map[string]interface{}
 
-	err = json.Unmarshal([]byte(sig.FullSerialize()), &fullSig)
+	err = pvjson.Unmarshal([]byte(sig.FullSerialize()), &fullSig)
 
 	if err != nil {
 		return nil, err

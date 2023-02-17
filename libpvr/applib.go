@@ -1,5 +1,5 @@
 //
-// Copyright 2021  Pantacor Ltd.
+// Copyright 2017-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -7,12 +7,13 @@
 //
 //   http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 //
+
 package libpvr
 
 import (
@@ -30,6 +31,7 @@ import (
 
 	"gitlab.com/pantacor/pvr/models"
 	"gitlab.com/pantacor/pvr/templates"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 )
 
 const (
@@ -47,13 +49,14 @@ var (
 )
 
 type DockerSource struct {
-	DockerName     string                 `json:"docker_name,omitempty"`
-	DockerTag      string                 `json:"docker_tag,omitempty"`
-	DockerDigest   string                 `json:"docker_digest,omitempty"`
-	DockerSource   string                 `json:"docker_source,omitempty"`
-	DockerConfig   map[string]interface{} `json:"docker_config,omitempty"`
-	DockerPlatform string                 `json:"docker_platform,omitempty"`
-	FormatOptions  string                 `json:"format_options,omitempty"`
+	DockerName      string                 `json:"docker_name,omitempty"`
+	DockerTag       string                 `json:"docker_tag,omitempty"`
+	DockerDigest    string                 `json:"docker_digest,omitempty"`
+	DockerOvlDigest string                 `json:"docker_ovl_digest,omitempty"`
+	DockerSource    string                 `json:"docker_source,omitempty"`
+	DockerConfig    map[string]interface{} `json:"docker_config,omitempty"`
+	DockerPlatform  string                 `json:"docker_platform,omitempty"`
+	FormatOptions   string                 `json:"format_options,omitempty"`
 }
 
 type PvrSource struct {
@@ -67,6 +70,7 @@ type RootFsSource struct {
 }
 
 type Source struct {
+	Base         string                   `json:"base,omitempty"`
 	Name         string                   `json:"name,omitempty"`
 	Spec         string                   `json:"#spec"`
 	Template     string                   `json:"template,omitempty"`
@@ -82,20 +86,74 @@ type Source struct {
 }
 
 // InstallApplication : Install Application from any type of source
-func (p *Pvr) InstallApplication(app AppData) error {
-	var err error
+func (p *Pvr) InstallApplication(app *AppData) (err error) {
 
-	switch app.SourceType {
+	app.SquashFile = SQUASH_FILE
+	appManifest, err := p.GetApplicationManifest(app.Appname)
+	if err != nil {
+		return err
+	}
+
+	targetApp := *app
+	targetManifest := appManifest
+	if appManifest.Base != "" {
+		targetManifest, err = p.GetApplicationManifest(appManifest.Base)
+		if err != nil {
+			return err
+		}
+		targetApp.Appmanifest = targetManifest
+		targetApp.Appname = appManifest.Base
+		targetApp.Base = ""
+	}
+
+	dockerName := targetManifest.DockerName
+	repoDigest := targetManifest.DockerDigest
+
+	targetApp.From = repoDigest
+	if targetApp.Source == "remote" && !strings.Contains(repoDigest, "@") {
+		targetApp.From = dockerName + "@" + repoDigest
+	}
+
+	switch targetApp.SourceType {
 	case models.SourceTypeDocker:
-		err = InstallDockerApp(p, app)
+		err = InstallDockerApp(p, &targetApp, targetManifest)
 	case models.SourceTypeRootFs:
-		err = InstallRootFsApp(p, app)
+		err = InstallRootFsApp(p, &targetApp, targetManifest)
 	case models.SourceTypePvr:
-		err = InstallPVApp(p, app)
+		err = InstallPVApp(p, &targetApp, targetManifest)
 	default:
 		return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
 	}
 
+	if err != nil {
+		return err
+	}
+
+	// if we have ovl digest we go for it ...
+	if appManifest.DockerOvlDigest != "" || appManifest.Base != "" {
+		appManifest, err = p.GetApplicationManifest(app.Appname)
+		if err != nil {
+			return err
+		}
+		app.SquashFile = SQUASH_OVL_FILE
+
+		repoDigest = appManifest.DockerOvlDigest
+		app.From = repoDigest
+		if app.Source == "remote" && !strings.Contains(repoDigest, "@") {
+			app.From = dockerName + "@" + repoDigest
+		}
+
+		switch app.SourceType {
+		case models.SourceTypeDocker:
+			err = InstallDockerApp(p, app, appManifest)
+		case models.SourceTypeRootFs:
+			err = InstallRootFsApp(p, app, appManifest)
+		case models.SourceTypePvr:
+			err = InstallPVApp(p, app, appManifest)
+		default:
+			return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -110,38 +168,94 @@ func (p *Pvr) InstallApplication(app AppData) error {
 		return nil
 	}
 
-	if app.Appmanifest.DmEnabled != nil {
+	if appManifest.DmEnabled != nil {
 		err = p.DmCVerityApply(app.Appname)
 	}
+
 	return err
 }
 
 // UpdateApplication : Update any application and any type
 func (p *Pvr) UpdateApplication(app AppData) error {
+	appManifest, err := p.GetApplicationManifest(app.Appname)
+	if err != nil {
+		return err
+	}
+
+	if !app.DoOverlay && (appManifest.Base == "" || appManifest.Base == app.Appname) {
+		app.SquashFile = SQUASH_FILE
+		app.DoOverlay = false
+		fmt.Println("Update base: " + app.SquashFile)
+		appManifest.DockerOvlDigest = ""
+	} else {
+		app.DoOverlay = true
+		app.SquashFile = SQUASH_OVL_FILE
+		fmt.Println("Update ovl: " + app.SquashFile)
+	}
 	switch app.SourceType {
 	case models.SourceTypeDocker:
-		return UpdateDockerApp(p, app)
+		err = UpdateDockerApp(p, &app, appManifest)
 	case models.SourceTypeRootFs:
-		return UpdateRootFSApp(p, app)
+		err = UpdateRootFSApp(p, &app, appManifest)
 	case models.SourceTypePvr:
-		return UpdatePvApp(p, app)
+		err = UpdatePvApp(p, &app, appManifest)
 	default:
-		return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
+		err = fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
 	}
+
+	if err != nil {
+		return err
+	}
+
+	err = p.InstallApplication(&app)
+	if err != nil {
+		return err
+	}
+
+	apps, err := p.GetApplications()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Searching for dependencies of %s\n", app.Appname)
+	for _, a := range apps {
+		if appManifest.Base == app.Appname {
+			fmt.Printf("Updating dependency %s\n", a.Appname)
+			if err := UpdateDockerApp(p, &a, appManifest); err != nil {
+				return err
+			}
+			fmt.Printf("%s is up to date\n", a.Appname)
+		}
+	}
+
+	return err
 }
 
 // AddApplication : Add application from several types of sources
-func (p *Pvr) AddApplication(app AppData) error {
+func (p *Pvr) AddApplication(app *AppData) (err error) {
+	if app.SquashFile == "" {
+		app.SquashFile = SQUASH_FILE
+	}
+	if app.DoOverlay {
+		app.SquashFile = SQUASH_OVL_FILE
+	}
+
 	switch app.SourceType {
 	case models.SourceTypeDocker:
-		return AddDockerApp(p, app)
+		err = AddDockerApp(p, app)
 	case models.SourceTypeRootFs:
-		return AddRootFsApp(p, app)
+		err = AddRootFsApp(p, app)
 	case models.SourceTypePvr:
-		return AddPvApp(p, app)
+		err = AddPvApp(p, app)
 	default:
-		return fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
+		err = fmt.Errorf("type %s not supported yet", models.SourceTypePvr)
 	}
+
+	if err != nil {
+		return err
+	}
+
+	return p.InstallApplication(app)
 }
 
 func (p *Pvr) isRunningAsRoot() bool {
@@ -217,12 +331,10 @@ func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 		Config:       map[string]interface{}{},
 		Logs:         []map[string]interface{}{},
 		Exports:      []string{},
-		DockerSource: DockerSource{
-			DockerSource: "remote,local",
-		},
+		DockerSource: DockerSource{},
 	}
 
-	err = json.Unmarshal(js, &result)
+	err = pvjson.Unmarshal(js, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -357,12 +469,13 @@ func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 		return "", nil, err
 	}
 
-	part := url.Fragment
-	if part == "" {
+	parts := strings.Split(url.Fragment, ",")
+	if len(parts) == 0 {
 		return "", nil, ErrEmptyPart
 	}
 
-	objectsCount, err := p.GetRepo(app.From, true, true)
+	state := PvrMap{}
+	objectsCount, err := p.GetRepo(app.From, false, true, &state)
 	if err != nil {
 		return "", nil, err
 	}
@@ -374,12 +487,12 @@ func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 
 	fmt.Println("\nImported " + strconv.Itoa(objectsCount) + " objects to " + p.Objdir)
 
-	err = p.Reset(false)
+	err = p.ResetWithState(&state)
 	if err != nil {
 		return "", nil, err
 	}
 
-	srcAppPath := filepath.Join(p.Dir, part)
+	srcAppPath := filepath.Join(p.Dir, parts[0])
 	destAppPath := filepath.Join(p.Dir, app.Appname)
 	if srcAppPath != destAppPath {
 		if err = os.Rename(srcAppPath, destAppPath); err != nil {
@@ -393,7 +506,7 @@ func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 	}
 
 	srcJson := Source{}
-	if err = json.Unmarshal(srcContent, &srcJson); err != nil {
+	if err = pvjson.Unmarshal(srcContent, &srcJson); err != nil {
 		return "", nil, err
 	}
 
@@ -412,12 +525,42 @@ func (p *Pvr) ListApplications() error {
 	}
 
 	for _, f := range files {
-		containerConfPath := filepath.Join(p.Dir, f.Name(), "lxc.container.conf")
+		containerConfPath := filepath.Join(p.Dir, f.Name(), "src.json")
 		if _, err := os.Stat(containerConfPath); err == nil {
 			fmt.Println(f.Name())
 		}
 	}
 	return nil
+}
+
+// ListApplications : List Applications
+func (p *Pvr) GetApplications() ([]AppData, error) {
+	files, err := ioutil.ReadDir(p.Dir)
+	if err != nil {
+		return nil, err
+	}
+
+	sources := []AppData{}
+	for _, f := range files {
+		containerConfPath := filepath.Join(p.Dir, f.Name(), "src.json")
+		if _, err := os.Stat(containerConfPath); err == nil {
+			source, err := p.GetApplicationManifest(f.Name())
+			if err != nil {
+				return nil, err
+			}
+			trackURL, err := p.GetTrackURL(f.Name())
+			if err != nil {
+				return nil, err
+			}
+			sources = append(sources, AppData{
+				Appmanifest:  source,
+				Appname:      f.Name(),
+				From:         trackURL,
+				TemplateArgs: map[string]interface{}{},
+			})
+		}
+	}
+	return sources, nil
 }
 
 // GetApplicationInfo : Get Application Info
@@ -428,7 +571,7 @@ func (p *Pvr) GetApplicationInfo(appname string) error {
 	}
 	src, _ := ioutil.ReadFile(srcFilePath)
 	var fileData interface{}
-	err := json.Unmarshal(src, &fileData)
+	err := pvjson.Unmarshal(src, &fileData)
 	if err != nil {
 		return err
 	}
@@ -470,12 +613,8 @@ func MakeSquash(rootfsPath string, app *AppData) error {
 	if makeSquashfsPath == "" {
 		return ErrMakeSquashFSNotFound
 	}
-
-	tempSquashFile := filepath.Join(app.DestinationPath, SQUASH_FILE+".new")
-	// Always Remove tempSquashfsFile
-	Remove(tempSquashFile)
-
-	squashFile := filepath.Join(app.DestinationPath, SQUASH_FILE)
+	tempSquashFile := filepath.Join(app.DestinationPath, app.SquashFile+".new")
+	squashFile := filepath.Join(app.DestinationPath, app.SquashFile)
 	squashExist, err := IsFileExists(squashFile)
 	if err != nil {
 		return err
@@ -536,7 +675,7 @@ func GetDockerConfigFile(p *Pvr, app *AppData) (map[string]interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = json.Unmarshal(config, &dockerConfig)
+		err = pvjson.Unmarshal(config, &dockerConfig)
 		if err != nil {
 			return nil, err
 		}

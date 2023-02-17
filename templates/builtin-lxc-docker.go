@@ -1,5 +1,5 @@
 //
-// Copyright 2019-2021  Pantacor Ltd.
+// Copyright 2017-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -7,12 +7,13 @@
 //
 //   http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 //
+
 package templates
 
 const (
@@ -39,7 +40,15 @@ lxc.cgroup.devices.allow = a
 lxc.cgroup.{{ $v }}
 {{- end }}
 {{- end }}
-lxc.rootfs.path = overlayfs:/volumes/{{- .Source.name -}}/root.squashfs:/volumes/{{- .Source.name -}}/lxc-overlay/upper
+lxc.rootfs.path = overlayfs:
+	{{- if .Source.docker_ovl_digest -}}
+		/volumes/{{- .Source.name -}}/root.ovl.squashfs:
+	{{- end }}
+	{{- if .Source.base -}}
+		/volumes/{{- .Source.base -}}/root.squashfs:
+	{{- else -}}
+		/volumes/{{- .Source.name -}}/root.squashfs:
+	{{- end -}}/volumes/{{- .Source.name -}}/lxc-overlay/upper
 lxc.init.cmd =
 {{- if .Docker.Entrypoint }}
 	{{- if pvr_isSlice .Docker.Entrypoint }}
@@ -47,7 +56,11 @@ lxc.init.cmd =
 			{{- "" }} {{ pvr_sliceIndex .Docker.Entrypoint 0}}{{ range pvr_sliceFrom .Docker.Entrypoint 1 }} "{{ . }}"{{ end }}
 		{{- end }}
 		{{- if and (.Docker.Cmd) (pvr_isSlice .Docker.Cmd) }}
-			{{- "" }} {{ range pvr_sliceFrom .Docker.Cmd 0 }} "{{ . }}"{{ end }}
+			{{- "" }} {{ range pvr_sliceFrom .Docker.Cmd 0 -}} "{{ . }}"{{ end }}
+		{{- else }}
+			{{- if .Docker.Cmd }}
+				{{- "" }} "{{ .Docker.Cmd }}"
+			{{- end }}
 		{{- end }}
 	{{- else }}
 		{{- "" }} {{ .Docker.Entrypoint }}
@@ -122,7 +135,7 @@ lxc.mount.entry = tmpfs {{ .Source.args.PV_RUN_TMPFS_PATH | pvr_ifNull "run" }} 
 {{- $src := .Source -}}
 {{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes $src.persistence -}}
 {{- if ne $key "lxc-overlay" }}
-lxc.mount.entry = /volumes/{{ $src.name }}/docker-{{ $key | trimSuffix "/" | replace "/" "-" }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
+lxc.mount.entry = /volumes/{{ $src.name }}/{{ pvr_dockerVolumeName $key }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
 {{- end -}}
 {{- end }}
 {{- if .Source.args.PV_LXC_CAP_DROP }}
@@ -179,6 +192,18 @@ lxc.mount.entry = /volumes/{{- $sourceVol }}/{{- $src.name}} {{ $targetPath }} n
 {{- $volume := splitList ":" $v | sprig_first }}
 {{- $mountTarget := splitList ":" $v | sprig_last }}
 lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} none bind,rw,create=dir 0 0
+{{- end }}
+{{- end }}
+{{- if .Source.args.PV_VOLUME_IMPORTS }}
+{{- range $k,$v := .Source.args.PV_VOLUME_IMPORTS }}
+{{- $sp := sprig_splitn ":" 4 $v }}
+{{- $source := $sp._0 }}
+{{- $origin := $sp._1 }}
+{{- $originsp := sprig_splitn "@" 2 $sp._1 }}
+{{- $dest := $sp._2 }}
+lxc.mount.entry = /volumes/{{- $source -}}/
+{{- if $originsp._1 }}{{ pvr_dockerVolumeName $originsp._1 }}/{{ $originsp._0 }}{{ else }}{{ pvr_dockerVolumeName $originsp._0 }}{{ end }} {{ trimPrefix "/" $dest }} none bind,
+{{- pvr_ifNull "rw" $sp._3 }},create=dir 0 0
 {{- end }}
 {{- end }}
 {{ end }}`
@@ -253,7 +278,7 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 	"roles": {{- .Source.args.PV_ROLES | sprig_toPrettyJson | sprig_indent 8 }},
 	{{- end }}
 	{{- end }}
-	"root-volume": "{{- if and (.Source.dm_enabled) (index .Source.dm_enabled "root.squashfs") }}dm:root.squashfs{{ else }}root.squashfs{{ end }}",
+	"root-volume": "{{- if and (.Source.dm_enabled) (or (index .Source.dm_enabled "root.ovl.squashfs") (index .Source.dm_enabled "root.squashfs")) }}dm:{{ end }}{{- if and (.Source.docker_ovl_digest) (.Source.base) }}root.ovl.squashfs{{ else }}root.squashfs{{ end }}",
 	"volumes":[
 		{{- $v := sprig_list }}
 		{{- if .Source.args.PV_EXTRA_VOLUMES }}
@@ -271,10 +296,16 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 			{{- $q := quote $j }}
 			{{- $n = sprig_append $n $q }}
 		{{- end }}
-		{{ $m := sprig_list}}
-		{{- range $i, $v := $n }}
-			{{- if and (.Source.dm_enabled) (index .Source.dm_enabled $v) }} {{ sprig_set $n $i (print "dm:" $v) }}{{ end }}
+		{{- if and .Source.docker_ovl_digest (pvr_isEmpty .Source.base) }}
+		{{- if not ( eq .Source.docker_ovl_digest "" ) }}
+			{{- $n = sprig_append $n "\"root.ovl.squashfs\"" }}
 		{{- end }}
+		{{- end}}
+		{{ $m := sprig_list}}
+		{{ $dmEnabled := .Source.dm_enabled }}
+		{{- range $i, $v := $n }}
+			{{- if and ($dmEnabled) (index $dmEnabled $v) }} {{ sprig_set $n $i (print "dm:" $v) }}{{ end }}
+		{{- end}}
 		{{ join ",\\n" $n }}
 	]
 }`
@@ -282,10 +313,16 @@ lxc.mount.entry = /volumes/{{- $src.name -}}/{{ $volume }} {{ $mountTarget }} no
 
 func BuiltinLXCDockerHandler(values map[string]interface{}) (files map[string][]byte, err error) {
 	files = make(map[string][]byte, 2)
-	lxcContainerBytes := compileTemplate(LXC_CONTAINER_CONF, values)
-	if len(lxcContainerBytes) > 0 {
-		files["lxc.container.conf"] = compileTemplate(LXC_CONTAINER_CONF, values)
+	lxcContainerBytes, err := compileTemplate(LXC_CONTAINER_CONF, values)
+	if err != nil {
+		return
 	}
-	files["run.json"] = compileTemplate(RUN_JSON, values)
+	if len(lxcContainerBytes) > 0 {
+		files["lxc.container.conf"], err = compileTemplate(LXC_CONTAINER_CONF, values)
+		if err != nil {
+			return
+		}
+	}
+	files["run.json"], err = compileTemplate(RUN_JSON, values)
 	return
 }

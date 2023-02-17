@@ -1,5 +1,5 @@
 //
-// Copyright 2019  Pantacor Ltd.
+// Copyright 2017-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -7,12 +7,13 @@
 //
 //   http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 //
+
 package main
 
 import (
@@ -88,18 +89,9 @@ func CommandAppInstall() cli.Command {
 				return cli.NewExitError(err, 3)
 			}
 
-			dockerName := appManifest.DockerName
-			repoDigest := appManifest.DockerDigest
-			from := repoDigest
-
-			if source == "remote" && !strings.Contains(repoDigest, "@") {
-				from = dockerName + "@" + repoDigest
-			}
-
-			app := libpvr.AppData{
+			app := &libpvr.AppData{
 				Appmanifest:  appManifest,
 				Appname:      appname,
-				From:         from,
 				Source:       source,
 				Username:     username,
 				Password:     password,
@@ -107,7 +99,12 @@ func CommandAppInstall() cli.Command {
 				TemplateArgs: map[string]interface{}{},
 			}
 
-			pvr.SetSourceTypeFromManifest(&app, nil)
+			pvr.SetSourceTypeFromManifest(app, nil)
+
+			if c.String("base") != "" {
+				app.DoOverlay = true
+				app.Base = strings.Trim(c.String("base"), "/")
+			}
 
 			err = pvr.InstallApplication(app)
 			if err != nil {
@@ -141,6 +138,11 @@ func CommandAppInstall() cli.Command {
 			Usage:  SourceFlagUsage,
 			EnvVar: "PVR_SOURCE",
 			Value:  "",
+		},
+		cli.StringFlag{
+			Name:   "base",
+			Usage:  "Base rootfs to create patch from",
+			EnvVar: "PVR_APP_ADD_BASE",
 		},
 		cli.StringFlag{
 			Name:   "runlevel",

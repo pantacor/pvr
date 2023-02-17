@@ -1,5 +1,5 @@
 //
-// Copyright 2018  Pantacor Ltd.
+// Copyright 2017-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -7,11 +7,13 @@
 //
 //   http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 package libpvr
 
 import (
@@ -26,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/go-resty/resty"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
 )
 
 type PvrAuthTarget struct {
@@ -73,7 +76,7 @@ func LoadConfig(filePath string) (*PvrAuthConfig, error) {
 
 	var authConfig PvrAuthConfig
 
-	err = json.Unmarshal(byteJson, &authConfig)
+	err = pvjson.Unmarshal(byteJson, &authConfig)
 	if err != nil {
 		return nil, errors.New("jSON Unmarshal error parsing config file in LoadConfig (" + filePath + "): " + err.Error())
 	}
@@ -101,7 +104,7 @@ func (p *PvrAuthConfig) DoRefresh(authEp, token string) (string, string, error) 
 		return "", "", err
 	}
 	m1 := map[string]interface{}{}
-	err = json.Unmarshal(response.Body(), &m1)
+	err = pvjson.Unmarshal(response.Body(), &m1)
 
 	if err != nil {
 		return "", "", err
@@ -186,7 +189,7 @@ func doAuthenticate(authEp, username, password, scopes string) (string, string, 
 	}
 
 	m1 := map[string]interface{}{}
-	err = json.Unmarshal(response.Body(), &m1)
+	err = pvjson.Unmarshal(response.Body(), &m1)
 
 	if err != nil {
 		return "", "", err
@@ -356,7 +359,7 @@ func (s *Session) Whoami() error {
 			return err
 		}
 		responseBody := map[string]interface{}{}
-		err = json.Unmarshal(response.Body(), &responseBody)
+		err = pvjson.Unmarshal(response.Body(), &responseBody)
 		if err != nil {
 			return err
 		}

@@ -1,5 +1,5 @@
 //
-// Copyright 2017-2020  Pantacor Ltd.
+// Copyright 2017-2023  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -7,12 +7,13 @@
 //
 //   http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 //
+
 package libpvr
 
 import (
@@ -36,12 +37,16 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
 
-	"github.com/Masterminds/sprig"
 	cjson "github.com/gibson042/canonicaljson-go"
+	"github.com/udhos/equalfile"
+	"gitlab.com/pantacor/pvr/utils/pvjson"
+
+	"github.com/Masterminds/sprig"
 	"github.com/go-resty/resty"
 )
 
@@ -221,7 +226,7 @@ func FormatJson(data []byte) ([]byte, error) {
 
 func FormatJsonC(data []byte) ([]byte, error) {
 	var value interface{}
-	err := json.Unmarshal(data, &value)
+	err := pvjson.Unmarshal(data, &value)
 
 	if err != nil {
 		return nil, err
@@ -452,7 +457,7 @@ func StructToMap(s interface{}) (map[string]interface{}, error) {
 
 	result := map[string]interface{}{}
 
-	err = json.Unmarshal(b, &result)
+	err = pvjson.Unmarshal(b, &result)
 
 	if err != nil {
 		return nil, err
@@ -520,7 +525,7 @@ func LoginDevice(
 	}
 	if response.StatusCode() == http.StatusOK {
 		responseData := map[string]interface{}{}
-		err = json.Unmarshal(response.Body(), &responseData)
+		err = pvjson.Unmarshal(response.Body(), &responseData)
 		if err != nil {
 			return "", err
 		}
@@ -561,7 +566,7 @@ func CreateTrail(baseURL string,
 // LogPrettyJSON : Pretty print Json content
 func LogPrettyJSON(content []byte) error {
 	var data interface{}
-	err := json.Unmarshal(content, &data)
+	err := pvjson.Unmarshal(content, &data)
 	if err != nil {
 		return err
 	}
@@ -766,7 +771,7 @@ func (s *Session) GetAuthStatus(baseURL string) (
 	return response, errors.New("error getting auth status")
 }
 
-//ValidateSourceFlag : Validate Source Flag
+// ValidateSourceFlag : Validate Source Flag
 func ValidateSourceFlag(source string) error {
 	if source == "" {
 		return nil
@@ -824,7 +829,7 @@ func (s *Session) SuggestDeviceNicks(userNick, searchTerm string, baseURL string
 		return
 	}
 	responseData := []interface{}{}
-	err = json.Unmarshal(devicesResponse.Body(), &responseData)
+	err = pvjson.Unmarshal(devicesResponse.Body(), &responseData)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error()+"\n")
 		return
@@ -860,7 +865,7 @@ func (s *Session) SuggestUserNicks(searchTerm string, baseURL string) {
 		return
 	}
 	responseData := []interface{}{}
-	err = json.Unmarshal(profilesResponse.Body(), &responseData)
+	err = pvjson.Unmarshal(profilesResponse.Body(), &responseData)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error()+"\n")
 		return
@@ -1114,4 +1119,168 @@ func DownloadFile(uri *url.URL) (string, error) {
 	}
 
 	return filepath.Abs(filepath.Dir(tempfile.Name()))
+}
+
+type TreeDiff struct {
+	A       string
+	B       string
+	Errors  []error
+	InA     []string
+	InB     []string
+	OnlyInA []string
+	OnlyInB []string
+	Differ  []string
+}
+
+func (tree *TreeDiff) String() string {
+	res, err := json.MarshalIndent(tree, "", "    ")
+	if err != nil {
+		return err.Error()
+	}
+	return string(res)
+}
+
+func MkTreeDiff(dir1, dir2 string) TreeDiff {
+	treeDiff := TreeDiff{
+		A:       dir1,
+		B:       dir2,
+		Errors:  []error{},
+		InA:     []string{},
+		InB:     []string{},
+		OnlyInA: []string{},
+		OnlyInB: []string{},
+		Differ:  []string{},
+	}
+	compareList := []string{}
+
+	filepath.Walk(dir1, func(path string, info os.FileInfo, err error) error {
+		if path == dir1 {
+			return nil
+		}
+		size := len(treeDiff.InA)
+		dir1len := len(dir1)
+		relpath := path[dir1len:]
+		pos := sort.Search(len(treeDiff.InA), func(i int) bool {
+			return strings.Compare(treeDiff.InA[i], relpath) >= 0
+		})
+		if pos == 0 {
+			treeDiff.InA = append([]string{relpath}, treeDiff.InA...)
+		} else if pos == size {
+			treeDiff.InA = append(treeDiff.InA, relpath)
+		} else {
+			treeDiff.InA = append(treeDiff.InA[0:pos+1], treeDiff.InA[pos:]...)
+			treeDiff.InA[pos] = relpath
+		}
+		return nil
+	})
+	filepath.Walk(dir2, func(path string, info os.FileInfo, err error) error {
+		if path == dir2 {
+			return nil
+		}
+		size := len(treeDiff.InB)
+		dir2len := len(dir2)
+		relpath := path[dir2len:]
+		pos := sort.Search(size, func(i int) bool {
+			return strings.Compare(treeDiff.InB[i], relpath) >= 0
+		})
+		if pos == 0 {
+			treeDiff.InB = append([]string{relpath}, treeDiff.InB...)
+		} else if pos == size {
+			treeDiff.InB = append(treeDiff.InB, relpath)
+		} else {
+			treeDiff.InB = append(treeDiff.InB[0:pos+1], treeDiff.InB[pos:]...)
+			treeDiff.InB[pos] = relpath
+		}
+		return nil
+	})
+	for _, v := range treeDiff.InA {
+		if len(treeDiff.OnlyInA) > 0 &&
+			strings.HasPrefix(v, treeDiff.OnlyInA[len(treeDiff.OnlyInA)-1]+"/") {
+			continue
+		}
+		pos := sort.Search(len(treeDiff.InB), func(i int) bool {
+			return strings.Compare(treeDiff.InB[i], v) >= 0
+		})
+		if pos == len(treeDiff.InB) {
+			treeDiff.OnlyInA = append(treeDiff.OnlyInA, v)
+		} else if treeDiff.InB[pos] == v {
+			compareList = append(compareList, v)
+		} else {
+			treeDiff.OnlyInA = append(treeDiff.OnlyInA, v)
+		}
+	}
+	for _, v := range treeDiff.InB {
+		if len(treeDiff.OnlyInB) > 0 &&
+			strings.HasPrefix(v, treeDiff.OnlyInB[len(treeDiff.OnlyInB)-1]+"/") {
+			continue
+		}
+		pos := sort.Search(len(treeDiff.InA), func(i int) bool {
+			return strings.Compare(treeDiff.InA[i], v) >= 0
+		})
+		if pos == len(treeDiff.InA) {
+			treeDiff.OnlyInB = append(treeDiff.OnlyInB, v)
+		} else if treeDiff.InA[pos] == v {
+			// compareList = append(compareList, v)
+		} else {
+			treeDiff.OnlyInB = append(treeDiff.OnlyInB, v)
+		}
+	}
+
+	for _, v := range compareList {
+		fInfo, err := os.Stat(path.Join(dir1, v))
+		if err != nil {
+			treeDiff.Errors = append(treeDiff.Errors, err)
+			continue
+		}
+		if fInfo.IsDir() {
+			continue
+		}
+		fcmp := equalfile.New(nil, equalfile.Options{})
+		sameContent, err := fcmp.CompareFile(path.Join(dir1, v), path.Join(dir2, v))
+		if err != nil {
+			treeDiff.Errors = append(treeDiff.Errors, err)
+			continue
+		}
+		if !sameContent {
+			treeDiff.Differ = append(treeDiff.Differ, v)
+		}
+	}
+
+	return treeDiff
+}
+
+func (tree *TreeDiff) MkOvl(ovlDir string) {
+	for _, v := range tree.OnlyInA {
+		vDir := path.Dir(v)
+		vBase := path.Base(v)
+		os.MkdirAll(path.Join(ovlDir, vDir), 0755)
+		// Remove the file from the overlay using
+		// A whiteout is created as a character device with 0/0 device number.
+		// When a whiteout is found in the upper level of a merged directory, any matching name in the lower level is ignored, and the whiteout itself is also hidden.
+		// https://docs.kernel.org/filesystems/overlayfs.html#whiteouts-and-opaque-directories
+		cmd := exec.Command("mknod", path.Join(ovlDir, vDir, vBase), "c", "0", "0")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
+		if err != nil {
+			tree.Errors = append(tree.Errors, err)
+			fmt.Println("ERROR: mknod failed with: " + err.Error())
+		}
+	}
+	for _, v := range append(tree.OnlyInB, tree.Differ...) {
+		vDir := path.Dir(v)
+		vBase := path.Base(v)
+		ovlTarget := path.Join(ovlDir, vDir)
+		os.MkdirAll(ovlTarget, 0755)
+		src := path.Join(tree.B, vDir, vBase)
+		dest := path.Join(ovlDir, vDir, vBase)
+		cmd := exec.Command("cp", "-a", "-v", src, dest)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
+		if err != nil {
+			tree.Errors = append(tree.Errors, err)
+			fmt.Println("ERROR: cp failed with: " + err.Error())
+		}
+	}
 }

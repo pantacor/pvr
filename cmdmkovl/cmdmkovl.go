@@ -18,19 +18,21 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 
-	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/libpvr"
 )
 
-func CommandScanDeprecated() cli.Command {
-	return cli.Command{
-		Name:      "scan",
-		ArgsUsage: "",
-		Usage:     "Scan for pantavisor devices announcing themselves through MDNS on local network.",
-		Before: func(c *cli.Context) error {
-			fmt.Print("\nDEPRECATED: the pvr scan command is deprecated and will go away in some future release. It can now be found as a device subcommand:pvr device scan\n")
-			return nil
-		},
-		Action: CommandScan().Action,
+func main() {
+
+	if len(os.Args) < 3 {
+		fmt.Println("ERROR: must have A and B dir as cli argument")
+		os.Exit(2)
 	}
+
+	diff := libpvr.MkTreeDiff(os.Args[1], os.Args[2])
+	diff.MkOvl(os.Args[3])
+	cmd := exec.Command("find", os.Args[3])
+	cmd.Run()
 }
