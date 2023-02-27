@@ -134,8 +134,18 @@ lxc.mount.entry = tmpfs {{ .Source.args.PV_RUN_TMPFS_PATH | pvr_ifNull "run" }} 
 {{- end }}
 {{- $src := .Source -}}
 {{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes $src.persistence -}}
+{{- $scheme := sprig_splitList ":" $key | sprig_first }}
+{{- if eq $key $scheme }}
+{{- $scheme = "dir" }}
+{{- end }}
 {{- if ne $key "lxc-overlay" }}
+{{- if eq $scheme "dir" }}
 lxc.mount.entry = /volumes/{{ $src.name }}/{{ pvr_dockerVolumeName $key }} {{ trimPrefix "/" $key }} none bind,rw,create=dir 0 0
+{{- end -}}
+{{- if eq $scheme "ovl" }}
+{{- $realkey := trimPrefix "ovl:" $key }}
+lxc.mount.entry = /volumes/{{ $src.name }}/dockerovl-{{ $realkey | trimSuffix "/" | replace "/" "-" }} {{ trimPrefix "/" $realkey }} overlay lowerdir=/volumes/{{ $src.name }}/root.squashfs/{{ trimPrefix "/" $realkey }},upperdir=/volumes/{{ $src.name }}/docker-{{ $realkey | trimSuffix "/" | replace "/" "-" }}/upper,workdir=/volumes/{{ $src.name }}/docker-{{ $realkey | trimSuffix "/" | replace "/" "-" }}/work,create=dir 0 0
+{{- end -}}
 {{- end -}}
 {{- end }}
 {{- if .Source.args.PV_LXC_CAP_DROP }}
@@ -242,8 +252,19 @@ lxc.mount.entry = /volumes/{{- $source -}}/
 	{{- end }}
 	"storage":{
 		{{- range $key, $value := pvr_mergePersistentMaps .Docker.Volumes $persistence -}}
-		{{- if ne $key "lxc-overlay" }}
-		"docker-{{ $key | trimSuffix "/" | replace "/" "-" -}}": {
+		{{- $realkey := $key }}
+		{{- $scheme := sprig_splitList ":" $key | sprig_first }}
+		{{- if ne $key $scheme }}
+		{{- $realkey = trimPrefix $scheme $key | trimPrefix ":" }}
+		{{- else }}
+		{{- $scheme = "dir" }}
+		{{- end }}
+		{{- if ne $realkey "lxc-overlay" }}
+		{{- if ne $scheme "dir" }}
+		"docker{{ $scheme }}-{{ $realkey | trimSuffix "/" | replace "/" "-" -}}": {
+		{{- else }}
+		"docker-{{ $realkey | trimSuffix "/" | replace "/" "-" -}}": {
+		{{- end }}
 			{{- $length := splitList "@" $value | len }}
 			{{- if eq $length 1 }}
 			"persistence": "{{- sprig_splitList "@" $value | sprig_first | pvr_ifNull "built-in" }}"
