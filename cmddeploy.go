@@ -140,7 +140,7 @@ func CommandDeploy() cli.Command {
 
 			err = deployPvr.DeployPvLinks()
 
-			if err != nil {
+			if err != nil && !os.IsNotExist(err) {
 				return cli.NewExitError(err, 10)
 			}
 
