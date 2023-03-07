@@ -532,7 +532,12 @@ func (p *Pvr) GenerateApplicationSquashFS(app *AppData, appManifest *Source) err
 	//	Exists flag is true only if the image got loaded which will depend on
 	//  priority order provided in --source=local,remote
 	if app.LocalImage.Exists {
-		filename := filepath.Join(cacheDir, app.LocalImage.DockerDigest) + ".tar.gz"
+		dockerdigest := app.LocalImage.DockerDigest
+		splited := strings.Split(app.LocalImage.DockerDigest, "@")
+		if len(splited) >= 2 {
+			dockerdigest = splited[1]
+		}
+		filename := filepath.Join(cacheDir, dockerdigest) + ".tar.gz"
 		fileExistInCache, err := IsFileExists(filename)
 		if err != nil {
 			return err
@@ -695,6 +700,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app *AppData, appManifest *Source) err
 		return errors.New("Unsupported SquashFile: " + app.SquashFile + ". Supported: " + SQUASH_FILE + ", " + SQUASH_OVL_FILE)
 	}
 
+	app.Appmanifest = appManifest
 	err = MakeSquash(extractPath, app)
 	if err != nil {
 		return err
