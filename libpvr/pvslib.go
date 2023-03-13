@@ -25,7 +25,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -212,7 +212,7 @@ func parseCertsFromPEMFile(path string) ([]*x509.Certificate, error) {
 
 	var certs []*x509.Certificate
 
-	pemCerts, err := ioutil.ReadFile(path)
+	pemCerts, err := os.ReadFile(path)
 
 	if err != nil {
 		return nil, err
@@ -260,7 +260,7 @@ func (p *Pvr) JwsSignPvs(privKeyPath string,
 		return errors.New("empty state format")
 	}
 
-	fileBuf, err := ioutil.ReadFile(pvsPath)
+	fileBuf, err := os.ReadFile(pvsPath)
 	if err != nil {
 		return err
 	}
@@ -315,7 +315,7 @@ func (p *Pvr) JwsSign(name string,
 		return err
 	}
 
-	fileBuf, err := ioutil.ReadAll(f)
+	fileBuf, err := io.ReadAll(f)
 	if err != nil {
 		return err
 	}
@@ -466,7 +466,7 @@ found:
 		return err
 	}
 
-	err = ioutil.WriteFile(path.Join(p.Dir, "_sigs", name+".json"), newJson, 0644)
+	err = os.WriteFile(path.Join(p.Dir, "_sigs", name+".json"), newJson, 0644)
 	if err != nil {
 		return err
 	}
@@ -552,7 +552,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 			return nil, err
 		}
 
-		fileBuf, err := ioutil.ReadAll(f)
+		fileBuf, err := io.ReadAll(f)
 		if err != nil {
 			return nil, err
 		}
@@ -606,7 +606,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 		if err != nil {
 			return nil, err
 		}
-		caCertsBuf, err := ioutil.ReadFile(caCerts)
+		caCertsBuf, err := os.ReadFile(caCerts)
 		if err != nil {
 			return nil, err
 		}
@@ -618,7 +618,7 @@ func (p *Pvr) JwsVerifyPvs(keyPath string, caCerts string, pvsPath string, inclu
 		}
 	}
 
-	fileBuf, err := ioutil.ReadFile(pvsPath)
+	fileBuf, err := os.ReadFile(pvsPath)
 	if err != nil {
 		return nil, err
 	}

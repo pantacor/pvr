@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -80,7 +79,7 @@ func UpdateRootFSApp(p *Pvr, app *AppData, appManifest *Source) error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(digestFile, []byte(rootfsDigest), 0644); err != nil {
+	if err = os.WriteFile(digestFile, []byte(rootfsDigest), 0644); err != nil {
 		return nil
 	}
 
@@ -91,7 +90,7 @@ func UpdateRootFSApp(p *Pvr, app *AppData, appManifest *Source) error {
 	}
 
 	srcFilePath := filepath.Join(appPath, SRC_FILE)
-	if err = ioutil.WriteFile(srcFilePath, srcContent, 0644); err != nil {
+	if err = os.WriteFile(srcFilePath, srcContent, 0644); err != nil {
 		return err
 	}
 
@@ -172,7 +171,7 @@ func AddRootFsApp(p *Pvr, app *AppData) error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(digestFile, []byte(rootfsDigest), 0644); err != nil {
+	if err = os.WriteFile(digestFile, []byte(rootfsDigest), 0644); err != nil {
 		return nil
 	}
 
@@ -183,7 +182,7 @@ func AddRootFsApp(p *Pvr, app *AppData) error {
 	}
 
 	srcFilePath := filepath.Join(appPath, SRC_FILE)
-	if err = ioutil.WriteFile(srcFilePath, srcContent, 0644); err != nil {
+	if err = os.WriteFile(srcFilePath, srcContent, 0644); err != nil {
 		return err
 	}
 
@@ -220,7 +219,7 @@ func GetFromRootFs(app *AppData) (string, error) {
 	}
 
 	if !fileInfo.IsDir() {
-		tempdir, err := ioutil.TempDir(os.TempDir(), "rootfs-")
+		tempdir, err := os.MkdirTemp(os.TempDir(), "rootfs-")
 		if err != nil {
 			return "", err
 		}
