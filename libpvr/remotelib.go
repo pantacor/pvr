@@ -18,11 +18,9 @@ package libpvr
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
-	"strings"
 
 	pvrapi "gitlab.com/pantacor/pvr/api"
 	"gitlab.com/pantacor/pvr/utils/pvjson"
@@ -80,62 +78,12 @@ func (p *Pvr) RemoteCopy(pvrSrc string, pvrDest string, merge bool,
 		return err
 	}
 
-	srcFrags := strings.Split(srcURL.Fragment, ",")
-	destFrags := strings.Split(destURL.Fragment, ",")
-
-	if destFrags[0] != "" && srcFrags[0] == "" {
-		return errors.New("RemoteCopy source URL must have a #fragement part if destination URL is specifying a #fragement")
-	}
-	if destFrags[0] != "" && len(destFrags) != len(srcFrags) {
-		return errors.New("RemoteCopy source URL must have same source fragements as destFragments or no destfragement at all")
-	}
-
-	// if we have no destFrag, we will use srcFrags
-	if srcFrags[0] != "" && destFrags[0] == "" {
-		destFrags = srcFrags
-	}
-
-	var srcJson map[string]interface{}
-	var destJson map[string]interface{}
-
-	err = pvjson.Unmarshal(srcJsonBuf, &srcJson)
+	_, dest, err := PatchState(srcJsonBuf, destJsonBuf, srcURL.Fragment, destURL.Fragment, merge, nil)
 	if err != nil {
 		return err
 	}
 
-	err = pvjson.Unmarshal(destJsonBuf, &destJson)
-	if err != nil {
-		return err
-	}
-
-	// reduce destJson if we are not merging
-	if !merge {
-		for k := range destJson {
-			for _, destFrag := range destFrags {
-				if destFrag != "" && strings.HasPrefix(k, destFrag+"/") {
-					delete(destJson, k)
-				} else if destFrag == "" {
-					// no destFrag we remove all in any folder
-					delete(destJson, k)
-				}
-			}
-		}
-	}
-
-	// copy over relevant key/values
-	for k, v := range srcJson {
-		for i, srcFrag := range srcFrags {
-			if (srcFrag != "" && (strings.HasPrefix(k, srcFrag+"/")) || srcFrag == k) ||
-				srcFrag == "" {
-				nk := strings.TrimPrefix(k, srcFrag)
-				nk = destFrags[i] + nk
-				destJson[nk] = v
-			}
-		}
-	}
-
-	buf, err := p.postRemoteJson(destRemote, destJson, envelope, commitMsg, rev, force)
-
+	buf, err := p.postRemoteJson(destRemote, dest, envelope, commitMsg, rev, force)
 	if err != nil {
 		return err
 	}

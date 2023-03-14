@@ -18,6 +18,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/urfave/cli"
@@ -54,10 +55,16 @@ func CommandImport() cli.Command {
 			if c.NArg() < 1 {
 				return errors.New("repo-tarball name is required. See --help")
 			}
-			err = pvr.Import(c.Args()[0])
+
+			filename := c.Args()[0]
+			err = pvr.Import(filename)
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
+
+			fmt.Println("\nImported " + filename)
+			fmt.Println("\n\nRun pvr checkout to checkout the changed files into the workspace.")
+			fmt.Println("Then run pvr add and pvr commit to merge the imported data with the current state.")
 
 			return nil
 		},
