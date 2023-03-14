@@ -5,7 +5,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -67,7 +68,7 @@ func LoadConfig(filePath string) (*PvrAuthConfig, error) {
 		return nil, errors.New("oS error getting stats for file in LoadConfig: " + err.Error())
 	}
 
-	byteJson, err := os.ReadFile(filePath)
+	byteJson, err := ioutil.ReadFile(filePath)
 
 	if err != nil {
 		return nil, errors.New("oS error reading config file LoadConfig: " + err.Error())
@@ -155,7 +156,7 @@ func (p *PvrAuthConfig) Save() error {
 		return err
 	}
 
-	err = os.WriteFile(configNew, byteJson, 0600)
+	err = ioutil.WriteFile(configNew, byteJson, 0600)
 	if err != nil {
 		return err
 	}

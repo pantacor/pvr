@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -164,7 +165,7 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 			return nil, err
 		}
 
-		content, err := io.ReadAll(resp.Body)
+		content, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +206,7 @@ func (p *Pvr) GetDockerConfig(manifestV2 *schema2.Manifest, image registry.Image
 		return nil, err
 	}
 
-	blobContent, err := io.ReadAll(resp.Body)
+	blobContent, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -502,8 +503,8 @@ func (p *Pvr) GenerateApplicationSquashFS(app *AppData, appManifest *Source) err
 
 	currentDigest, err := os.Open(digestFile)
 	if err == nil {
-		currentDigestContent, err := io.ReadAll(currentDigest)
 		defer currentDigest.Close()
+		currentDigestContent, err := ioutil.ReadAll(currentDigest)
 		if err == nil {
 			if string(currentDigestContent) == string(digest) && appManifest.Base == "" {
 				return nil
@@ -519,9 +520,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app *AppData, appManifest *Source) err
 		return fmt.Errorf("couldn't create cache folder %v", err)
 	}
 
-	fmt.Println("Generating squashfs...")
-
-	tempdir, err := os.MkdirTemp(os.TempDir(), "download-layer-")
+	tempdir, err := ioutil.TempDir(os.TempDir(), "download-layer-")
 	if err != nil {
 		return err
 	}
@@ -573,7 +572,7 @@ func (p *Pvr) GenerateApplicationSquashFS(app *AppData, appManifest *Source) err
 			return err
 		}
 		// Read layer.tar file locations from manifest.json
-		manifestFile, err := os.ReadFile(tempdir + "/layers/manifest.json")
+		manifestFile, err := ioutil.ReadFile(tempdir + "/layers/manifest.json")
 		if err != nil {
 			return err
 		}
@@ -706,7 +705,8 @@ func (p *Pvr) GenerateApplicationSquashFS(app *AppData, appManifest *Source) err
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(digestFile, []byte(digest), 0644)
+
+	return ioutil.WriteFile(digestFile, []byte(digest), 0644)
 }
 
 // ProcessWhiteouts : FInd Whiteouts from a layer and process it in a given extract path
@@ -789,7 +789,7 @@ func FindWhiteoutsFromLayer(layerPath string) ([]string, error) {
 	return whiteoutPaths, nil
 }
 func (p *Pvr) GetSquashFSDigest(squashFile, appName string) (string, error) {
-	content, err := os.ReadFile(filepath.Join(p.Dir, appName, squashFile+DOCKER_DIGEST_SUFFIX))
+	content, err := ioutil.ReadFile(filepath.Join(p.Dir, appName, squashFile+DOCKER_DIGEST_SUFFIX))
 	if os.IsNotExist(err) {
 		return "", nil
 	}

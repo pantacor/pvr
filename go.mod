@@ -34,7 +34,6 @@ require (
 	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/peterhellberg/link v1.1.0 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
-	github.com/stretchr/testify v1.8.1
 	github.com/udhos/equalfile v0.3.0
 	github.com/urfave/cli v1.22.5
 	gitlab.com/pantacor/pantahub-base v0.0.0-20220922224408-d1e8099e66c0

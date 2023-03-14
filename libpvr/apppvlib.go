@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"io/ioutil"
 	"path/filepath"
 
 	"github.com/urfave/cli"
@@ -60,7 +60,7 @@ func AddPvApp(p *Pvr, app *AppData) error {
 	}
 
 	srcFilePath := filepath.Join(destAppPath, SRC_FILE)
-	err = os.WriteFile(srcFilePath, srcContent, 0644)
+	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func UpdatePvApp(p *Pvr, app *AppData, appManifest *Source) error {
 	}
 
 	srcFilePath := filepath.Join(p.Dir, app.Appname, SRC_FILE)
-	err = os.WriteFile(srcFilePath, srcContent, 0644)
+	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
 	if err != nil {
 		return err
 	}

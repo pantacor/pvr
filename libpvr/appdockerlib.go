@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -122,7 +123,7 @@ func AddDockerApp(p *Pvr, app *AppData) error {
 	}
 
 	srcFilePath := filepath.Join(appPath, SRC_FILE)
-	err = os.WriteFile(srcFilePath, srcContent, 0644)
+	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
 	if err != nil {
 		return err
 	}
@@ -193,7 +194,7 @@ func UpdateDockerApp(p *Pvr, app *AppData, appManifest *Source) (err error) {
 	}
 
 	srcFilePath := filepath.Join(p.Dir, app.Appname, SRC_FILE)
-	err = os.WriteFile(srcFilePath, srcContent, 0644)
+	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
 	if err != nil {
 		return err
 	}

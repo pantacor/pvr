@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -266,7 +267,10 @@ func IsSha(sha string) bool {
 		return false
 	}
 	_, err := hex.DecodeString(sha)
-	return err == nil
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func Min(x, y int) int {
@@ -328,7 +332,7 @@ func ReadOrCreateFile(filePath string) (*[]byte, error) {
 		return nil, errors.New("oS error getting stats for: " + err.Error())
 	}
 
-	content, err := os.ReadFile(filePath)
+	content, err := ioutil.ReadFile(filePath)
 
 	if err != nil {
 		return nil, errors.New("oS error reading file: " + err.Error())
@@ -341,7 +345,7 @@ func WriteTxtFile(filePath string, content string) error {
 
 	data := []byte(content)
 
-	return os.WriteFile(filePath, data, 0644)
+	return ioutil.WriteFile(filePath, data, 0644)
 }
 
 // GetPlatform get string with the full platform name
@@ -1097,7 +1101,7 @@ func GetFileContentType(src string) (string, error) {
 }
 
 func DownloadFile(uri *url.URL) (string, error) {
-	tempfile, err := os.CreateTemp(os.TempDir(), "download-rootfs-")
+	tempfile, err := ioutil.TempFile(os.TempDir(), "download-rootfs-")
 	if err != nil {
 		return "", err
 	}

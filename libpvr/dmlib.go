@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -66,7 +66,7 @@ func (p *Pvr) dmifySrcJson(container, volume string) error {
 	}
 
 	srcFilePath := filepath.Join(p.Dir, container, SRC_FILE)
-	err = os.WriteFile(srcFilePath, srcContent, 0644)
+	err = ioutil.WriteFile(srcFilePath, srcContent, 0644)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (p *Pvr) dmifyRunJson(container, volume string) error {
 	var itmp interface{}
 
 	runJsonPath := path.Join(p.Dir, container, "run.json")
-	fBuf, err := os.ReadFile(runJsonPath)
+	fBuf, err := ioutil.ReadFile(runJsonPath)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (p *Pvr) dmifyRunJson(container, volume string) error {
 		return err
 	}
 
-	err = os.WriteFile(runJsonPath+".new", outB, 0644)
+	err = ioutil.WriteFile(runJsonPath+".new", outB, 0644)
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func (p *Pvr) DmCVerityApply(prefix string) error {
 			if err != nil {
 				return err
 			}
-			out, err := io.ReadAll(outPipe)
+			out, err := ioutil.ReadAll(outPipe)
 			if err != nil {
 				return err
 			}
@@ -250,7 +250,7 @@ func (p *Pvr) DmCVerityApply(prefix string) error {
 				return err
 			}
 
-			err = os.WriteFile(manifestPath+".new", outB, 0644)
+			err = ioutil.WriteFile(manifestPath+".new", outB, 0644)
 			if err != nil {
 				return err
 			}
@@ -278,7 +278,7 @@ func (p *Pvr) DmCVerityConvert(container string, volume string) error {
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(manifestPath, []byte("{}"), 0644)
+		err = ioutil.WriteFile(manifestPath, []byte("{}"), 0644)
 		if err != nil {
 			return err
 		}
@@ -313,7 +313,7 @@ func (p *Pvr) DmCVerityConvert(container string, volume string) error {
 	if err != nil {
 		return err
 	}
-	out, err := io.ReadAll(outPipe)
+	out, err := ioutil.ReadAll(outPipe)
 	if err != nil {
 		return err
 	}
@@ -327,7 +327,7 @@ func (p *Pvr) DmCVerityConvert(container string, volume string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(manifestPath+".new", outB, 0644)
+	err = ioutil.WriteFile(manifestPath+".new", outB, 0644)
 	if err != nil {
 		return err
 	}

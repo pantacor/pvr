@@ -61,7 +61,7 @@ func ExampleSprintTmplSprintf2() {
 func ExampleSprintTmplStruct() {
 	s, _ := SprintTmpl("Basic: {{ .Field1 | sprintf \"%.3s\" }}", testStruct1)
 	fmt.Println(s)
-	// Output: Basic: Tes
+	// Output: Basic: Test1234
 }
 
 func ExampleFixupRef1() {

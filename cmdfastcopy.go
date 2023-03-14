@@ -18,6 +18,7 @@ package main
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
 
 	"fmt"
@@ -50,7 +51,7 @@ func CommandFastCopy() cli.Command {
 				return cli.NewExitError(err, 4)
 			}
 
-			wd, err := os.MkdirTemp(os.TempDir(), "pvr-fastcopy-")
+			wd, err := ioutil.TempDir(os.TempDir(), "pvr-fastcopy-")
 
 			if err != nil {
 				return cli.NewExitError(err, 3)
@@ -85,7 +86,7 @@ func CommandFastCopy() cli.Command {
 				Usage: "provide the json envelope to wrap around the pvr post. use {} when not provided",
 			},
 			cli.StringFlag{
-				Name:  "commit-msg, m",
+				Name: "commit-msg, m",
 				Usage: "add 'commit-msg' field 	to envelope",
 			},
 			cli.StringFlag{
