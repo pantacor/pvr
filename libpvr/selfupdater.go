@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -250,7 +249,7 @@ func (pvr *Pvr) getDockerContent(dockerURL string, outputDir, username, password
 		return "", "", err
 	}
 
-	extractPath, err := ioutil.TempDir(os.TempDir(), "bin-")
+	extractPath, err := os.MkdirTemp(os.TempDir(), "bin-")
 	if err != nil {
 		return "", "", err
 	}

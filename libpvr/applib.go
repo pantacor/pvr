@@ -321,7 +321,7 @@ func (p *Pvr) SetSourceTypeFromManifest(app *AppData, options *models.GetSTOptio
 
 func (p *Pvr) GetApplicationManifest(appname string) (*Source, error) {
 	appManifestFile := filepath.Join(p.Dir, appname, SRC_FILE)
-	js, err := ioutil.ReadFile(appManifestFile)
+	js, err := os.ReadFile(appManifestFile)
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +404,7 @@ func (p *Pvr) GenerateApplicationTemplateFiles(appname string, dockerConfig map[
 	}
 
 	for name, content := range files {
-		err = ioutil.WriteFile(filepath.Join(p.Dir, appname, name), content, 0644)
+		err = os.WriteFile(filepath.Join(p.Dir, appname, name), content, 0644)
 		if err != nil {
 			return err
 		}
@@ -500,7 +500,7 @@ func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 		}
 	}
 
-	srcContent, err := ioutil.ReadFile(filepath.Join(destAppPath, SRC_FILE))
+	srcContent, err := os.ReadFile(filepath.Join(destAppPath, SRC_FILE))
 	if err != nil {
 		return "", nil, err
 	}
@@ -519,7 +519,7 @@ func (p *Pvr) GetFromRepo(app *AppData) (string, *Source, error) {
 
 // ListApplications : List Applications
 func (p *Pvr) ListApplications() error {
-	files, err := ioutil.ReadDir(p.Dir)
+	files, err := os.ReadDir(p.Dir)
 	if err != nil {
 		return err
 	}
@@ -569,7 +569,7 @@ func (p *Pvr) GetApplicationInfo(appname string) error {
 	if _, err := os.Stat(srcFilePath); err != nil {
 		return errors.New("App '" + appname + "' doesn't exist")
 	}
-	src, _ := ioutil.ReadFile(srcFilePath)
+	src, _ := os.ReadFile(srcFilePath)
 	var fileData interface{}
 	err := pvjson.Unmarshal(src, &fileData)
 	if err != nil {
@@ -671,7 +671,7 @@ func GetDockerConfigFile(p *Pvr, app *AppData) (map[string]interface{}, error) {
 			return nil, err
 		}
 
-		config, err := ioutil.ReadFile(configFile)
+		config, err := os.ReadFile(configFile)
 		if err != nil {
 			return nil, err
 		}

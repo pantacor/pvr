@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -90,7 +89,7 @@ func CommandClone() cli.Command {
 			}
 			baseDir := path.Dir(base)
 
-			tempdir, err := ioutil.TempDir(baseDir, "pvr-clone-")
+			tempdir, err := os.MkdirTemp(baseDir, "pvr-clone-")
 			if err != nil {
 				return cli.NewExitError(err, 4)
 			}
