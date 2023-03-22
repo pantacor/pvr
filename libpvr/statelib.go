@@ -28,6 +28,39 @@ func copyState(state map[string]interface{}) map[string]interface{} {
 	return result
 }
 
+func AddFragsToState(srcState, patchState map[string]interface{}, frags string) map[string]interface{} {
+	pJSONMap := copyState(srcState)
+
+	unpartPrefixes := []string{}
+	if frags != "" {
+		parsePrefixes := strings.Split(frags, ",")
+		for _, v := range parsePrefixes {
+			if strings.HasPrefix(v, "-") {
+				unpartPrefixes = append(unpartPrefixes, v[1:])
+			}
+		}
+	}
+
+	for _, partPrefix := range unpartPrefixes {
+		for k := range pJSONMap {
+			if strings.HasPrefix(k, partPrefix) {
+				delete(pJSONMap, k)
+			}
+		}
+	}
+
+	for k1, v := range patchState {
+		for k2 := range pJSONMap {
+			if k1 == k2 {
+				delete(pJSONMap, k1)
+			}
+		}
+		pJSONMap[k1] = v
+	}
+
+	return pJSONMap
+}
+
 func FilterByFrags(state map[string]interface{}, frags string) (map[string]interface{}, error) {
 	pJSONMap := copyState(state)
 
@@ -152,15 +185,7 @@ func PatchState(srcBuff, patchBuff []byte, srcFrags, patchFrag string, merge boo
 			return nil, nil, err
 		}
 	} else {
-		jsonMap, err := FilterByFrags(srcState, patchFrag)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		for k, v := range patchState {
-			jsonMap[k] = v
-		}
-
+		jsonMap := AddFragsToState(srcState, patchState, srcFrags)
 		jsonMerged, err = cjson.Marshal(jsonMap)
 		if err != nil {
 			return nil, nil, err
