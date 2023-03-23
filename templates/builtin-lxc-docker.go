@@ -250,6 +250,9 @@ lxc.mount.entry = /volumes/{{- $source -}}/
 	{{- if .Source.args.PV_STATUS_GOAL }}
 	"status_goal": "{{- .Source.args.PV_STATUS_GOAL }}",
 	{{- end }}
+	{{- if .Source.args.PV_AUTOMODFW }}
+	"automodfw": {{ .Source.args.PV_AUTOMODFW | sprig_toPrettyJson | trim }},
+	{{- end }}
 	{{- if .Source.args.PV_REMOUNT }}
 	"remount": {{ .Source.args.PV_REMOUNT | sprig_toPrettyJson | sprig_indent 8 | trim }},
 	{{- end }}
