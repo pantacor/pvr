@@ -633,6 +633,7 @@ func MakeSquash(rootfsPath string, app *AppData) error {
 	} else {
 		comp = strings.Split(app.Appmanifest.FormatOptions, " ")
 	}
+	comp = append(comp, "-root-mode", "0755")
 
 	args := []string{makeSquashfsPath, rootfsPath, tempSquashFile}
 	args = append(args, comp...)
