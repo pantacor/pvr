@@ -6,7 +6,7 @@ require (
 	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
-	github.com/asac/json-patch v0.0.0-20201120095033-59358024a068
+	github.com/asac/json-patch v0.0.0-20230329144845-77cb4725ea4a
 	github.com/bmatcuk/doublestar v1.3.4
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/cavaliercoder/grab v2.0.0+incompatible
