@@ -200,6 +200,7 @@ func main() {
 		CommandCompletion(),
 		CommandDmApply(),
 		CommandDmConvert(),
+		CommandVersion(),
 	}
 
 	err := app.Run(os.Args)
