@@ -6,7 +6,7 @@ require (
 	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
-	github.com/asac/json-patch v0.0.0-20230331153702-17dc07880f89 // indirect
+	github.com/asac/json-patch v0.0.0-20230331153702-17dc07880f89
 	github.com/bmatcuk/doublestar v1.3.4
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/cavaliercoder/grab v2.0.0+incompatible
@@ -24,6 +24,7 @@ require (
 	github.com/go-resty/resty v1.12.0
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/grandcat/zeroconf v1.0.0
+	github.com/highercomve/jsondiff v0.0.0-20230331184928-5ac4220227bb
 	github.com/huandu/xstrings v1.3.1 // indirect
 	github.com/justincampbell/bigduration v0.0.0-20160531141349-e45bf03c0666 // indirect
 	github.com/justincampbell/timeago v0.0.0-20160528003754-027f40306f1d

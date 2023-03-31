@@ -41,6 +41,7 @@ import (
 	"github.com/cavaliercoder/grab"
 	cjson "github.com/gibson042/canonicaljson-go"
 	"github.com/go-resty/resty"
+	"github.com/highercomve/jsondiff"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	pvrapi "gitlab.com/pantacor/pvr/api"
 	"gitlab.com/pantacor/pvr/utils/pvjson"
@@ -542,13 +543,22 @@ func (p *Pvr) Diff() (*[]byte, error) {
 		return nil, err
 	}
 
-	diff, err := jsonpatch.CreateMergePatch(cPristineJson, workingJson)
-
+	diff, err := jsondiff.CompareJSON(cPristineJson, workingJson)
 	if err != nil {
 		return nil, err
 	}
 
-	return &diff, nil
+	pvrdiff := map[string]interface{}{}
+	for _, op := range diff {
+		pvrdiff[op.Name] = op.Value
+	}
+
+	diffbytes, err := cjson.Marshal(pvrdiff)
+	if err != nil {
+		return nil, err
+	}
+
+	return &diffbytes, nil
 }
 
 func (p *Pvr) Status() (*PvrStatus, error) {
@@ -564,35 +574,48 @@ func (p *Pvr) Status() (*PvrStatus, error) {
 		return nil, err
 	}
 
-	diff, err := jsonpatch.CreateMergePatch(cPristineJson, workingJson)
+	var diffbytes []byte
+	diffJson := []interface{}{}
+	diff, err := jsondiff.CompareJSON(cPristineJson, workingJson)
 	if err != nil {
 		return nil, err
 	}
 
-	rs.JsonDiff = &diff
-
-	// make json map out of diff
-	diffJson := map[string]interface{}{}
-	err = pvjson.Unmarshal(*rs.JsonDiff, &diffJson)
-	if err != nil {
-		return nil, err
+	if diff != nil {
+		diffbytes, err = cjson.Marshal(diff)
+		if err != nil {
+			return nil, err
+		}
+		err = pvjson.Unmarshal(diffbytes, &diffJson)
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	rs.JsonDiff = &diffbytes
 
 	// run
-	for file := range diffJson {
-		val := diffJson[file]
+	for _, operation := range diff {
+		op := operation.Type
+		filePaths := strings.Split(operation.Name, ".")
+		path := filePaths[0]
+		if len(filePaths) > 1 {
+			path = filePaths[0] + "." + strings.Split(filePaths[1], "/")[0]
+		}
 
-		if val == nil {
-			rs.RemovedFiles = append(rs.RemovedFiles, file)
+		if op == "add" {
+			rs.NewFiles = append(rs.NewFiles, path)
 			continue
 		}
 
-		// if we have this key in pristine, then file was changed
-		if _, ok := p.PristineJsonMap[file]; ok {
-			rs.ChangedFiles = append(rs.ChangedFiles, file)
+		if op == "remove" {
+			rs.RemovedFiles = append(rs.RemovedFiles, path)
 			continue
-		} else {
-			rs.NewFiles = append(rs.NewFiles, file)
+		}
+
+		if op == "move" || op == "replace" || op == "copy" {
+			rs.ChangedFiles = append(rs.ChangedFiles, path)
+			continue
 		}
 	}
 
@@ -739,26 +762,33 @@ func (p *Pvr) Commit(msg string, isCheckpoint bool) (err error) {
 		return err
 	}
 
-	newJson, err := jsonpatch.MergePatch(p.PristineJson, *status.JsonDiff)
+	var newJson []byte
+	if *status.JsonDiff != nil {
 
-	if err != nil {
-		return err
+		patch, err := jsonpatch.DecodePatch(*status.JsonDiff)
+		if err != nil {
+			return err
+		}
+
+		newJson, err = patch.Apply(p.PristineJson)
+		if err != nil {
+			return err
+		}
+	} else {
+		newJson = p.PristineJson
 	}
 
 	newJson, err = FormatJsonC(newJson)
-
 	if err != nil {
 		return err
 	}
 
 	err = os.WriteFile(filepath.Join(p.Pvrdir, "json.new"), newJson, 0644)
-
 	if err != nil {
 		return err
 	}
 
 	err = os.Rename(filepath.Join(p.Pvrdir, "json.new"), filepath.Join(p.Pvrdir, "json"))
-
 	if err != nil {
 		return err
 	}
