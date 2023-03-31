@@ -559,7 +559,12 @@ func (p *Pvr) Status() (*PvrStatus, error) {
 		return nil, err
 	}
 
-	diff, err := jsonpatch.CreateMergePatch(p.PristineJson, workingJson)
+	cPristineJson, err := p.GetCPristineJson()
+	if err != nil {
+		return nil, err
+	}
+
+	diff, err := jsonpatch.CreateMergePatch(cPristineJson, workingJson)
 	if err != nil {
 		return nil, err
 	}
