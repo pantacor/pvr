@@ -193,9 +193,15 @@ func PatchState(srcBuff, patchBuff []byte, srcFrags, patchFrag string, merge boo
 	}
 
 	err = cjson.Unmarshal(jsonMerged, &patchState)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	if state != nil {
 		OverwriteState(*state, patchState)
 	}
+
+	jsonMerged, err = cjson.Marshal(&patchState)
 
 	return jsonMerged, patchState, err
 }
