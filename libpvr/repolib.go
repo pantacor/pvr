@@ -1589,7 +1589,9 @@ func (p *Pvr) postRemoteJson(remotePvr pvrapi.PvrRemote, pvrMap PvrMap, envelope
 		return nil, err
 	}
 
-	if response.StatusCode() != 200 {
+	if response.StatusCode() == 503 && response.Header().Get("Retry-After") != "" {
+		return nil, errors.New("Endpoint reported \"Not ready\"; retry in: " + response.Header().Get("Retry-After") + " seconds")
+	} else if response.StatusCode() != 200 {
 		return nil, errors.New("REST call failed. " +
 			strconv.Itoa(response.StatusCode()) + "  " + response.Status() +
 			"\n\t" + string(response.Body()))
