@@ -192,7 +192,7 @@ func main() {
 		CommandPsDeprecated(),
 		CommandLogsDeprecated(),
 		CommandApp(),
-		CommandSelfUpdate(),
+		CommandSelfUpgrade(),
 		CommandGlobalConfig(),
 		CommandWhoami(),
 		CommandLogin(),

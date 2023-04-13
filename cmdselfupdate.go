@@ -24,8 +24,8 @@ import (
 	"gitlab.com/pantacor/pvr/libpvr"
 )
 
-// CommandSelfUpdate update the PVR CLI using the latest version of the docker container
-func CommandSelfUpdate() cli.Command {
+// CommandSelfUpgrade update the PVR CLI using the latest version of the docker container
+func CommandSelfUpgrade() cli.Command {
 	return cli.Command{
 		Name:      "self-upgrade",
 		ArgsUsage: "",
@@ -49,7 +49,7 @@ func CommandSelfUpdate() cli.Command {
 			username := c.String("username")
 			password := c.String("password")
 
-			err = pvr.UpdatePvr(username, password, false)
+			err = pvr.UpdatePvr(username, password, false, true)
 			if err != nil {
 				fmt.Println(err.Error())
 				cli.NewExitError(err.Error(), 2)

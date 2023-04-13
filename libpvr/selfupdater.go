@@ -99,20 +99,20 @@ func UpdateIfNecessary(c *cli.Context) error {
 
 	username := c.String("username")
 	password := c.String("password")
-	pvr.UpdatePvr(username, password, true)
+	pvr.UpdatePvr(username, password, true, false)
 	WriteTxtFile(lastCheckedPath, time.Now().Format(time.RFC3339))
 
 	return nil
 }
 
 // UpdatePvr Take the username, password and configuration File (aka: ~/.pvr) and update the pvr binary
-func (pvr *Pvr) UpdatePvr(username, password string, silent bool) error {
+func (pvr *Pvr) UpdatePvr(username, password string, silent, force bool) error {
 	currentDigest, previousDigest, manifestV2, err := pvr.getDigetsDifference(username, password)
 	if err != nil {
 		return err
 	}
 
-	if currentDigest == previousDigest {
+	if !force && currentDigest == previousDigest {
 		if !silent {
 			fmt.Fprintln(os.Stderr, "You already have the latest version of PVR :) \n\r")
 		}
