@@ -144,7 +144,7 @@ lxc.mount.entry = /volumes/{{ $src.name }}/{{ pvr_dockerVolumeName $key }} {{ tr
 {{- end -}}
 {{- if eq $scheme "ovl" }}
 {{- $realkey := trimPrefix "ovl:" $key }}
-lxc.mount.entry = /volumes/{{ $src.name }}/dockerovl-{{ $realkey | trimSuffix "/" | replace "/" "-" }} {{ trimPrefix "/" $realkey }} overlay lowerdir=/volumes/{{ $src.name }}/root.squashfs/{{ trimPrefix "/" $realkey }},upperdir=/volumes/{{ $src.name }}/docker-{{ $realkey | trimSuffix "/" | replace "/" "-" }}/upper,workdir=/volumes/{{ $src.name }}/docker-{{ $realkey | trimSuffix "/" | replace "/" "-" }}/work,create=dir 0 0
+lxc.mount.entry = /volumes/{{ $src.name }}/dockerovl-{{ $realkey | trimSuffix "/" | replace "/" "-" }} {{ trimPrefix "/" $realkey }} overlay lowerdir=/volumes/{{ $src.name }}/root.squashfs/{{ trimPrefix "/" $realkey }},upperdir=/volumes/{{ $src.name }}/dockerovl-{{ $realkey | trimSuffix "/" | replace "/" "-" }}/upper,workdir=/volumes/{{ $src.name }}/dockerovl-{{ $realkey | trimSuffix "/" | replace "/" "-" }}/work,create=dir 0 0
 {{- end -}}
 {{- end -}}
 {{- end }}
